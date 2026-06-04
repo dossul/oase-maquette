@@ -244,7 +244,8 @@
             </v-col>
             <v-col cols="12" md="4">
               <v-select
-                v-model="baseJuridique.typeActe"
+                :model-value="baseJuridique.typeActe as any"
+                @update:model-value="(v: any) => baseJuridique.typeActe = v"
                 :items="TYPES_ACTE"
                 label="Type d'acte *"
                 hint="Tab. 7 — Rapport Diagnostic"
