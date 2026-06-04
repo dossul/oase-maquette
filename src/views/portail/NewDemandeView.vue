@@ -957,7 +957,7 @@ const selectedType = ref('douaniere')
 
 // Reset flow when type changes
 watch(selectedType, () => { cddiScreen.value = 0; step.value = 1 })
-const baseJuridique = ref({ famille: '', typeActe: '', reference: '' })
+const baseJuridique = ref<{ famille: string; typeActe: string; reference: string }>({ famille: '', typeActe: '', reference: '' })
 // Contexte opérationnel CI — détermine les pièces §1.1.2.3
 const ciOperationType = ref<string>('general')
 const hasAgrement     = ref<boolean>(false)
