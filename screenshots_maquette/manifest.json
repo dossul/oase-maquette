@@ -1,0 +1,754 @@
+{
+  "generatedAt": "2026-06-04T19:23:22.202Z",
+  "baseUrl": "http://127.0.0.1:4174",
+  "totalRoutes": 62,
+  "successCount": 62,
+  "failureCount": 0,
+  "captures": [
+    {
+      "name": "01_login",
+      "route": "/login",
+      "url": "http://127.0.0.1:4174/login",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/00_entree_demo",
+      "process": "par_processus/01_auth_et_entree",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\00_entree_demo\\01_login.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\01_auth_et_entree\\01_login.png"
+      ]
+    },
+    {
+      "name": "02_mfa",
+      "route": "/mfa",
+      "url": "http://127.0.0.1:4174/mfa",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/00_entree_demo",
+      "process": "par_processus/01_auth_et_entree",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\00_entree_demo\\02_mfa.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\01_auth_et_entree\\02_mfa.png"
+      ]
+    },
+    {
+      "name": "03_reset-password",
+      "route": "/reset-password",
+      "url": "http://127.0.0.1:4174/reset-password",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/00_entree_demo",
+      "process": "par_processus/01_auth_et_entree",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\00_entree_demo\\03_reset-password.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\01_auth_et_entree\\03_reset-password.png"
+      ]
+    },
+    {
+      "name": "04_activate",
+      "route": "/activate",
+      "url": "http://127.0.0.1:4174/activate",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/00_entree_demo",
+      "process": "par_processus/01_auth_et_entree",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\00_entree_demo\\04_activate.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\01_auth_et_entree\\04_activate.png"
+      ]
+    },
+    {
+      "name": "05_mobile-mvp",
+      "route": "/mobile/mvp",
+      "url": "http://127.0.0.1:4174/mobile/mvp",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/mobile_projection",
+      "process": "par_processus/12_mobile",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\mobile_projection\\05_mobile-mvp.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\12_mobile\\05_mobile-mvp.png"
+      ]
+    },
+    {
+      "name": "06_portail-dashboard",
+      "route": "/portail/dashboard",
+      "url": "http://127.0.0.1:4174/portail/dashboard",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P1_beneficiaire",
+      "process": "par_processus/02_portail_beneficiaire",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P1_beneficiaire\\06_portail-dashboard.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\02_portail_beneficiaire\\06_portail-dashboard.png"
+      ]
+    },
+    {
+      "name": "07_portail-nouvelle-demande",
+      "route": "/portail/nouvelle-demande",
+      "url": "http://127.0.0.1:4174/portail/nouvelle-demande",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P1_beneficiaire",
+      "process": "par_processus/02_portail_beneficiaire",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P1_beneficiaire\\07_portail-nouvelle-demande.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\02_portail_beneficiaire\\07_portail-nouvelle-demande.png"
+      ]
+    },
+    {
+      "name": "08_portail-demande-detail",
+      "route": "/portail/demandes/DEMO-001",
+      "url": "http://127.0.0.1:4174/portail/demandes/DEMO-001",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P1_beneficiaire",
+      "process": "par_processus/02_portail_beneficiaire",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P1_beneficiaire\\08_portail-demande-detail.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\02_portail_beneficiaire\\08_portail-demande-detail.png"
+      ]
+    },
+    {
+      "name": "09_portail-exonerations-actives",
+      "route": "/portail/exonerations-actives",
+      "url": "http://127.0.0.1:4174/portail/exonerations-actives",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P1_beneficiaire",
+      "process": "par_processus/02_portail_beneficiaire",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P1_beneficiaire\\09_portail-exonerations-actives.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\02_portail_beneficiaire\\09_portail-exonerations-actives.png"
+      ]
+    },
+    {
+      "name": "10_portail-profil",
+      "route": "/portail/profil",
+      "url": "http://127.0.0.1:4174/portail/profil",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P1_beneficiaire",
+      "process": "par_processus/02_portail_beneficiaire",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P1_beneficiaire\\10_portail-profil.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\02_portail_beneficiaire\\10_portail-profil.png"
+      ]
+    },
+    {
+      "name": "11_backoffice-dashboard",
+      "route": "/backoffice/dashboard",
+      "url": "http://127.0.0.1:4174/backoffice/dashboard",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P2_regie_financiere",
+      "process": "par_processus/03_instruction_validation_backoffice",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P2_regie_financiere\\11_backoffice-dashboard.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\03_instruction_validation_backoffice\\11_backoffice-dashboard.png"
+      ]
+    },
+    {
+      "name": "12_backoffice-dossiers",
+      "route": "/backoffice/dossiers",
+      "url": "http://127.0.0.1:4174/backoffice/dossiers",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P2_regie_financiere",
+      "process": "par_processus/03_instruction_validation_backoffice",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P2_regie_financiere\\12_backoffice-dossiers.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\03_instruction_validation_backoffice\\12_backoffice-dossiers.png"
+      ]
+    },
+    {
+      "name": "13_backoffice-instruction",
+      "route": "/backoffice/dossiers/DEMO-001/instruction",
+      "url": "http://127.0.0.1:4174/backoffice/dossiers/DEMO-001/instruction",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P2_regie_financiere",
+      "process": "par_processus/03_instruction_validation_backoffice",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P2_regie_financiere\\13_backoffice-instruction.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\03_instruction_validation_backoffice\\13_backoffice-instruction.png"
+      ]
+    },
+    {
+      "name": "14_backoffice-validation",
+      "route": "/backoffice/dossiers/DEMO-001/validation",
+      "url": "http://127.0.0.1:4174/backoffice/dossiers/DEMO-001/validation",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P2_regie_financiere",
+      "process": "par_processus/03_instruction_validation_backoffice",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P2_regie_financiere\\14_backoffice-validation.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\03_instruction_validation_backoffice\\14_backoffice-validation.png"
+      ]
+    },
+    {
+      "name": "15_backoffice-controle",
+      "route": "/backoffice/controle",
+      "url": "http://127.0.0.1:4174/backoffice/controle",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P2_regie_financiere",
+      "process": "par_processus/03_instruction_validation_backoffice",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P2_regie_financiere\\15_backoffice-controle.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\03_instruction_validation_backoffice\\15_backoffice-controle.png"
+      ]
+    },
+    {
+      "name": "16_backoffice-budget",
+      "route": "/backoffice/budget",
+      "url": "http://127.0.0.1:4174/backoffice/budget",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P2_regie_financiere",
+      "process": "par_processus/03_instruction_validation_backoffice",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P2_regie_financiere\\16_backoffice-budget.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\03_instruction_validation_backoffice\\16_backoffice-budget.png"
+      ]
+    },
+    {
+      "name": "17_workflow-ci-otr",
+      "route": "/backoffice/workflow-ci-otr",
+      "url": "http://127.0.0.1:4174/backoffice/workflow-ci-otr",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P2_regie_financiere",
+      "process": "par_processus/04_workflows_regimes",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P2_regie_financiere\\17_workflow-ci-otr.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\04_workflows_regimes\\17_workflow-ci-otr.png"
+      ]
+    },
+    {
+      "name": "18_workflow-cddi",
+      "route": "/backoffice/workflow-cddi",
+      "url": "http://127.0.0.1:4174/backoffice/workflow-cddi",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P2_regie_financiere",
+      "process": "par_processus/04_workflows_regimes",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P2_regie_financiere\\18_workflow-cddi.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\04_workflows_regimes\\18_workflow-cddi.png"
+      ]
+    },
+    {
+      "name": "19_workflow-zone-franche",
+      "route": "/backoffice/workflow-zone-franche",
+      "url": "http://127.0.0.1:4174/backoffice/workflow-zone-franche",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P2_regie_financiere",
+      "process": "par_processus/04_workflows_regimes",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P2_regie_financiere\\19_workflow-zone-franche.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\04_workflows_regimes\\19_workflow-zone-franche.png"
+      ]
+    },
+    {
+      "name": "20_workflow-code-invest",
+      "route": "/backoffice/workflow-code-invest",
+      "url": "http://127.0.0.1:4174/backoffice/workflow-code-invest",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P2_regie_financiere",
+      "process": "par_processus/04_workflows_regimes",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P2_regie_financiere\\20_workflow-code-invest.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\04_workflows_regimes\\20_workflow-code-invest.png"
+      ]
+    },
+    {
+      "name": "21_workflow-convention-miniere",
+      "route": "/backoffice/workflow-convention-miniere",
+      "url": "http://127.0.0.1:4174/backoffice/workflow-convention-miniere",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P2_regie_financiere",
+      "process": "par_processus/04_workflows_regimes",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P2_regie_financiere\\21_workflow-convention-miniere.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\04_workflows_regimes\\21_workflow-convention-miniere.png"
+      ]
+    },
+    {
+      "name": "22_agences-dashboard",
+      "route": "/agences/dashboard",
+      "url": "http://127.0.0.1:4174/agences/dashboard",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P3_agence",
+      "process": "par_processus/05_agences_conventions_engagements",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P3_agence\\22_agences-dashboard.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\05_agences_conventions_engagements\\22_agences-dashboard.png"
+      ]
+    },
+    {
+      "name": "23_agences-conventions",
+      "route": "/agences/conventions",
+      "url": "http://127.0.0.1:4174/agences/conventions",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P3_agence",
+      "process": "par_processus/05_agences_conventions_engagements",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P3_agence\\23_agences-conventions.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\05_agences_conventions_engagements\\23_agences-conventions.png"
+      ]
+    },
+    {
+      "name": "24_agences-agrements",
+      "route": "/agences/agrements",
+      "url": "http://127.0.0.1:4174/agences/agrements",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P3_agence",
+      "process": "par_processus/05_agences_conventions_engagements",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P3_agence\\24_agences-agrements.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\05_agences_conventions_engagements\\24_agences-agrements.png"
+      ]
+    },
+    {
+      "name": "25_agences-engagements",
+      "route": "/agences/engagements",
+      "url": "http://127.0.0.1:4174/agences/engagements",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P3_agence",
+      "process": "par_processus/05_agences_conventions_engagements",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P3_agence\\25_agences-engagements.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\05_agences_conventions_engagements\\25_agences-engagements.png"
+      ]
+    },
+    {
+      "name": "26_decideur-dashboard",
+      "route": "/decideur/dashboard",
+      "url": "http://127.0.0.1:4174/decideur/dashboard",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P4_decideur",
+      "process": "par_processus/06_pilotage_decideur",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P4_decideur\\26_decideur-dashboard.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\06_pilotage_decideur\\26_decideur-dashboard.png"
+      ]
+    },
+    {
+      "name": "27_decideur-analyse",
+      "route": "/decideur/analyse",
+      "url": "http://127.0.0.1:4174/decideur/analyse",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P4_decideur",
+      "process": "par_processus/06_pilotage_decideur",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P4_decideur\\27_decideur-analyse.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\06_pilotage_decideur\\27_decideur-analyse.png"
+      ]
+    },
+    {
+      "name": "28_decideur-rapport-annuel",
+      "route": "/decideur/rapport-annuel",
+      "url": "http://127.0.0.1:4174/decideur/rapport-annuel",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P4_decideur",
+      "process": "par_processus/06_pilotage_decideur",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P4_decideur\\28_decideur-rapport-annuel.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\06_pilotage_decideur\\28_decideur-rapport-annuel.png"
+      ]
+    },
+    {
+      "name": "29_decideur-simulation",
+      "route": "/decideur/simulation",
+      "url": "http://127.0.0.1:4174/decideur/simulation",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P4_decideur",
+      "process": "par_processus/06_pilotage_decideur",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P4_decideur\\29_decideur-simulation.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\06_pilotage_decideur\\29_decideur-simulation.png"
+      ]
+    },
+    {
+      "name": "30_decideur-referentiel",
+      "route": "/decideur/referentiel",
+      "url": "http://127.0.0.1:4174/decideur/referentiel",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P4_decideur",
+      "process": "par_processus/06_pilotage_decideur",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P4_decideur\\30_decideur-referentiel.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\06_pilotage_decideur\\30_decideur-referentiel.png"
+      ]
+    },
+    {
+      "name": "31_decideur-registre-central",
+      "route": "/decideur/registre-central",
+      "url": "http://127.0.0.1:4174/decideur/registre-central",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P4_decideur",
+      "process": "par_processus/06_pilotage_decideur",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P4_decideur\\31_decideur-registre-central.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\06_pilotage_decideur\\31_decideur-registre-central.png"
+      ]
+    },
+    {
+      "name": "32_tresor-dashboard",
+      "route": "/tresor/dashboard",
+      "url": "http://127.0.0.1:4174/tresor/dashboard",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P2bis_tresor_gudef",
+      "process": "par_processus/07_tresor_rapprochements_archives",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P2bis_tresor_gudef\\32_tresor-dashboard.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\07_tresor_rapprochements_archives\\32_tresor-dashboard.png"
+      ]
+    },
+    {
+      "name": "33_tresor-rapprochements",
+      "route": "/tresor/rapprochements",
+      "url": "http://127.0.0.1:4174/tresor/rapprochements",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P2bis_tresor_gudef",
+      "process": "par_processus/07_tresor_rapprochements_archives",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P2bis_tresor_gudef\\33_tresor-rapprochements.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\07_tresor_rapprochements_archives\\33_tresor-rapprochements.png"
+      ]
+    },
+    {
+      "name": "34_tresor-archives",
+      "route": "/tresor/archives",
+      "url": "http://127.0.0.1:4174/tresor/archives",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P2bis_tresor_gudef",
+      "process": "par_processus/07_tresor_rapprochements_archives",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P2bis_tresor_gudef\\34_tresor-archives.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\07_tresor_rapprochements_archives\\34_tresor-archives.png"
+      ]
+    },
+    {
+      "name": "35_ministeres-dashboard",
+      "route": "/ministeres/dashboard",
+      "url": "http://127.0.0.1:4174/ministeres/dashboard",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P3bis_ministeres_sectoriels",
+      "process": "par_processus/08_institutions_specialisees",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P3bis_ministeres_sectoriels\\35_ministeres-dashboard.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\08_institutions_specialisees\\35_ministeres-dashboard.png"
+      ]
+    },
+    {
+      "name": "36_mae-accords-siege",
+      "route": "/mae/accords-siege",
+      "url": "http://127.0.0.1:4174/mae/accords-siege",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P3ter_mae_accords_siege",
+      "process": "par_processus/08_institutions_specialisees",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P3ter_mae_accords_siege\\36_mae-accords-siege.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\08_institutions_specialisees\\36_mae-accords-siege.png"
+      ]
+    },
+    {
+      "name": "37_extractif-dashboard",
+      "route": "/extractif/dashboard",
+      "url": "http://127.0.0.1:4174/extractif/dashboard",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P3quater_extractif",
+      "process": "par_processus/08_institutions_specialisees",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P3quater_extractif\\37_extractif-dashboard.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\08_institutions_specialisees\\37_extractif-dashboard.png"
+      ]
+    },
+    {
+      "name": "38_conedef-dashboard",
+      "route": "/conedef/dashboard",
+      "url": "http://127.0.0.1:4174/conedef/dashboard",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P4bis_conedef",
+      "process": "par_processus/08_institutions_specialisees",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P4bis_conedef\\38_conedef-dashboard.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\08_institutions_specialisees\\38_conedef-dashboard.png"
+      ]
+    },
+    {
+      "name": "39_dsi-dashboard",
+      "route": "/dsi/dashboard",
+      "url": "http://127.0.0.1:4174/dsi/dashboard",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P7bis_dsi_mef",
+      "process": "par_processus/08_institutions_specialisees",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P7bis_dsi_mef\\39_dsi-dashboard.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\08_institutions_specialisees\\39_dsi-dashboard.png"
+      ]
+    },
+    {
+      "name": "40_audit-dashboard",
+      "route": "/audit/dashboard",
+      "url": "http://127.0.0.1:4174/audit/dashboard",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P5_audit",
+      "process": "par_processus/09_audit_controle",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P5_audit\\40_audit-dashboard.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\09_audit_controle\\40_audit-dashboard.png"
+      ]
+    },
+    {
+      "name": "41_audit-journal",
+      "route": "/audit/journal",
+      "url": "http://127.0.0.1:4174/audit/journal",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P5_audit",
+      "process": "par_processus/09_audit_controle",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P5_audit\\41_audit-journal.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\09_audit_controle\\41_audit-journal.png"
+      ]
+    },
+    {
+      "name": "42_audit-anomalies",
+      "route": "/audit/anomalies",
+      "url": "http://127.0.0.1:4174/audit/anomalies",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P5_audit",
+      "process": "par_processus/09_audit_controle",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P5_audit\\42_audit-anomalies.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\09_audit_controle\\42_audit-anomalies.png"
+      ]
+    },
+    {
+      "name": "43_audit-dossiers",
+      "route": "/audit/dossiers",
+      "url": "http://127.0.0.1:4174/audit/dossiers",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P5_audit",
+      "process": "par_processus/09_audit_controle",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P5_audit\\43_audit-dossiers.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\09_audit_controle\\43_audit-dossiers.png"
+      ]
+    },
+    {
+      "name": "44_audit-missions",
+      "route": "/audit/missions",
+      "url": "http://127.0.0.1:4174/audit/missions",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P5_audit",
+      "process": "par_processus/09_audit_controle",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P5_audit\\44_audit-missions.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\09_audit_controle\\44_audit-missions.png"
+      ]
+    },
+    {
+      "name": "45_opendata-home",
+      "route": "/opendata",
+      "url": "http://127.0.0.1:4174/opendata",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P6_opendata_public",
+      "process": "par_processus/10_open_data",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P6_opendata_public\\45_opendata-home.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\10_open_data\\45_opendata-home.png"
+      ]
+    },
+    {
+      "name": "46_opendata-tableaux-de-bord",
+      "route": "/opendata/tableaux-de-bord",
+      "url": "http://127.0.0.1:4174/opendata/tableaux-de-bord",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P6_opendata_public",
+      "process": "par_processus/10_open_data",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P6_opendata_public\\46_opendata-tableaux-de-bord.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\10_open_data\\46_opendata-tableaux-de-bord.png"
+      ]
+    },
+    {
+      "name": "47_opendata-datasets",
+      "route": "/opendata/datasets",
+      "url": "http://127.0.0.1:4174/opendata/datasets",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P6_opendata_public",
+      "process": "par_processus/10_open_data",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P6_opendata_public\\47_opendata-datasets.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\10_open_data\\47_opendata-datasets.png"
+      ]
+    },
+    {
+      "name": "48_opendata-rapports",
+      "route": "/opendata/rapports",
+      "url": "http://127.0.0.1:4174/opendata/rapports",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P6_opendata_public",
+      "process": "par_processus/10_open_data",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P6_opendata_public\\48_opendata-rapports.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\10_open_data\\48_opendata-rapports.png"
+      ]
+    },
+    {
+      "name": "49_admin-utilisateurs",
+      "route": "/admin/utilisateurs",
+      "url": "http://127.0.0.1:4174/admin/utilisateurs",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P7_admin",
+      "process": "par_processus/11_administration_gouvernance",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P7_admin\\49_admin-utilisateurs.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\11_administration_gouvernance\\49_admin-utilisateurs.png"
+      ]
+    },
+    {
+      "name": "50_admin-roles",
+      "route": "/admin/roles",
+      "url": "http://127.0.0.1:4174/admin/roles",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P7_admin",
+      "process": "par_processus/11_administration_gouvernance",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P7_admin\\50_admin-roles.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\11_administration_gouvernance\\50_admin-roles.png"
+      ]
+    },
+    {
+      "name": "51_admin-connecteurs",
+      "route": "/admin/connecteurs",
+      "url": "http://127.0.0.1:4174/admin/connecteurs",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P7_admin",
+      "process": "par_processus/11_administration_gouvernance",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P7_admin\\51_admin-connecteurs.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\11_administration_gouvernance\\51_admin-connecteurs.png"
+      ]
+    },
+    {
+      "name": "52_admin-workflow",
+      "route": "/admin/workflow",
+      "url": "http://127.0.0.1:4174/admin/workflow",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P7_admin",
+      "process": "par_processus/11_administration_gouvernance",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P7_admin\\52_admin-workflow.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\11_administration_gouvernance\\52_admin-workflow.png"
+      ]
+    },
+    {
+      "name": "53_admin-formulaires",
+      "route": "/admin/formulaires",
+      "url": "http://127.0.0.1:4174/admin/formulaires",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P7_admin",
+      "process": "par_processus/11_administration_gouvernance",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P7_admin\\53_admin-formulaires.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\11_administration_gouvernance\\53_admin-formulaires.png"
+      ]
+    },
+    {
+      "name": "54_admin-dictionnaire-o2",
+      "route": "/admin/dictionnaire-o2",
+      "url": "http://127.0.0.1:4174/admin/dictionnaire-o2",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P7_admin",
+      "process": "par_processus/11_administration_gouvernance",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P7_admin\\54_admin-dictionnaire-o2.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\11_administration_gouvernance\\54_admin-dictionnaire-o2.png"
+      ]
+    },
+    {
+      "name": "55_admin-gouvernance-donnees",
+      "route": "/admin/gouvernance-donnees",
+      "url": "http://127.0.0.1:4174/admin/gouvernance-donnees",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P7_admin",
+      "process": "par_processus/11_administration_gouvernance",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P7_admin\\55_admin-gouvernance-donnees.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\11_administration_gouvernance\\55_admin-gouvernance-donnees.png"
+      ]
+    },
+    {
+      "name": "56_admin-requetes-dynamiques",
+      "route": "/admin/requetes-dynamiques",
+      "url": "http://127.0.0.1:4174/admin/requetes-dynamiques",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P7_admin",
+      "process": "par_processus/11_administration_gouvernance",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P7_admin\\56_admin-requetes-dynamiques.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\11_administration_gouvernance\\56_admin-requetes-dynamiques.png"
+      ]
+    },
+    {
+      "name": "57_admin-ged",
+      "route": "/admin/ged",
+      "url": "http://127.0.0.1:4174/admin/ged",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P7_admin",
+      "process": "par_processus/11_administration_gouvernance",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P7_admin\\57_admin-ged.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\11_administration_gouvernance\\57_admin-ged.png"
+      ]
+    },
+    {
+      "name": "58_admin-publication-open-data",
+      "route": "/admin/publication-open-data",
+      "url": "http://127.0.0.1:4174/admin/publication-open-data",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P7_admin",
+      "process": "par_processus/11_administration_gouvernance",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P7_admin\\58_admin-publication-open-data.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\11_administration_gouvernance\\58_admin-publication-open-data.png"
+      ]
+    },
+    {
+      "name": "59_admin-regles",
+      "route": "/admin/regles",
+      "url": "http://127.0.0.1:4174/admin/regles",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P7_admin",
+      "process": "par_processus/11_administration_gouvernance",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P7_admin\\59_admin-regles.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\11_administration_gouvernance\\59_admin-regles.png"
+      ]
+    },
+    {
+      "name": "60_admin-parametres",
+      "route": "/admin/parametres",
+      "url": "http://127.0.0.1:4174/admin/parametres",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P7_admin",
+      "process": "par_processus/11_administration_gouvernance",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P7_admin\\60_admin-parametres.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\11_administration_gouvernance\\60_admin-parametres.png"
+      ]
+    },
+    {
+      "name": "61_admin-monitoring",
+      "route": "/admin/monitoring",
+      "url": "http://127.0.0.1:4174/admin/monitoring",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/P7_admin",
+      "process": "par_processus/11_administration_gouvernance",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P7_admin\\61_admin-monitoring.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\11_administration_gouvernance\\61_admin-monitoring.png"
+      ]
+    },
+    {
+      "name": "62_notifications",
+      "route": "/notifications",
+      "url": "http://127.0.0.1:4174/notifications",
+      "title": "OASE — Outil Automatisé de Suivi des Exonérations",
+      "persona": "par_persona/transversal",
+      "process": "par_processus/13_transverse_notifications",
+      "files": [
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\transversal\\62_notifications.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\13_transverse_notifications\\62_notifications.png"
+      ]
+    }
+  ],
+  "failures": []
+}

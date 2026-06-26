@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -102,6 +103,22 @@ const router = createRouter({
     // Centre de notifications (transversal)
     { path: '/notifications', component: () => import('../views/NotificationsView.vue'), meta: { layout: 'app', persona: 'Tous' } },
   ],
+})
+
+router.beforeEach((to) => {
+  const auth = useAuthStore()
+  const publicRoutes = ['login', 'reset-password', 'activate', 'opendata']
+  const isPublic = publicRoutes.some((r) => to.path.startsWith(`/${r}`)) || to.meta.layout === 'public'
+
+  if (!isPublic && !auth.isAuthenticated) {
+    return '/login'
+  }
+
+  if (to.meta.role && !auth.hasRole([to.meta.role as string])) {
+    return '/login'
+  }
+
+  return true
 })
 
 export default router
