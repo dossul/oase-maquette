@@ -114,6 +114,8 @@
       <v-row class="mb-4">
         <v-col v-for="k in kpis" :key="k.label" cols="6" md="3"><KpiCard v-bind="k"/></v-col>
       </v-row>
+      <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
+      <v-alert v-if="error" type="error" variant="tonal" class="mb-4" density="compact">{{ error }}</v-alert>
 
       <v-card rounded="lg" elevation="1">
         <v-card-text class="pa-4">
@@ -189,11 +191,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import ExportButton from '../../components/ExportButton.vue'
 import KpiCard from '../../components/KpiCard.vue'
-import { mockUtilisateurs } from '../../mock/data'
+import { listerUtilisateurs, creerUtilisateur } from '../../services/utilisateurs'
 import type { Utilisateur } from '../../types'
 
 const search = ref('')
@@ -202,7 +204,30 @@ const filterStatut = ref(null)
 const addDialog = ref(false)
 const selectedUser = ref<Utilisateur | null>(null)
 const permSaved = ref(false)
-const utilisateurs = ref([...mockUtilisateurs])
+const utilisateurs = ref<Utilisateur[]>([])
+const loading = ref(false)
+const error = ref<string | null>(null)
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    const res = await listerUtilisateurs()
+    utilisateurs.value = res.data.map((u) => ({
+      id: u.id,
+      nom: u.nom,
+      prenom: u.prenom,
+      email: u.email,
+      role: u.role as any,
+      statut: (u.statutCode || u.statut || 'actif') as 'actif' | 'inactif',
+      structure: u.institutionId || 'OTR',
+      derniereConnexion: u.derniereConnexion || '',
+    }))
+  } catch (e) {
+    error.value = 'Impossible de charger les utilisateurs'
+  } finally {
+    loading.value = false
+  }
+})
 
 const notifChannels = ref({ email: true, sms: true, whatsapp: false, inapp: true })
 
@@ -280,19 +305,30 @@ const roleColor = (r: string) => roles.find(x => x.value === r)?.color || 'secon
 const formatDate = (iso: string) => new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 const toggleStatut = () => { if (selectedUser.value) selectedUser.value.statut = selectedUser.value.statut === 'actif' ? 'inactif' : 'actif' }
 
-function createUser() {
-  utilisateurs.value.push({
-    id: String(utilisateurs.value.length + 1),
-    prenom: newUser.value.prenom,
-    nom: newUser.value.nom,
-    email: newUser.value.email,
-    role: newUser.value.role as any,
-    structure: newUser.value.structure,
-    statut: 'actif',
-    derniereConnexion: new Date().toISOString(),
-  })
-  addDialog.value = false
-  newUser.value = { prenom: '', nom: '', email: '', role: '', structure: '', notifs: ['email', 'inapp'] }
+async function createUser() {
+  try {
+    const res = await creerUtilisateur({
+      prenom: newUser.value.prenom,
+      nom: newUser.value.nom,
+      email: newUser.value.email,
+      role: newUser.value.role,
+      institutionId: newUser.value.structure,
+    })
+    utilisateurs.value.push({
+      id: res.data.id,
+      nom: res.data.nom,
+      prenom: res.data.prenom,
+      email: res.data.email,
+      role: res.data.role as any,
+      statut: (res.data.statutCode || res.data.statut || 'actif') as 'actif' | 'inactif',
+      structure: res.data.institutionId || newUser.value.structure,
+      derniereConnexion: res.data.derniereConnexion || '',
+    })
+    addDialog.value = false
+    newUser.value = { prenom: '', nom: '', email: '', role: '', structure: '', notifs: ['email', 'inapp'] }
+  } catch (e) {
+    error.value = 'Impossible de créer le compte'
+  }
 }
 
 const userActivityLogs = [
