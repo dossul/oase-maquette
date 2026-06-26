@@ -8,6 +8,8 @@
     <v-row class="mb-5">
       <v-col v-for="k in kpis" :key="k.label" cols="6" md="3"><KpiCard v-bind="k"/></v-col>
     </v-row>
+    <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
+    <v-alert v-if="error" type="error" variant="tonal" class="mb-4" density="compact">{{ error }}</v-alert>
     <v-row>
       <v-col cols="12" md="8">
         <v-card rounded="lg" elevation="1" class="mb-4">
@@ -16,7 +18,7 @@
             <v-btn size="x-small" variant="tonal" to="/audit/anomalies">Voir tout</v-btn>
           </v-card-title>
           <v-list lines="two" class="pa-0">
-            <v-list-item v-for="(a, i) in anomalies" :key="a.id" :divider="i<anomalies.length-1" class="px-4 py-3">
+            <v-list-item v-for="(a, i) in visibleAnomalies" :key="a.id" :divider="i<visibleAnomalies.length-1" class="px-4 py-3">
               <template #prepend>
                 <v-avatar :color="graviteColor(a.gravite)" size="36" rounded="lg">
                   <v-icon icon="mdi-alert-circle" color="white" size="18"/>
@@ -57,16 +59,40 @@
   </div>
 </template>
 <script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
-import { mockAnomalies } from '../../mock/data'
-const anomalies = mockAnomalies.filter(a => a.statut === 'nouvelle').slice(0, 4)
-const kpis = [
-  { label: 'Sans base juridique valide', value: 4, icon: 'mdi-scale-unbalanced', color: 'error', to: '/audit/anomalies' },
+import { listerAnomalies } from '../../services/anomalies'
+const anomalies = ref<any[]>([])
+const loading = ref(false)
+const error = ref<string | null>(null)
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    const res = await listerAnomalies()
+    anomalies.value = res.data.map((a) => ({
+      ...a,
+      dossier: a.demandeId || a.reference || a.id,
+      gravite: a.graviteCode || a.gravite || 'moyenne',
+      categorie: a.categorieCode || a.categorie || 'procedurale',
+      statut: a.statutCode || a.statut || 'nouvelle',
+      description: a.description || 'Anomalie détectée',
+    }))
+  } catch (e) {
+    error.value = 'Impossible de charger les anomalies'
+  } finally {
+    loading.value = false
+  }
+})
+
+const visibleAnomalies = computed(() => anomalies.value.filter(a => a.statut === 'nouvelle').slice(0, 4))
+const kpis = computed(() => [
+  { label: 'Anomalies nouvelles', value: anomalies.value.filter(a => a.statut === 'nouvelle').length, icon: 'mdi-scale-unbalanced', color: 'error', to: '/audit/anomalies' },
   { label: 'Bénéficiaires irréguliers', value: 7, icon: 'mdi-account-alert', color: 'warning', to: '/audit/anomalies' },
   { label: 'Non notifiées SYDONIA', value: 3, icon: 'mdi-api-off', color: 'error', to: '/audit/journal' },
-  { label: 'Taux mise en œuvre recommandations', value: '68%', icon: 'mdi-check-circle', color: 'success', to: '/audit/missions' },
-]
+  { label: 'Taux mise en œuvre', value: '68%', icon: 'mdi-check-circle', color: 'success', to: '/audit/missions' },
+])
 const missionHeaders = [{ title: 'Mission', key: 'ref' }, { title: 'Institution', key: 'institution' }, { title: 'Période', key: 'periode' }, { title: 'Statut', key: 'statut' }]
 const missions = [
   { ref: 'AUDIT-IGF-2026-001', institution: 'OTR Douanes', periode: 'Jan–Mar 2026', statut: 'En cours' },
