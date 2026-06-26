@@ -18,6 +18,9 @@
       </v-col>
     </v-row>
 
+    <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
+    <v-alert v-if="error" type="error" variant="tonal" class="mb-4" density="compact">{{ error }}</v-alert>
+
     <!-- Quick filter -->
     <div class="d-flex align-center ga-2 mb-4 flex-wrap">
       <span class="text-body-2 font-weight-medium text-medium-emphasis me-1">Filtrer :</span>
@@ -86,34 +89,58 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
 import StatusChip from '../../components/StatusChip.vue'
 import AlertBanner from '../../components/AlertBanner.vue'
-import { mockDemandes, mockNotifications } from '../../mock/data'
+import { mockNotifications } from '../../mock/data'
+import { listerDemandes } from '../../services/demandes'
 import { EXO_TYPE_LABELS } from '../../types'
 import type { ExoType } from '../../types'
 
 const activeFilter = ref('all')
 const filters = [
   { label: 'Toutes', value: 'all' },
-  { label: 'Actives', value: 'approuve' },
-  { label: 'En instruction', value: 'en_cours' },
+  { label: 'Actives', value: 'accordee' },
+  { label: 'En instruction', value: 'en_instruction' },
   { label: 'Action requise', value: 'action_requise' },
-  { label: 'Archivées', value: 'expire' },
+  { label: 'Archivées', value: 'archivee' },
 ]
+
+const demandesApi = ref<any[]>([])
+const loading = ref(false)
+const error = ref<string | null>(null)
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    const res = await listerDemandes()
+    demandesApi.value = res.data.map((d) => ({
+      ...d,
+      statut: d.statutCode,
+      montantFCFA: Number(d.montantFcfa),
+      dateDepot: d.dateDepot ? new Date(d.dateDepot).toISOString() : '',
+      etapeActuelle: d.etapeActuelle || d.statutCode,
+      type: d.type || 'fiscale_tva',
+    }))
+  } catch (e) {
+    error.value = 'Impossible de charger les demandes'
+  } finally {
+    loading.value = false
+  }
+})
 
 const filteredDemandes = computed(() =>
-  activeFilter.value === 'all' ? mockDemandes : mockDemandes.filter(d => d.statut === activeFilter.value)
+  activeFilter.value === 'all' ? demandesApi.value : demandesApi.value.filter(d => d.statut === activeFilter.value)
 )
 
-const kpis = [
-  { label: 'Demandes en cours', value: mockDemandes.filter(d => d.statut === 'en_cours').length, icon: 'mdi-clock-outline', color: 'info', to: '/portail/demandes/1' },
-  { label: 'Demandes approuvées actives', value: mockDemandes.filter(d => d.statut === 'approuve').length, icon: 'mdi-check-circle', color: 'success', subtitle: '1 expire dans 30j', to: '/portail/exonerations-actives' },
-  { label: 'Actions requises', value: mockDemandes.filter(d => d.statut === 'action_requise').length, icon: 'mdi-alert-circle', color: 'warning', to: '/portail/demandes/3' },
-  { label: 'Expirées / Clôturées', value: mockDemandes.filter(d => ['expire','rejete'].includes(d.statut)).length, icon: 'mdi-archive', color: 'secondary', to: '/portail/exonerations-actives' },
-]
+const kpis = computed(() => [
+  { label: 'Demandes en cours', value: demandesApi.value.filter(d => d.statut === 'en_instruction').length, icon: 'mdi-clock-outline', color: 'info', to: '/portail/demandes/1' },
+  { label: 'Demandes approuvées actives', value: demandesApi.value.filter(d => d.statut === 'accordee').length, icon: 'mdi-check-circle', color: 'success', subtitle: '1 expire dans 30j', to: '/portail/exonerations-actives' },
+  { label: 'Actions requises', value: demandesApi.value.filter(d => d.statut === 'action_requise').length, icon: 'mdi-alert-circle', color: 'warning', to: '/portail/demandes/3' },
+  { label: 'Expirées / Clôturées', value: demandesApi.value.filter(d => ['archivee','rejetee'].includes(d.statut)).length, icon: 'mdi-archive', color: 'secondary', to: '/portail/exonerations-actives' },
+])
 
 const recentNotifs = mockNotifications.slice(0, 4)
 
@@ -122,6 +149,6 @@ const typeIcon = (type: ExoType) => {
   return m[type]
 }
 const notifIcon = (t: string) => ({ action: 'mdi-alert-circle', info: 'mdi-information', alerte: 'mdi-bell-alert', systeme: 'mdi-cog' }[t] || 'mdi-bell')
-const formatDate = (d: string) => new Date(d).toLocaleDateString('fr-FR')
+const formatDate = (d: string) => d ? new Date(d).toLocaleDateString('fr-FR') : '-'
 const formatMontant = (v: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF', maximumFractionDigits: 0 }).format(v)
 </script>
