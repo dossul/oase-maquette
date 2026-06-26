@@ -9,6 +9,7 @@ export interface Demande {
   dateDepot: Date | null
   etapeActuelle: string | null
   type: string
+  impotConcerne?: string | null
 }
 
 export function listerDemandes(): Promise<{ data: Demande[] }> {

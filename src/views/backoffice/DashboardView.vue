@@ -8,6 +8,8 @@
     <v-row class="mb-5">
       <v-col v-for="k in kpis" :key="k.label" cols="6" md="3"><KpiCard v-bind="k" /></v-col>
     </v-row>
+    <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
+    <v-alert v-if="error" type="error" variant="tonal" class="mb-4" density="compact">{{ error }}</v-alert>
     <!-- New assignment notification alert -->
     <v-alert
       v-if="showNewAlert"
@@ -85,22 +87,43 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
 import AlertBanner from '../../components/AlertBanner.vue'
+import { listerDemandes } from '../../services/demandes'
 const showNewAlert = ref(true)
-const kpis = [
-  { label: 'En attente d\'instruction', value: 7, icon: 'mdi-inbox', color: 'info', trend: -2, to: '/backoffice/dossiers' },
-  { label: 'En retard réglementaire', value: 2, icon: 'mdi-alert', color: 'error', to: '/backoffice/dossiers' },
-  { label: 'Traités ce mois', value: 23, icon: 'mdi-check-circle', color: 'success', trend: 5, to: '/backoffice/dossiers' },
-  { label: 'Alertes moteur règles', value: 4, icon: 'mdi-cog-play', color: 'warning', to: '/backoffice/controle' },
-]
-const queue = [
-  { id: '1', reference: 'OASE-2026-0042', beneficiaire: 'TOGO STEEL SARL', type: 'Douanière', date: '15/03/2026', delai: '8j restants', priorite: 'normale', retard: false },
-  { id: '8', reference: 'OASE-2026-0041', beneficiaire: 'HOPITAL SAINT-LUC ONG', type: 'TVA', date: '28/03/2026', delai: '12j restants', priorite: 'normale', retard: false },
-  { id: '3', reference: 'OASE-2026-0029', beneficiaire: 'BATI-TOGO SA', type: 'IS', date: '01/03/2026', delai: '-3j (retard)', priorite: 'haute', retard: true },
-]
+const demandes = ref<any[]>([])
+const loading = ref(false)
+const error = ref<string | null>(null)
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    const res = await listerDemandes()
+    demandes.value = res.data.map((d) => ({
+      ...d,
+      reference: d.reference || d.id,
+      type: d.impotConcerne || d.type || 'TVA',
+      date: d.dateDepot ? new Date(d.dateDepot).toLocaleDateString('fr-FR') : '-',
+      delai: '15j',
+      priorite: 'normale',
+      retard: false,
+    }))
+  } catch (e) {
+    error.value = 'Impossible de charger la file de traitement'
+  } finally {
+    loading.value = false
+  }
+})
+
+const kpis = computed(() => [
+  { label: 'En attente d\'instruction', value: demandes.value.filter(d => d.statutCode === 'en_instruction').length, icon: 'mdi-inbox', color: 'info', to: '/backoffice/dossiers' },
+  { label: 'En retard réglementaire', value: 0, icon: 'mdi-alert', color: 'error', to: '/backoffice/dossiers' },
+  { label: 'Traités ce mois', value: demandes.value.filter(d => d.statutCode === 'accordee').length, icon: 'mdi-check-circle', color: 'success', to: '/backoffice/dossiers' },
+  { label: 'Alertes moteur règles', value: 0, icon: 'mdi-cog-play', color: 'warning', to: '/backoffice/controle' },
+])
+const queue = computed(() => demandes.value.slice(0, 6))
 const alertes = [
   { id: 1, icon: 'mdi-alert-circle', texte: 'LOMÉ LOGISTICS SA — Quota dépassé 340%', date: '18/04/2026', color: 'error' },
   { id: 2, icon: 'mdi-calendar-alert', texte: 'OASE-2025-0098 expire dans 28 jours', date: '26/04/2026', color: 'warning' },
