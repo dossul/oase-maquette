@@ -4,6 +4,8 @@
     <v-row class="mb-5">
       <v-col v-for="k in kpis" :key="k.label" cols="6" md="3"><KpiCard v-bind="k" /></v-col>
     </v-row>
+    <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
+    <v-alert v-if="error" type="error" variant="tonal" class="mb-4" density="compact">{{ error }}</v-alert>
     <AlertBanner type="warning" title="3 notifications OTR non transmises" text="Des conventions actives n'ont pas encore été notifiées à l'OTR." />
     <v-row>
       <v-col cols="12" md="8">
@@ -50,16 +52,37 @@
   </div>
 </template>
 <script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
 import AlertBanner from '../../components/AlertBanner.vue'
-import { mockConventions } from '../../mock/data'
-const conventions = mockConventions.slice(0,3)
-const kpis = [
-  { label: 'Conventions actives', value: 12, icon: 'mdi-file-certificate', color: 'success', trend: 2, to: '/agences/conventions' },
-  { label: 'Échéances < 90j', value: 3, icon: 'mdi-calendar-alert', color: 'warning', to: '/agences/conventions' },
-  { label: 'Agréments en instruction', value: 5, icon: 'mdi-clipboard-text', color: 'info', to: '/agences/agrements' },
-  { label: 'Défauts d\'engagement', value: 2, icon: 'mdi-account-alert', color: 'error', to: '/agences/engagements' },
-]
-const formatDate = (d: string) => new Date(d).toLocaleDateString('fr-FR')
+import { listerConventions } from '../../services/conventions'
+const conventions = ref<any[]>([])
+const loading = ref(false)
+const error = ref<string | null>(null)
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    const res = await listerConventions()
+    conventions.value = res.data.map((c) => ({
+      ...c,
+      reference: c.reference || c.id,
+      statut: c.statut || 'active',
+      dateFin: c.dateFin || c.echeance || new Date().toISOString(),
+    }))
+  } catch (e) {
+    error.value = 'Impossible de charger les conventions'
+  } finally {
+    loading.value = false
+  }
+})
+
+const kpis = computed(() => [
+  { label: 'Conventions actives', value: conventions.value.filter(c => c.statut === 'active').length, icon: 'mdi-file-certificate', color: 'success', trend: 2, to: '/agences/conventions' },
+  { label: 'Échéances < 90j', value: conventions.value.filter(c => c.statut === 'active').slice(0, 3).length, icon: 'mdi-calendar-alert', color: 'warning', to: '/agences/conventions' },
+  { label: 'Agréments en instruction', value: 0, icon: 'mdi-clipboard-text', color: 'info', to: '/agences/agrements' },
+  { label: 'Défauts d\'engagement', value: 0, icon: 'mdi-account-alert', color: 'error', to: '/agences/engagements' },
+])
+const formatDate = (d: string) => d ? new Date(d).toLocaleDateString('fr-FR') : '-'
 </script>

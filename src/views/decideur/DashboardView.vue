@@ -9,6 +9,8 @@
     <v-row class="mb-5">
       <v-col v-for="k in kpis" :key="k.label" cols="6" md="3"><KpiCard v-bind="k" /></v-col>
     </v-row>
+    <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
+    <v-alert v-if="error" type="error" variant="tonal" class="mb-4" density="compact">{{ error }}</v-alert>
     <v-row>
       <!-- Évolution mensuelle sparkline -->
       <v-col cols="12" md="8">
@@ -93,26 +95,55 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
 import ExportButton from '../../components/ExportButton.vue'
+import { getKpisP4, getKpisP5 } from '../../services/dashboards'
 import { mockEvolutionMensuelle, mockTopSecteurs, mockRegions } from '../../mock/data'
 const periode = ref('Année 2026')
-const kpis = [
-  { label: 'Total exonéré 2026', value: '847,3 Mds FCFA', icon: 'mdi-currency-usd', color: 'primary', trend: 12.4, subtitle: 'Depuis le 1er janv. 2026', to: '/decideur/analyse' },
-  { label: 'Exonérations actives', value: '1 248', icon: 'mdi-check-circle', color: 'success', trend: 3.2, to: '/decideur/analyse' },
-  { label: 'Dépenses fiscales / PIB', value: '4,2%', icon: 'mdi-chart-line', color: 'info', trend: -0.3, to: '/decideur/rapport-annuel' },
-  { label: 'Alertes non traitées', value: 23, icon: 'mdi-alert', color: 'warning', to: '/decideur/simulation' },
-]
+const p4 = ref<any>(null)
+const p5 = ref<any>(null)
+const loading = ref(false)
+const error = ref<string | null>(null)
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    const [res4, res5] = await Promise.all([getKpisP4(), getKpisP5()])
+    p4.value = res4.data
+    p5.value = res5.data
+  } catch (e) {
+    error.value = 'Impossible de charger les indicateurs'
+  } finally {
+    loading.value = false
+  }
+})
+
+const kpis = computed(() => [
+  { label: 'Total exonéré', value: p5.value ? new Intl.NumberFormat('fr-FR').format(p5.value.totalAccorde) + ' FCFA' : '—', icon: 'mdi-currency-usd', color: 'primary', subtitle: 'Montants accordés', to: '/decideur/analyse' },
+  { label: 'Exonérations actives', value: p4.value ? p4.value.totalDemandes : '—', icon: 'mdi-check-circle', color: 'success', to: '/decideur/analyse' },
+  { label: 'Bénéficiaires', value: p5.value ? p5.value.nombreBeneficiaires : '—', icon: 'mdi-chart-line', color: 'info', to: '/decideur/rapport-annuel' },
+  { label: 'Alertes non traitées', value: '—', icon: 'mdi-alert', color: 'warning', to: '/decideur/simulation' },
+])
 const evolutionData = mockEvolutionMensuelle.slice(0, 6)
 const topSecteurs = mockTopSecteurs.slice(0, 7)
-const repartitionType = [
-  { label: 'Droits de douane', pct: 42, color: 'primary' },
-  { label: 'TVA', pct: 28, color: 'info' },
-  { label: 'Impôt sur les sociétés', pct: 22, color: 'success' },
-  { label: 'Autres', pct: 8, color: 'secondary' },
-]
+const repartitionType = computed(() => {
+  if (!p5.value?.parImpot) {
+    return [
+      { label: 'Droits de douane', pct: 42, color: 'primary' },
+      { label: 'TVA', pct: 28, color: 'info' },
+      { label: 'Impôt sur les sociétés', pct: 22, color: 'success' },
+      { label: 'Autres', pct: 8, color: 'secondary' },
+    ]
+  }
+  const total = p5.value.totalAccorde || 1
+  return p5.value.parImpot.map((i: any) => ({
+    label: i.impotConcerne || 'Autres',
+    pct: Math.round((i._sum?.montantExonerationAccorde || 0) / total * 100),
+    color: 'primary',
+  }))
+})
 const regions = mockRegions
 const topBenef = [
   { nom: 'MINES DU NORD TOGO', type: 'Mines', montant: 234 },
