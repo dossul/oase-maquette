@@ -166,8 +166,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { api } from '../../services/api'
+import { useAuthStore } from '../../stores/auth'
 
 const router = useRouter()
+const auth = useAuthStore()
 const formRef = ref()
 const email = ref('k.abalo@otr.tg')
 const password = ref('••••••••')
@@ -183,10 +186,31 @@ const handleLogin = async () => {
   const { valid } = await formRef.value.validate()
   if (!valid) return
   loading.value = true
-  setTimeout(() => {
+  loginError.value = false
+  attempts.value++
+
+  try {
+    const res = await api<{ accessToken?: string; mfaRequired?: boolean; user?: any }>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: email.value, password: password.value }),
+    })
+
+    if (res.mfaRequired) {
+      localStorage.setItem('mfa_pending', 'true')
+      return router.push('/mfa')
+    }
+
+    if (res.accessToken && res.user) {
+      auth.setSession(res.accessToken, res.user)
+      return router.push('/')
+    }
+
+    loginError.value = true
+  } catch (e) {
+    loginError.value = true
+  } finally {
     loading.value = false
-    router.push('/mfa')
-  }, 800)
+  }
 }
 
 const metierPersonas = [
