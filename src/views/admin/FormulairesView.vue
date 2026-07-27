@@ -108,7 +108,7 @@
                 <v-card-title class="text-body-2 font-weight-semibold">Apercu du formulaire</v-card-title>
                 <v-card-text>
                   <v-row dense>
-                    <v-col cols="12" md="6"><v-text-field label="Beneficiaire / structure" density="compact" /></v-col>
+                    <v-col cols="12" md="6"><v-text-field label="Contribuable / structure" density="compact" /></v-col>
                     <v-col cols="12" md="6"><v-text-field label="NIF / reference institutionnelle" density="compact" /></v-col>
                     <v-col cols="12" md="6"><v-select :items="['Public','Interne','Restreint','Confidentiel']" label="Confidentialite" density="compact" /></v-col>
                     <v-col cols="12" md="6"><v-text-field label="Date d'effet" type="date" density="compact" /></v-col>

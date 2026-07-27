@@ -258,7 +258,7 @@
                   <li>Liberté de transfert des capitaux, dividendes et bénéfices ;</li>
                   <li>Accès prioritaire aux infrastructures communes de la zone.</li>
                 </ol>
-                <div style="font-weight:700;font-size:12px;margin:20px 0 12px;color:#2774AE">Article 3 — ENGAGEMENTS DU BÉNÉFICIAIRE</div>
+                <div style="font-weight:700;font-size:12px;margin:20px 0 12px;color:#2774AE">Article 3 — ENGAGEMENTS DU CONTRIBUABLE</div>
                 <ol style="font-size:11px;line-height:2;padding-left:18px">
                   <li>Réaliser un investissement d'au moins <strong>{{ selected?.montantInvest ? Number(selected.montantInvest).toLocaleString('fr-FR') + ' FCFA' : '[montant à préciser]' }}</strong> dans les 24 mois suivant la signature ;</li>
                   <li>Créer au moins <strong>{{ selected?.emplois }} emplois directs</strong> dont 60% de ressortissants togolais ;</li>
@@ -427,7 +427,7 @@ const o2Rows = computed(() => {
   if (!selected.value) return []
   return [
     { label: 'id_mesure / id_decision', value: `AGR-${selected.value.entreprise.replace(/\s+/g, '-')} / ATT-AG-2026-01` },
-    { label: 'beneficiaire / regime', value: `${selected.value.entreprise} / ${regimeLabel(selected.value.regime)}` },
+    { label: 'contribuable / regime', value: `${selected.value.entreprise} / ${regimeLabel(selected.value.regime)}` },
     { label: 'code additionnel / zone', value: `${selected.value.regime}-2026-01 / ${zoneFullLabel(selected.value.localisation)}` },
     { label: 'montant brut / investissement', value: `${Number(selected.value.montantInvest || 0).toLocaleString('fr-FR')} FCFA` },
     { label: 'emplois / duree', value: `${selected.value.emplois.toLocaleString('fr-FR')} / ${selected.value.dureeConvention} ans` },

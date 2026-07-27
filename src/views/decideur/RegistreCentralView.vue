@@ -32,7 +32,7 @@
           <v-col cols="12" md="4">
             <v-text-field
               v-model="search"
-              label="Recherche mesure, beneficiaire, texte, reference..."
+              label="Recherche mesure, contribuable, texte, reference..."
               prepend-inner-icon="mdi-magnify"
               hide-details
               clearable
@@ -94,7 +94,7 @@
         <v-card-title class="pa-5 d-flex align-center justify-space-between">
           <div>
             <div class="text-h6">{{ selected.idMesure }}</div>
-            <div class="text-body-2 text-medium-emphasis">{{ selected.beneficiaire }} — {{ selected.baseJuridique }}</div>
+            <div class="text-body-2 text-medium-emphasis">{{ selected.contribuable }} — {{ selected.baseJuridique }}</div>
           </div>
           <div class="d-flex flex-wrap ga-2 justify-end">
             <v-chip :color="confidentialiteColor(selected.confidentialite)" size="small" variant="outlined">
@@ -181,7 +181,7 @@
                   <div class="mb-2"><strong>Empreinte :</strong> 8f1c...a7d9</div>
                   <div class="mb-2"><strong>Derniere consultation :</strong> 01/06/2026 22:41</div>
                   <div class="mb-2"><strong>Profils autorises :</strong> UPF, DGBF, organe habilite</div>
-                  <div><strong>Champs masques en diffusion publique :</strong> beneficiaire nominal, reference acte, pieces probantes</div>
+                  <div><strong>Champs masques en diffusion publique :</strong> contribuable nominal, reference acte, pieces probantes</div>
                 </v-card-text>
               </v-card>
 
@@ -223,7 +223,7 @@ import KpiCard from '../../components/KpiCard.vue'
 type RegistreItem = {
   idMesure: string
   articlesConcernes: string
-  beneficiaire: string
+  contribuable: string
   nif: string
   regime: string
   baseJuridique: string
@@ -273,7 +273,7 @@ const statuts = ['Active', 'Expiree', 'Suspendue', 'Archivee']
 
 const headers = [
   { title: 'Mesure', key: 'idMesure' },
-  { title: 'Beneficiaire', key: 'beneficiaire' },
+  { title: 'Contribuable', key: 'contribuable' },
   { title: 'Regime', key: 'regime' },
   { title: 'Base juridique', key: 'baseJuridique' },
   { title: 'Systeme source', key: 'systemeSource' },
@@ -288,7 +288,7 @@ const items: RegistreItem[] = [
   {
     idMesure: 'MES-2026-00124',
     articlesConcernes: 'Art. 12, 14 et 18',
-    beneficiaire: 'Mission diplomatique Canada',
+    contribuable: 'Mission diplomatique Canada',
     nif: 'TG-DIP-2026-014',
     regime: 'Accord de siege',
     baseJuridique: 'Accord de siege 2024 + CGI 2025',
@@ -324,7 +324,7 @@ const items: RegistreItem[] = [
   {
     idMesure: 'MES-2026-00083',
     articlesConcernes: 'Art. 5, 7 et annexe ZF',
-    beneficiaire: 'LOME TEXTILE ZF SAS',
+    contribuable: 'LOME TEXTILE ZF SAS',
     nif: 'TG-LOM-2018-ZF-98',
     regime: 'Zone franche',
     baseJuridique: 'Loi zone franche + agrement SAZOF',
@@ -360,7 +360,7 @@ const items: RegistreItem[] = [
   {
     idMesure: 'MES-2025-00411',
     articlesConcernes: 'Code minier art. 33 a 41',
-    beneficiaire: 'Mines du Nord Togo',
+    contribuable: 'Mines du Nord Togo',
     nif: 'TG-MIN-2025-411',
     regime: 'Convention miniere',
     baseJuridique: 'Convention miniere + Code minier',
@@ -396,7 +396,7 @@ const items: RegistreItem[] = [
   {
     idMesure: 'MES-2024-00977',
     articlesConcernes: 'LFI 2024 art. 45',
-    beneficiaire: 'Programme logement social',
+    contribuable: 'Programme logement social',
     nif: 'TG-ETAT-2024-LS',
     regime: 'LFI / loi speciale',
     baseJuridique: 'LFI 2024 art. 45',
@@ -459,7 +459,7 @@ const formatMontant = (value: number) =>
 const o2AttributeRows = (item: RegistreItem) => [
   { label: '1. id_mesure', value: item.idMesure },
   { label: '2. id_base_juridique + articles_concernes', value: `${item.baseJuridique} / ${item.articlesConcernes}` },
-  { label: '3. id_beneficiaire + nif', value: `${item.beneficiaire} / ${item.nif}` },
+  { label: '3. id_contribuable + nif', value: `${item.contribuable} / ${item.nif}` },
   { label: '4. id_decision / numero_attestation', value: `${item.decision} / ${item.numeroAttestation}` },
   { label: '5. code_additionnel', value: item.codeAdditionnel },
   { label: '6. id_systeme_source + numero_operation_si', value: `${item.systemeSource} / ${item.numeroOperationSi}` },

@@ -3,7 +3,7 @@ import { api } from './api'
 export interface Convention {
   id: string
   reference?: string
-  beneficiaire?: string
+  contribuable?: string
   regime?: string
   dateFin?: string
   statut?: string

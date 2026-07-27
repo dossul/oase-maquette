@@ -14,7 +14,7 @@
 
         <!-- Règle fiche 34 / Alert unique combiné -->
         <v-alert v-if="schema.regleFiche34" type="error" variant="tonal" rounded="lg" density="compact" class="mb-3 text-caption">
-          <strong>Règle fiche 34 obligatoire :</strong> La facture doit indiquer la base légale, la référence de l'attestation et le NIF du bénéficiaire. Date ≤ 3 ans. Plusieurs fichiers possibles (chaque facture doit respecter cette règle).
+          <strong>Règle fiche 34 obligatoire :</strong> La facture doit indiquer la base légale, la référence de l'attestation et le NIF du contribuable. Date ≤ 3 ans. Plusieurs fichiers possibles (chaque facture doit respecter cette règle).
         </v-alert>
 
         <!-- Alert contextuelle -->
@@ -96,7 +96,7 @@
               <v-checkbox v-model="check34.refAttestation" label="La facture mentionne la référence de l'attestation" density="compact" hide-details />
             </v-col>
             <v-col cols="12" sm="6">
-              <v-checkbox v-model="check34.nifBenef" label="La facture mentionne le NIF du bénéficiaire" density="compact" hide-details />
+              <v-checkbox v-model="check34.nifBenef" label="La facture mentionne le NIF du contribuable" density="compact" hide-details />
             </v-col>
             <v-col cols="12" sm="6">
               <v-checkbox v-model="check34.dateMoins3ans" label="La facture date de moins de 3 ans" density="compact" hide-details />
@@ -152,6 +152,11 @@
           {{ validationError }}
         </v-alert>
 
+        <!-- Erreur upload API -->
+        <v-alert v-if="uploadError" type="error" variant="tonal" rounded="lg" density="compact" class="mt-3">
+          {{ uploadError }}
+        </v-alert>
+
       </v-card-text>
 
       <v-card-actions class="pa-4 pt-0">
@@ -162,6 +167,7 @@
           variant="tonal"
           prepend-icon="mdi-check"
           :disabled="!canConfirm"
+          :loading="uploading"
           @click="confirm"
         >
           Valider le document
@@ -173,6 +179,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { uploadPieceJointe } from '../services/portail'
 
 interface DocField {
   id: string; label: string; type: 'text' | 'date' | 'number' | 'select' | 'checkbox'
@@ -180,7 +187,7 @@ interface DocField {
   required?: boolean; cols?: number; md?: number
 }
 interface UploadedFile {
-  name: string; metadata: Record<string, string>
+  name: string; metadata: Record<string, string>; file?: File
 }
 interface DocSchema {
   alert?: string; alertType?: 'info' | 'warning' | 'error'
@@ -191,10 +198,10 @@ interface Doc {
   groupe: string; obligatoire?: boolean; metadata?: Record<string, string>
 }
 
-const props = defineProps<{ modelValue: boolean; doc: Doc | null }>()
+const props = defineProps<{ modelValue: boolean; doc: Doc | null; demandeId?: string }>()
 const emit  = defineEmits<{
   'update:modelValue': [v: boolean]
-  'confirmed': [doc: Doc, fileName: string, metadata: Record<string, string>, files?: UploadedFile[]]
+  'confirmed': [doc: Doc, fileName: string, metadata: Record<string, string>, files?: UploadedFile[], file?: File]
 }>()
 
 const open = computed({
@@ -204,23 +211,31 @@ const open = computed({
 
 const fileName   = ref('')
 const fileSize   = ref('')
+const fileObj    = ref<File | null>(null)
 const formData   = ref<Record<string, string>>({})
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const validationError = ref('')
+const uploading  = ref(false)
+const uploadError = ref('')
 const check34 = ref<Record<string, boolean>>({ baseLegale: false, refAttestation: false, nifBenef: false, dateMoins3ans: false })
 const uploadedFiles = ref<UploadedFile[]>([])        // ← multi-file : liste des factures déposées
 const currentFormData = ref<Record<string, string>>({}) // ← formulaire de la facture en cours
 const currentFileName = ref('')                        // ← fichier de la facture en cours
+const currentFileObj = ref<File | null>(null)          // ← File réel de la facture en cours
 
 watch(() => props.doc, () => {
   fileName.value = ''
   fileSize.value = ''
+  fileObj.value = null
   formData.value = {}
   validationError.value = ''
+  uploadError.value = ''
+  uploading.value = false
   check34.value = { baseLegale: false, refAttestation: false, nifBenef: false, dateMoins3ans: false }
   uploadedFiles.value = []
   currentFormData.value = {}
   currentFileName.value = ''
+  currentFileObj.value = null
 })
 
 // ── Schémas par document ID ─────────────────────────────────────────────────
@@ -625,15 +640,17 @@ function handleDrop(e: DragEvent) {
 }
 
 function setFile(file: File) {
-  if (file.size > 5 * 1024 * 1024) {
-    validationError.value = 'Fichier trop volumineux (max 5 Mo).'
+  if (file.size > 10 * 1024 * 1024) {
+    validationError.value = 'Fichier trop volumineux (max 10 Mo).'
     return
   }
   validationError.value = ''
   if (schema.value.multiFile) {
     currentFileName.value = file.name
+    currentFileObj.value = file
   } else {
     fileName.value = file.name
+    fileObj.value = file
   }
   fileSize.value = (file.size / 1024).toFixed(0) + ' Ko'
 }
@@ -641,8 +658,10 @@ function setFile(file: File) {
 function clearFile() {
   if (schema.value.multiFile) {
     currentFileName.value = ''
+    currentFileObj.value = null
   } else {
     fileName.value = ''
+    fileObj.value = null
   }
   fileSize.value = ''
   if (fileInputRef.value) fileInputRef.value.value = ''
@@ -653,8 +672,10 @@ function addCurrentFile() {
   uploadedFiles.value.push({
     name: currentFileName.value,
     metadata: { ...currentFormData.value },
+    file: currentFileObj.value ?? undefined,
   })
   currentFileName.value = ''
+  currentFileObj.value = null
   currentFormData.value = {}
   fileSize.value = ''
   check34.value = { baseLegale: false, refAttestation: false, nifBenef: false, dateMoins3ans: false }
@@ -669,16 +690,37 @@ function cancel() {
   open.value = false
 }
 
-function confirm() {
-  if (!props.doc || !canConfirm.value) return
+async function confirm() {
+  if (!props.doc || !canConfirm.value || uploading.value) return
+  uploadError.value = ''
+
+  const metadata = Object.fromEntries(
+    Object.entries(formData.value).map(([k, v]) => [k, String(v)]),
+  )
+
+  // Upload réel immédiat lorsque la demande existe déjà (détail / complément).
+  if (props.demandeId) {
+    uploading.value = true
+    try {
+      if (schema.value.multiFile) {
+        for (const uf of uploadedFiles.value) {
+          if (uf.file) await uploadPieceJointe(props.demandeId, uf.file, 'premier')
+        }
+      } else if (fileObj.value) {
+        await uploadPieceJointe(props.demandeId, fileObj.value, 'premier')
+      }
+    } catch (e) {
+      uploadError.value = e instanceof Error ? e.message : "Échec de l'upload du document"
+      uploading.value = false
+      return
+    }
+    uploading.value = false
+  }
+
   if (schema.value.multiFile) {
     emit('confirmed', props.doc, `${uploadedFiles.value.length} facture(s)`, {}, uploadedFiles.value)
   } else {
-    emit('confirmed', props.doc, fileName.value, {
-      ...Object.fromEntries(
-        Object.entries(formData.value).map(([k, v]) => [k, String(v)])
-      ),
-    })
+    emit('confirmed', props.doc, fileName.value, metadata, undefined, fileObj.value ?? undefined)
   }
   open.value = false
 }

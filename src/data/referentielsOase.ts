@@ -41,8 +41,8 @@ export const NATURES_MESURE = [
   'Taux réduit',
 ] as const
 
-// ── Tableau 11 : 7 types de bénéficiaires ─────────────────────────────────
-export const TYPES_BENEFICIAIRE = [
+// ── Tableau 11 : 7 types de contribuables ─────────────────────────────────
+export const TYPES_CONTRIBUABLE = [
   'Coopérative',
   'Entreprise',
   'Ménages',

@@ -5,9 +5,12 @@
         <ExportButton label="Exporter" size="small" @export="() => {}" />
       </template>
     </PageHeader>
-    <v-alert type="warning" variant="tonal" rounded="lg" density="compact" class="mb-5" prepend-icon="mdi-alarm">
-      <strong>1 exonération</strong> expire dans moins de 30 jours. Pensez à demander un renouvellement.
+    <v-alert v-if="expiringSoonCount > 0" type="warning" variant="tonal" rounded="lg" density="compact" class="mb-5" prepend-icon="mdi-alarm">
+      <strong>{{ expiringSoonCount }} exonération{{ expiringSoonCount > 1 ? 's' : '' }}</strong> expire{{ expiringSoonCount > 1 ? 'nt' : '' }} dans moins de 30 jours. Pensez à demander un renouvellement.
     </v-alert>
+    <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
+    <v-alert v-if="loadError" type="error" variant="tonal" density="compact" rounded="lg" class="mb-4">{{ loadError }}</v-alert>
+    <v-alert v-if="downloadError" type="error" variant="tonal" density="compact" rounded="lg" class="mb-4">{{ downloadError }}</v-alert>
     <v-card rounded="lg" elevation="1" class="mb-6">
       <div class="pa-4 pb-2 d-flex align-center ga-3">
         <span class="text-body-1 font-weight-semibold">Liste des exonérations</span>
@@ -49,6 +52,7 @@
         </template>
         <template #item.actions="{ item }">
           <v-btn color="primary" size="x-small" variant="tonal" :to="`/portail/demandes/${item.id}`" class="me-1">Voir</v-btn>
+          <v-btn color="success" size="x-small" variant="tonal" prepend-icon="mdi-download" class="me-1" :loading="downloadingId === item.id" @click="downloadAttestation(item.id)">Télécharger l'attestation</v-btn>
           <v-btn v-if="isExpiringSoon(item.dateEcheance)" color="warning" size="x-small" variant="tonal">Renouveler</v-btn>
         </template>
       </v-data-table>
@@ -148,19 +152,74 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import ExportButton from '../../components/ExportButton.vue'
-import { mockDemandes } from '../../mock/data'
-import { EXO_TYPE_LABELS } from '../../types'
+import { EXO_TYPE_LABELS, type ExoType } from '../../types'
+import { listerMesDemandes, listerBasesJuridiques, telechargerAttestation } from '../../services/portail'
 
-const actives = mockDemandes.filter(d => d.statut === 'approuve')
+interface ExoActive {
+  id: string
+  reference: string
+  type: ExoType
+  secteur: string
+  dateDepot: string | null
+  dateEcheance: string | null
+  quotaConsomme?: number
+  quotaTotal?: number
+}
+
+const actives = ref<ExoActive[]>([])
+const loading = ref(false)
+const loadError = ref('')
+const downloadError = ref('')
+const downloadingId = ref<string | null>(null)
+
+function impotVersType(impot?: string | null): ExoType {
+  if (impot === 'TVA') return 'fiscale_tva'
+  if (impot === 'IS') return 'fiscale_is'
+  return 'douaniere'
+}
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    const [demandes, bases] = await Promise.all([
+      listerMesDemandes('approuve'),
+      listerBasesJuridiques().catch(() => []),
+    ])
+    actives.value = demandes.map(d => ({
+      id: d.id,
+      reference: d.reference,
+      type: impotVersType(bases.find(b => b.id === d.baseJuridiqueVersionId)?.impotConcerne),
+      secteur: d.secteur || '—',
+      dateDepot: d.dateDepot,
+      dateEcheance: d.dateEcheance,
+    }))
+  } catch {
+    loadError.value = 'Impossible de charger les exonérations actives'
+  } finally {
+    loading.value = false
+  }
+})
+
+async function downloadAttestation(id: string) {
+  downloadError.value = ''
+  downloadingId.value = id
+  try {
+    await telechargerAttestation(id)
+  } catch (e) {
+    downloadError.value = e instanceof Error ? e.message : "Échec du téléchargement de l'attestation"
+  } finally {
+    downloadingId.value = null
+  }
+}
 
 const regimeFilter = ref<string | null>(null)
 const regimeOptions = Object.entries(EXO_TYPE_LABELS).map(([value, title]) => ({ value, title }))
 
 const filteredActives = computed(() =>
-  regimeFilter.value ? actives.filter(d => d.type === regimeFilter.value) : actives
+  regimeFilter.value ? actives.value.filter(d => d.type === regimeFilter.value) : actives.value
 )
 
 const headers = [
@@ -175,9 +234,9 @@ const headers = [
 
 const formatDate = (d: string) => new Date(d).toLocaleDateString('fr-FR')
 const formatMontant = (v: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(v) + ' FCFA'
-const isExpiringSoon = (d?: string) => { if (!d) return false; const diff = new Date(d).getTime() - Date.now(); return diff > 0 && diff < 30*24*3600*1000 }
+const isExpiringSoon = (d?: string | null) => { if (!d) return false; const diff = new Date(d).getTime() - Date.now(); return diff > 0 && diff < 30*24*3600*1000 }
 
-const getPeriode = (item: typeof actives[number]) => {
+const getPeriode = (item: ExoActive) => {
   if (!item.dateEcheance) return '—'
   const annee = new Date(item.dateEcheance).getFullYear()
   return `Exercice ${annee}`
@@ -199,34 +258,34 @@ const horizonFilter = ref<'1an' | '2ans' | '5ans' | 'tout'>('tout')
 const HORIZON_DAYS: Record<string, number> = { '1an': 365, '2ans': 730, '5ans': 1825, 'tout': Infinity }
 
 // ── Échéances helpers ───────────────────────────────────────────────────────
-const daysRemaining = (d?: string) => {
+const daysRemaining = (d?: string | null) => {
   if (!d) return 0
   return Math.max(0, Math.ceil((new Date(d).getTime() - Date.now()) / (24 * 3600 * 1000)))
 }
 
 // % restant sur une durée max de 365j (pour la barre)
-const daysRemainingPct = (d?: string) => {
+const daysRemainingPct = (d?: string | null) => {
   if (!d) return 0
   return Math.min(100, (daysRemaining(d) / 365) * 100)
 }
 
-const echeanceColor = (d?: string) => {
+const echeanceColor = (d?: string | null) => {
   const days = daysRemaining(d)
   if (days < 30)  return 'error'
   if (days < 90)  return 'warning'
   return undefined
 }
 
-const echeanceProgressColor = (d?: string) => {
+const echeanceProgressColor = (d?: string | null) => {
   const days = daysRemaining(d)
   if (days < 30)  return 'error'
   if (days < 90)  return 'warning'
   return 'success'
 }
 
-const isExpiring90 = (d?: string) => { if (!d) return false; return daysRemaining(d) < 90 }
+const isExpiring90 = (d?: string | null) => { if (!d) return false; return daysRemaining(d) < 90 }
 
-const expiringSoonCount = computed(() => actives.filter(d => isExpiringSoon(d.dateEcheance)).length)
+const expiringSoonCount = computed(() => actives.value.filter(d => isExpiringSoon(d.dateEcheance)).length)
 
 // Trier et filtrer par horizon : expirant bientôt en premier
 const sortedActives = computed(() => {

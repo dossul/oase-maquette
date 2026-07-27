@@ -123,7 +123,7 @@ const referentielsNormes = [
   { nom: 'R_TYPE_ACTE', description: 'Loi, décret, convention, accord, arrêté, agrément', pointFocal: 'UPF', couverture: 93, statut: 'A jour' },
   { nom: 'R_NATURE_MESURE', description: 'Exonération, franchise, report, suspension, taux réduit', pointFocal: 'UPF', couverture: 87, statut: 'A jour' },
   { nom: 'R_IMPOT_TAXE', description: 'TVA, IS, IRPP, DD, RS, TPI, ADA, DAPP, TSR', pointFocal: 'OTR', couverture: 89, statut: 'A jour' },
-  { nom: 'R_TYPE_BENEFICIAIRE', description: 'Entreprise, ONG, OI, corps diplomatique, projet public', pointFocal: 'MEF / MAE', couverture: 84, statut: 'A jour' },
+  { nom: 'R_TYPE_CONTRIBUABLE', description: 'Entreprise, ONG, OI, corps diplomatique, projet public', pointFocal: 'MEF / MAE', couverture: 84, statut: 'A jour' },
   { nom: 'R_SECTEUR_BRANCHE', description: 'Secteur et branche NES', pointFocal: 'INSEED', couverture: 69, statut: 'A revoir' },
   { nom: 'R_OBJECTIF_POLITIQUE', description: 'Objectif fiscal, économique, social, sectoriel, ODD', pointFocal: 'UPF', couverture: 74, statut: 'A revoir' },
   { nom: 'R_ORGANE', description: 'Organe attributaire, gestionnaire et de contrôle', pointFocal: 'MEF / OTR', couverture: 88, statut: 'A jour' },

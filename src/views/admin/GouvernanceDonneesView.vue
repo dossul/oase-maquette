@@ -195,7 +195,7 @@ const referentiels = [
   { nom: 'R_TYPE_ACTE', description: 'Loi, decret, convention, accord, arrete, agrement', pointFocal: 'UPF', revue: '28/05/2026', couverture: 93, statut: 'A jour' },
   { nom: 'R_NATURE_MESURE', description: 'Exoneration, franchise, taux reduit, report, credit, suspension', pointFocal: 'UPF', revue: '26/05/2026', couverture: 86, statut: 'A jour' },
   { nom: 'R_IMPOT_TAXE', description: 'TVA, IS, IRPP, DD, RS, TPI, ADA, DAPP, TSR et autres taxes', pointFocal: 'OTR', revue: '30/05/2026', couverture: 89, statut: 'A jour' },
-  { nom: 'R_TYPE_BENEFICIAIRE', description: 'Entreprise, ONG, organisme international, diplomatique, projet public', pointFocal: 'MEF / MAE', revue: '27/05/2026', couverture: 83, statut: 'A jour' },
+  { nom: 'R_TYPE_CONTRIBUABLE', description: 'Entreprise, ONG, organisme international, diplomatique, projet public', pointFocal: 'MEF / MAE', revue: '27/05/2026', couverture: 83, statut: 'A jour' },
   { nom: 'R_SECTEUR_BRANCHE', description: 'Nomenclature sectorielle et branche NES', pointFocal: 'INSEED', revue: '15/05/2026', couverture: 69, statut: 'A revoir' },
   { nom: 'R_ORGANE', description: 'Structures attributrices, gestionnaires et de controle', pointFocal: 'MEF / OTR', revue: '31/05/2026', couverture: 88, statut: 'A jour' },
   { nom: 'R_PORTEE_DUREE', description: 'Temporaire, permanente, renouvelable, par phase', pointFocal: 'UPF', revue: '23/05/2026', couverture: 77, statut: 'A revoir' },

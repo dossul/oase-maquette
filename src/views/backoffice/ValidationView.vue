@@ -7,7 +7,7 @@
           <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Récapitulatif du dossier (lecture seule)</v-card-title>
           <v-card-text class="pa-4">
             <v-row dense>
-              <v-col cols="6"><div class="label-micro text-medium-emphasis">Bénéficiaire</div><div class="font-weight-semibold text-body-2">{{ demande.beneficiaire }}</div></v-col>
+              <v-col cols="6"><div class="label-micro text-medium-emphasis">Contribuable</div><div class="font-weight-semibold text-body-2">{{ demande.contribuable }}</div></v-col>
               <v-col cols="6"><div class="label-micro text-medium-emphasis">NIF</div><div class="text-body-2">{{ demande.nif }}</div></v-col>
               <v-col cols="6"><div class="label-micro text-medium-emphasis">Type</div><div class="text-body-2">{{ demande.type }}</div></v-col>
               <v-col cols="6"><div class="label-micro text-medium-emphasis">Montant accordé</div><div class="font-weight-bold text-primary">{{ formatMontant(demande.montantFCFA) }}</div></v-col>
@@ -83,7 +83,7 @@
                   <div style="font-size:0.7rem;color:#6B7280">N° OASE-2026-ATT-0039</div>
                 </div>
                 <div style="font-size:0.72rem;color:#374151;line-height:1.6">
-                  Le Ministère de l'Économie et des Finances, vu les dispositions de <strong>{{ demande.baseJuridique }}</strong>, accorde à <strong>{{ demande.beneficiaire }}</strong> (NIF: {{ demande.nif }}) une exonération fiscale d'un montant de <strong>{{ formatMontant(demande.montantFCFA) }}</strong> pour une durée de <strong>12 mois</strong> à compter du <strong>27/04/2026</strong>.
+                  Le Ministère de l'Économie et des Finances, vu les dispositions de <strong>{{ demande.baseJuridique }}</strong>, accorde à <strong>{{ demande.contribuable }}</strong> (NIF: {{ demande.nif }}) une exonération fiscale d'un montant de <strong>{{ formatMontant(demande.montantFCFA) }}</strong> pour une durée de <strong>12 mois</strong> à compter du <strong>27/04/2026</strong>.
                 </div>
                 <div class="mt-4 text-end">
                   <div style="font-size:0.65rem;color:#6B7280">Signature électronique</div>
@@ -115,12 +115,13 @@
             </v-alert>
             <v-text-field v-model="signataire" label="Signataire" readonly prepend-inner-icon="mdi-account-tie" class="mb-3" />
             <v-text-field v-model="fonction" label="Qualité / Fonction" readonly prepend-inner-icon="mdi-briefcase" class="mb-3" />
-            <v-text-field label="Code PIN de signature" type="password" prepend-inner-icon="mdi-lock" class="mb-4" />
+            <v-text-field v-model="pin" label="Code PIN de signature" type="password" inputmode="numeric" maxlength="6" prepend-inner-icon="mdi-lock" class="mb-4" />
+            <v-alert v-if="signError" type="error" variant="tonal" rounded="lg" density="compact" class="mb-4">{{ signError }}</v-alert>
             <v-btn color="success" block size="large" rounded="lg" prepend-icon="mdi-file-sign" :loading="signing" @click="sign">
-              Signer et envoyer au bénéficiaire
+              Signer et envoyer au contribuable
             </v-btn>
             <v-alert v-if="signed" type="success" variant="tonal" rounded="lg" class="mt-4">
-              Document signé et envoyé ! Le bénéficiaire a été notifié par e-mail et SMS. Document archivé dans le registre OASE.
+              Document signé et envoyé ! Le contribuable a été notifié par e-mail et SMS. Document archivé dans le registre OASE.
             </v-alert>
           </v-card-text>
         </v-card>
@@ -168,29 +169,63 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import PageHeader from '../../components/PageHeader.vue'
-import { mockDemandes } from '../../mock/data'
+import { useAuthStore } from '../../stores/auth'
+import { ApiError } from '../../services/api'
+import { detailDemande, verifierPin, listerEtapes, validerEtape, etapeAValider } from '../../services/backoffice'
+
 const route = useRoute()
-const demande = mockDemandes.find(d => d.id === route.params.id) || mockDemandes[1]
+const auth = useAuthStore()
+const demandeId = String(route.params.id)
+
+/** Récapitulatif alimenté par l'API réelle (GET /demandes/:id). */
+const demande = ref({
+  reference: '…',
+  contribuable: '…',
+  nif: '—',
+  type: '—',
+  montantFCFA: 0,
+  baseJuridique: '—',
+})
 const typeActe = ref('attestation')
 const regimeTab = ref('invest')
-const signataire = ref('Directeur Général OTR Douanes')
-const fonction = ref('Directeur Général')
+const signataire = ref('')
+const fonction = ref('Agent instructeur OASE')
+const pin = ref('')
 const signing = ref(false)
 const signed = ref(false)
+const signError = ref<string | null>(null)
 const formatMontant = (v: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF', maximumFractionDigits: 0 }).format(v)
-const o2Rows = [
-  { label: 'id_mesure / id_decision', value: `${demande.reference} / OASE-2026-ATT-0039` },
-  { label: 'base juridique / articles', value: `${demande.baseJuridique} / art. 14 et 18` },
-  { label: 'id_beneficiaire / nif', value: `${demande.beneficiaire} / ${demande.nif}` },
-  { label: 'code additionnel / operation SI', value: 'DOU-INV-2026-05 / SW-2026-00483' },
-  { label: 'montant brut taxable / montant exonere', value: `148 000 000 FCFA / ${formatMontant(demande.montantFCFA)}` },
-  { label: 'taux applique / organe attribution', value: '18 % / OTR' },
-  { label: 'organe gestion / objectif ODD', value: 'DGBF / investissement ODD9' },
-  { label: 'piece PDF / hash / horodatage', value: 'attestation_oase.pdf / 8f1c...a7d9 / 01/06/2026 23:32' },
-]
+
+onMounted(async () => {
+  if (auth.user) signataire.value = `${auth.user.prenom} ${auth.user.nom}`
+  try {
+    const d = await detailDemande(demandeId)
+    demande.value = {
+      reference: d.reference,
+      contribuable: d.contribuable?.raisonSociale ?? '—',
+      nif: d.contribuable?.nif ?? '—',
+      type: d.secteur ?? 'Exonération',
+      montantFCFA: Number(d.montantFcfa ?? 0),
+      baseJuridique: d.baseJuridiqueVersionId ?? '—',
+    }
+  } catch {
+    // Le récapitulatif conserve les valeurs par défaut ; la signature reste bloquée côté API.
+  }
+})
+
+const o2Rows = computed(() => [
+  { label: 'id_mesure / reference', value: demande.value.reference },
+  { label: 'base juridique (version)', value: demande.value.baseJuridique },
+  { label: 'id_contribuable / nif', value: `${demande.value.contribuable} / ${demande.value.nif}` },
+  { label: 'code additionnel / operation SI', value: '—' },
+  { label: 'montant exonere', value: formatMontant(demande.value.montantFCFA) },
+  { label: 'type d acte', value: typeActe.value },
+  { label: 'signataire', value: signataire.value || '—' },
+  { label: 'piece PDF / hash / horodatage', value: 'attestation_oase.pdf / —' },
+])
 const regimeCards = [
   {
     value: 'invest',
@@ -213,5 +248,35 @@ const regimeCards = [
     points: ['Identifier la phase recherche / exploitation', 'Rappeler la convention ratifiee', 'Rattacher le suivi a DGMG / CONEDEF'],
   },
 ]
-const sign = () => { signing.value = true; setTimeout(() => { signing.value = false; signed.value = true }, 1200) }
+
+/** Signature réelle : vérification du PIN côté backend puis validation de l'étape de workflow en attente. */
+const sign = async () => {
+  signError.value = null
+  if (!/^\d{6}$/.test(pin.value)) {
+    signError.value = 'Saisissez votre code PIN de signature à 6 chiffres.'
+    return
+  }
+  signing.value = true
+  try {
+    // 1) Vérification du PIN auprès du backend (POST /auth/verify-pin)
+    const pinOk = await verifierPin(pin.value)
+    if (!pinOk) {
+      signError.value = 'PIN de signature invalide — vérifiez votre code à 6 chiffres.'
+      return
+    }
+    // 2) Validation de l'étape de workflow en attente, s'il en existe une
+    //    (POST /workflow/etapes/:etapeId/valider avec le PIN)
+    const etapes = await listerEtapes(demandeId)
+    const etape = etapeAValider(etapes, auth.user?.role)
+    if (etape) await validerEtape(etape.id, pin.value)
+    signed.value = true
+  } catch (e) {
+    signError.value =
+      e instanceof ApiError && e.code === 'PIN_INVALIDE'
+        ? 'PIN de signature invalide — vérifiez votre code à 6 chiffres.'
+        : e instanceof Error ? e.message : 'La signature a échoué'
+  } finally {
+    signing.value = false
+  }
+}
 </script>

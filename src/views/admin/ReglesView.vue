@@ -322,7 +322,7 @@
               </template>
               <template #subtitle>
                 <span class="text-caption">
-                  Dossier: <strong>{{ j.dossier }}</strong> · {{ j.beneficiaire }} · {{ j.date }}
+                  Dossier: <strong>{{ j.dossier }}</strong> · {{ j.contribuable }} · {{ j.date }}
                 </span>
               </template>
               <template #append>
@@ -428,7 +428,7 @@
                     <div class="d-flex align-center justify-space-between flex-wrap ga-2">
                       <div>
                         <div class="text-body-2 font-weight-semibold">{{ j.regle }}</div>
-                        <div class="text-caption text-medium-emphasis">{{ j.dossier }} · {{ j.beneficiaire }}</div>
+                        <div class="text-caption text-medium-emphasis">{{ j.dossier }} · {{ j.contribuable }}</div>
                       </div>
                       <div class="d-flex ga-1 align-center">
                         <span class="text-caption text-medium-emphasis">{{ j.date }}</span>
@@ -575,10 +575,10 @@ interface Regle {
   andOr: 'ET' | 'OU'; actions: RuleActions; portee: RulePortee
   expanded: boolean; activeTab: string
 }
-interface JournalEntry { id: number; regle: string; dossier: string; beneficiaire: string; date: string; severite: string; resolu: boolean }
+interface JournalEntry { id: number; regle: string; dossier: string; contribuable: string; date: string; severite: string; resolu: boolean }
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const condFields = ['beneficiaire.dettes_sigtas', 'beneficiaire.dettes_sydonia', 'demande.montant_fcfa', 'demande.type', 'demande.duree_mois', 'demande.secteur', 'quota.utilise_pct', 'dossier.base_juridique_active', 'dossier.nb_doublons', 'dossier.date_expiration', 'agent.charge_dossiers']
+const condFields = ['contribuable.dettes_sigtas', 'contribuable.dettes_sydonia', 'demande.montant_fcfa', 'demande.type', 'demande.duree_mois', 'demande.secteur', 'quota.utilise_pct', 'dossier.base_juridique_active', 'dossier.nb_doublons', 'dossier.date_expiration', 'agent.charge_dossiers']
 const condOperators = ['>', '<', '>=', '<=', '==', '!=', 'contient', 'est vide', 'est expiré']
 const categories = ['Fiscal', 'Douanier', 'Quota', 'Juridique', 'Doublon', 'Conformité', 'Temporel']
 const typesExo = ['Exonération douanière', 'Exonération IS', 'Exonération TVA', 'Zone Franche', "Convention d'investissement"]
@@ -600,22 +600,22 @@ function mkConds(arr: Partial<CondItem>[]): CondItem[] {
 
 // ── Data ─────────────────────────────────────────────────────────────────────
 const regles = ref<Regle[]>([
-  { id: 'r1', description: 'Bénéficiaire avec dettes fiscales actives dans SIGTAS', severite: 'bloquant', categorie: 'Fiscal', declenchements: 8, active: true, andOr: 'ET', expanded: false, activeTab: 'condition', actions: { ...mkActions(), bloquer: true }, portee: { ...mkPortee(), types: [], etapes: ['Instruction','Validation'], institutions: ['OTR Impôts'] }, conditions: mkConds([{ field: 'beneficiaire.dettes_sigtas', operator: '>', value: '0' }, { field: 'demande.type', operator: '==', value: "'fiscale_is'" }]) },
+  { id: 'r1', description: 'Contribuable avec dettes fiscales actives dans SIGTAS', severite: 'bloquant', categorie: 'Fiscal', declenchements: 8, active: true, andOr: 'ET', expanded: false, activeTab: 'condition', actions: { ...mkActions(), bloquer: true }, portee: { ...mkPortee(), types: [], etapes: ['Instruction','Validation'], institutions: ['OTR Impôts'] }, conditions: mkConds([{ field: 'contribuable.dettes_sigtas', operator: '>', value: '0' }, { field: 'demande.type', operator: '==', value: "'fiscale_is'" }]) },
   { id: 'r2', description: 'Dépassement quota de plus de 200%', severite: 'bloquant', categorie: 'Quota', declenchements: 3, active: true, andOr: 'ET', expanded: false, activeTab: 'condition', actions: { ...mkActions(), bloquer: true }, portee: mkPortee(), conditions: mkConds([{ field: 'quota.utilise_pct', operator: '>=', value: '200' }]) },
   { id: 'r3', description: 'Exonération dépassant la durée légale autorisée', severite: 'avertissement', categorie: 'Temporel', declenchements: 5, active: true, andOr: 'ET', expanded: false, activeTab: 'condition', actions: mkActions(), portee: mkPortee(), conditions: mkConds([{ field: 'demande.duree_mois', operator: '>', value: '36' }]) },
-  { id: 'r4', description: 'Doublon SYDONIA/SIGTAS même bénéficiaire même base', severite: 'bloquant', categorie: 'Doublon', declenchements: 2, active: true, andOr: 'ET', expanded: false, activeTab: 'condition', actions: { ...mkActions(), bloquer: true }, portee: mkPortee(), conditions: mkConds([{ field: 'dossier.nb_doublons', operator: '>=', value: '1' }]) },
+  { id: 'r4', description: 'Doublon SYDONIA/SIGTAS même contribuable même base', severite: 'bloquant', categorie: 'Doublon', declenchements: 2, active: true, andOr: 'ET', expanded: false, activeTab: 'condition', actions: { ...mkActions(), bloquer: true }, portee: mkPortee(), conditions: mkConds([{ field: 'dossier.nb_doublons', operator: '>=', value: '1' }]) },
   { id: 'r5', description: 'Exonération expirée dans 30 jours sans renouvellement', severite: 'info', categorie: 'Temporel', declenchements: 7, active: true, andOr: 'ET', expanded: false, activeTab: 'condition', actions: mkActions(), portee: mkPortee(), conditions: mkConds([{ field: 'dossier.date_expiration', operator: 'est expiré', value: '30j' }]) },
   { id: 'r6', description: 'Base juridique marquée abrogée utilisée dans dossier actif', severite: 'avertissement', categorie: 'Juridique', declenchements: 1, active: false, andOr: 'ET', expanded: false, activeTab: 'condition', actions: mkActions(), portee: mkPortee(), conditions: mkConds([{ field: 'dossier.base_juridique_active', operator: '==', value: 'false' }]) },
-  { id: 'r7', description: 'Bénéficiaire avec dettes douanières SYDONIA non soldées', severite: 'bloquant', categorie: 'Douanier', declenchements: 4, active: true, andOr: 'ET', expanded: false, activeTab: 'condition', actions: { ...mkActions(), bloquer: true }, portee: { ...mkPortee(), institutions: ['OTR Douanes'] }, conditions: mkConds([{ field: 'beneficiaire.dettes_sydonia', operator: '>', value: '0' }]) },
+  { id: 'r7', description: 'Contribuable avec dettes douanières SYDONIA non soldées', severite: 'bloquant', categorie: 'Douanier', declenchements: 4, active: true, andOr: 'ET', expanded: false, activeTab: 'condition', actions: { ...mkActions(), bloquer: true }, portee: { ...mkPortee(), institutions: ['OTR Douanes'] }, conditions: mkConds([{ field: 'contribuable.dettes_sydonia', operator: '>', value: '0' }]) },
 ])
 
 const journal = ref<JournalEntry[]>([
-  { id: 1, regle: 'Bénéficiaire avec dettes fiscales (SIGTAS)', dossier: 'OASE-2026-0038', beneficiaire: 'TOGO STEEL SARL', date: '24/04/2026', severite: 'bloquant', resolu: false },
-  { id: 2, regle: 'Dépassement quota 340%', dossier: 'OASE-2025-0082', beneficiaire: 'AGRO-TOGO INVEST', date: '18/04/2026', severite: 'bloquant', resolu: true },
-  { id: 3, regle: 'Doublon SYDONIA/SIGTAS', dossier: 'OASE-2025-0099', beneficiaire: 'LOMÉ TRANSIT SA', date: '25/04/2026', severite: 'bloquant', resolu: false },
-  { id: 4, regle: 'Exonération expirée dans 30 jours', dossier: 'OASE-2024-0210', beneficiaire: 'API-ZF INVEST', date: '22/04/2026', severite: 'info', resolu: true },
-  { id: 5, regle: 'Durée légale dépassée', dossier: 'OASE-2023-0175', beneficiaire: 'TECHNOPOLE SA', date: '20/04/2026', severite: 'avertissement', resolu: false },
-  { id: 6, regle: 'Dettes douanières SYDONIA', dossier: 'OASE-2026-0041', beneficiaire: 'IMPORT EXPRESS', date: '19/04/2026', severite: 'bloquant', resolu: true },
+  { id: 1, regle: 'Contribuable avec dettes fiscales (SIGTAS)', dossier: 'OASE-2026-0038', contribuable: 'TOGO STEEL SARL', date: '24/04/2026', severite: 'bloquant', resolu: false },
+  { id: 2, regle: 'Dépassement quota 340%', dossier: 'OASE-2025-0082', contribuable: 'AGRO-TOGO INVEST', date: '18/04/2026', severite: 'bloquant', resolu: true },
+  { id: 3, regle: 'Doublon SYDONIA/SIGTAS', dossier: 'OASE-2025-0099', contribuable: 'LOMÉ TRANSIT SA', date: '25/04/2026', severite: 'bloquant', resolu: false },
+  { id: 4, regle: 'Exonération expirée dans 30 jours', dossier: 'OASE-2024-0210', contribuable: 'API-ZF INVEST', date: '22/04/2026', severite: 'info', resolu: true },
+  { id: 5, regle: 'Durée légale dépassée', dossier: 'OASE-2023-0175', contribuable: 'TECHNOPOLE SA', date: '20/04/2026', severite: 'avertissement', resolu: false },
+  { id: 6, regle: 'Dettes douanières SYDONIA', dossier: 'OASE-2026-0041', contribuable: 'IMPORT EXPRESS', date: '19/04/2026', severite: 'bloquant', resolu: true },
 ])
 
 const mockDossiers = [
@@ -705,10 +705,10 @@ function expandAll() { regles.value.forEach(r => r.expanded = true) }
 function collapseAll() { regles.value.forEach(r => r.expanded = false) }
 
 function addCond(regle: Regle) {
-  regle.conditions.push({ field: 'beneficiaire.dettes_sigtas', operator: '>', value: '' })
+  regle.conditions.push({ field: 'contribuable.dettes_sigtas', operator: '>', value: '' })
 }
 function addFormCond() {
-  form.conditions.push({ field: 'beneficiaire.dettes_sigtas', operator: '>', value: '' })
+  form.conditions.push({ field: 'contribuable.dettes_sigtas', operator: '>', value: '' })
 }
 
 function openCreate() {

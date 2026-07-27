@@ -29,11 +29,15 @@
               <v-list-item prepend-icon="mdi-identifier" :title="`ID : user-${selectedUser.id}`" density="compact"/>
             </v-list>
             <v-card-actions class="pa-3">
-              <v-btn :color="selectedUser.statut==='actif'?'warning':'success'" variant="tonal" size="small" block @click="toggleStatut">
+              <v-btn :color="selectedUser.statut==='actif'?'warning':'success'" variant="tonal" size="small" block :loading="statutLoading" @click="changerStatut(selectedUser)">
                 <v-icon :icon="selectedUser.statut==='actif'?'mdi-account-off':'mdi-account-check'" size="16" class="me-1"/>
                 {{ selectedUser.statut==='actif'?'Désactiver le compte':'Réactiver le compte' }}
               </v-btn>
             </v-card-actions>
+            <div class="d-flex ga-2 px-3 pb-3">
+              <v-btn size="small" variant="tonal" color="secondary" prepend-icon="mdi-shield-refresh" :loading="resetMfaLoading" @click="resetMfa">Réinitialiser MFA</v-btn>
+              <v-btn size="small" variant="tonal" color="secondary" prepend-icon="mdi-lock-reset" @click="confirmPinDialog=true">Réinitialiser PIN</v-btn>
+            </div>
           </v-card>
 
           <!-- Notification channels config -->
@@ -145,7 +149,7 @@
             <v-btn size="x-small" variant="tonal" color="primary" class="me-1" @click.stop="selectedUser=item">
               <v-icon icon="mdi-shield-edit" size="14" class="me-1"/>Permissions
             </v-btn>
-            <v-btn size="x-small" variant="tonal" :color="item.statut==='actif'?'warning':'success'" @click.stop="item.statut=item.statut==='actif'?'inactif':'actif'">
+            <v-btn size="x-small" variant="tonal" :color="item.statut==='actif'?'warning':'success'" @click.stop="changerStatut(item)">
               {{ item.statut==='actif'?'Désactiver':'Réactiver' }}
             </v-btn>
           </template>
@@ -166,7 +170,7 @@
               <v-select v-model="newUser.role" :items="roles" item-title="label" item-value="value" label="Rôle RBAC"/>
             </v-col>
             <v-col cols="6">
-              <v-select v-model="newUser.structure" :items="structures" label="Structure"/>
+              <v-select v-model="newUser.structure" :items="structures" item-title="code" item-value="id" label="Structure"/>
             </v-col>
           </v-row>
           <div class="label-micro text-medium-emphasis mb-2">Canaux de notification</div>
@@ -187,6 +191,51 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Reset MFA : affichage du QR otpauth retourné par l'API -->
+    <v-dialog v-model="mfaDialog" max-width="520">
+      <v-card rounded="xl">
+        <v-card-title class="pa-5 d-flex align-center ga-2">
+          <v-icon icon="mdi-shield-refresh" color="secondary"/>MFA réinitialisé
+        </v-card-title>
+        <v-card-text class="pa-5 pt-0">
+          <v-alert type="warning" variant="tonal" density="compact" rounded="lg" class="mb-3">
+            Transmettez ce QR code / secret à l'utilisateur de manière sécurisée. Il devra le scanner avec son application d'authentification.
+          </v-alert>
+          <div class="label-micro text-medium-emphasis mb-1">URI otpauth (QR code)</div>
+          <code class="d-block pa-3 rounded-lg text-caption" style="word-break:break-all;background:rgba(0,0,0,0.05)">{{ mfaResult?.mfaQrCodeUri }}</code>
+          <div class="label-micro text-medium-emphasis mt-3 mb-1">Secret TOTP</div>
+          <code class="d-block pa-3 rounded-lg text-caption" style="word-break:break-all;background:rgba(0,0,0,0.05)">{{ mfaResult?.mfaSecret }}</code>
+        </v-card-text>
+        <v-card-actions class="pa-4">
+          <v-spacer/>
+          <v-btn color="primary" @click="mfaDialog=false">Fermer</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Reset PIN : confirmation -->
+    <v-dialog v-model="confirmPinDialog" max-width="440">
+      <v-card rounded="xl">
+        <v-card-title class="pa-5">Réinitialiser le PIN ?</v-card-title>
+        <v-card-text class="pa-5 pt-0">
+          Le PIN de signature de <strong>{{ selectedUser?.prenom }} {{ selectedUser?.nom }}</strong> sera supprimé. L'utilisateur devra en définir un nouveau à sa prochaine connexion.
+        </v-card-text>
+        <v-card-actions class="pa-4">
+          <v-spacer/>
+          <v-btn variant="text" @click="confirmPinDialog=false">Annuler</v-btn>
+          <v-btn color="warning" :loading="resetPinLoading" @click="resetPin">Confirmer la réinitialisation</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Snackbars globales -->
+    <v-snackbar v-model="statutError" color="error" timeout="5000" location="top">
+      <v-icon icon="mdi-alert-circle" class="me-2"/>{{ statutErrorMsg }}
+    </v-snackbar>
+    <v-snackbar v-model="actionSuccess" color="success" timeout="3000" location="top">
+      <v-icon icon="mdi-check-circle" class="me-2"/>{{ actionSuccessMsg }}
+    </v-snackbar>
   </div>
 </template>
 
@@ -196,6 +245,15 @@ import PageHeader from '../../components/PageHeader.vue'
 import ExportButton from '../../components/ExportButton.vue'
 import KpiCard from '../../components/KpiCard.vue'
 import { listerUtilisateurs, creerUtilisateur } from '../../services/utilisateurs'
+import {
+  listerInstitutions,
+  modifierStatutUtilisateur,
+  resetMfaUtilisateur,
+  resetPinUtilisateur,
+  CODE_DERNIER_ADMIN,
+  type Institution,
+  type ResetMfaResponse,
+} from '../../services/admin'
 import type { Utilisateur } from '../../types'
 
 const search = ref('')
@@ -207,8 +265,21 @@ const permSaved = ref(false)
 const utilisateurs = ref<Utilisateur[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
+const structures = ref<Institution[]>([])
 
-onMounted(async () => {
+// État des actions admin (statut / MFA / PIN)
+const statutLoading = ref(false)
+const statutError = ref(false)
+const statutErrorMsg = ref('')
+const actionSuccess = ref(false)
+const actionSuccessMsg = ref('')
+const mfaDialog = ref(false)
+const mfaResult = ref<ResetMfaResponse | null>(null)
+const resetMfaLoading = ref(false)
+const confirmPinDialog = ref(false)
+const resetPinLoading = ref(false)
+
+async function chargerUtilisateurs() {
   loading.value = true
   try {
     const res = await listerUtilisateurs()
@@ -219,30 +290,49 @@ onMounted(async () => {
       email: u.email,
       role: u.role as any,
       statut: (u.statutCode || u.statut || 'actif') as 'actif' | 'inactif',
-      structure: u.institutionId || 'OTR',
+      structure: u.institution?.code || u.institutionId || '—',
       derniereConnexion: u.derniereConnexion || '',
     }))
+    if (selectedUser.value) {
+      selectedUser.value = utilisateurs.value.find((u) => u.id === selectedUser.value!.id) || null
+    }
   } catch (e) {
     error.value = 'Impossible de charger les utilisateurs'
   } finally {
     loading.value = false
   }
+}
+
+onMounted(async () => {
+  await Promise.all([
+    chargerUtilisateurs(),
+    listerInstitutions().then((list) => { structures.value = list }),
+  ])
 })
 
 const notifChannels = ref({ email: true, sms: true, whatsapp: false, inapp: true })
 
 const newUser = ref({ prenom: '', nom: '', email: '', role: '', structure: '', notifs: ['email', 'inapp'] })
 
+// OASE [Recette E2E] : valeurs alignées sur les rôles CANONIQUES du backend
+// (les anciennes valeurs 'agent_otr', 'agence', 'admin' étaient rejetées en 400).
 const roles = [
-  { label: 'Bénéficiaire', value: 'beneficiaire', color: 'secondary' },
-  { label: 'Agent OTR', value: 'agent_otr', color: 'primary' },
+  { label: 'Contribuable', value: 'contribuable', color: 'secondary' },
+  { label: 'Agent CI (OTR)', value: 'agent_ci', color: 'primary' },
+  { label: 'Agent CDDI', value: 'agent_cddi', color: 'primary' },
   { label: 'Agent DGBF', value: 'agent_dgbf', color: 'info' },
-  { label: 'Agence', value: 'agence', color: 'teal' },
+  { label: 'Agent DGTCP', value: 'agent_dgtcp', color: 'info' },
+  { label: 'Agent Agence (API-ZF/SAZOF)', value: 'agent_agence', color: 'teal' },
+  { label: 'Agent MAE', value: 'agent_mae', color: 'teal' },
+  { label: 'Agent DGMG (Extractif)', value: 'agent_dgmg', color: 'teal' },
+  { label: 'Agent Ministère sectoriel', value: 'agent_ministere', color: 'teal' },
+  { label: 'Agent CONEDEF', value: 'agent_conedef', color: 'purple' },
   { label: 'Décideur', value: 'decideur', color: 'purple' },
   { label: 'Auditeur', value: 'auditeur', color: 'warning' },
-  { label: 'Admin', value: 'admin', color: 'error' },
+  { label: 'Administrateur SI', value: 'admin_si', color: 'error' },
 ]
-const structures = ['OTR Douanes', 'OTR Impôts', 'DGBF', 'DGTCP', 'API-ZF', 'SAZOF', 'UPF', 'IGF', 'Cour des comptes', 'DSI/MEF']
+// NOTE : les options de Structure (id + code) sont chargées depuis l'API
+// dans `structures` (ref déclarée plus haut) — plus de libellés codés en dur.
 
 const permTypes = ['Lecture', 'Écriture', 'Suppression', 'Export']
 
@@ -259,13 +349,15 @@ const permMatrix = ref([
 ])
 
 const roleTemplates: Record<string, string[]> = {
-  agent_otr: ['Lecture', 'Écriture', 'Export'],
+  agent_ci: ['Lecture', 'Écriture', 'Export'],
+  agent_cddi: ['Lecture', 'Écriture', 'Export'],
   agent_dgbf: ['Lecture', 'Export'],
+  agent_dgtcp: ['Lecture', 'Export'],
   decideur: ['Lecture', 'Export'],
   auditeur: ['Lecture', 'Export'],
-  admin: ['Lecture', 'Écriture', 'Suppression', 'Export'],
-  beneficiaire: ['Lecture'],
-  agence: ['Lecture', 'Écriture', 'Export'],
+  admin_si: ['Lecture', 'Écriture', 'Suppression', 'Export'],
+  contribuable: ['Lecture'],
+  agent_agence: ['Lecture', 'Écriture', 'Export'],
 }
 
 function applyRoleTemplate(role: string) {
@@ -303,7 +395,60 @@ const headers = [
 const roleLabel = (r: string) => roles.find(x => x.value === r)?.label || r
 const roleColor = (r: string) => roles.find(x => x.value === r)?.color || 'secondary'
 const formatDate = (iso: string) => new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-const toggleStatut = () => { if (selectedUser.value) selectedUser.value.statut = selectedUser.value.statut === 'actif' ? 'inactif' : 'actif' }
+
+/**
+ * Active / désactive un compte via PATCH /utilisateurs/:id (statutCode),
+ * puis rafraîchit la liste. Gère le 409 DERNIER_ADMIN avec un message métier.
+ */
+async function changerStatut(user: Utilisateur) {
+  const nouveauStatut = user.statut === 'actif' ? 'inactif' : 'actif'
+  statutLoading.value = true
+  try {
+    await modifierStatutUtilisateur(user.id, nouveauStatut)
+    await chargerUtilisateurs()
+    actionSuccessMsg.value = nouveauStatut === 'inactif' ? 'Compte désactivé' : 'Compte réactivé'
+    actionSuccess.value = true
+  } catch (e) {
+    statutErrorMsg.value = e instanceof Error && e.message.startsWith(CODE_DERNIER_ADMIN)
+      ? e.message.slice(CODE_DERNIER_ADMIN.length + 2)
+      : 'Impossible de modifier le statut du compte'
+    statutError.value = true
+  } finally {
+    statutLoading.value = false
+  }
+}
+
+/** Réinitialise le MFA et affiche le QR otpauth retourné par l'API. */
+async function resetMfa() {
+  if (!selectedUser.value) return
+  resetMfaLoading.value = true
+  try {
+    mfaResult.value = await resetMfaUtilisateur(selectedUser.value.id)
+    mfaDialog.value = true
+  } catch (e) {
+    statutErrorMsg.value = 'Impossible de réinitialiser le MFA'
+    statutError.value = true
+  } finally {
+    resetMfaLoading.value = false
+  }
+}
+
+/** Réinitialise le PIN (avec confirmation). */
+async function resetPin() {
+  if (!selectedUser.value) return
+  resetPinLoading.value = true
+  try {
+    await resetPinUtilisateur(selectedUser.value.id)
+    confirmPinDialog.value = false
+    actionSuccessMsg.value = 'PIN réinitialisé — l\'utilisateur devra en définir un nouveau'
+    actionSuccess.value = true
+  } catch (e) {
+    statutErrorMsg.value = 'Impossible de réinitialiser le PIN'
+    statutError.value = true
+  } finally {
+    resetPinLoading.value = false
+  }
+}
 
 async function createUser() {
   try {
@@ -314,18 +459,14 @@ async function createUser() {
       role: newUser.value.role,
       institutionId: newUser.value.structure,
     })
-    utilisateurs.value.push({
-      id: res.data.id,
-      nom: res.data.nom,
-      prenom: res.data.prenom,
-      email: res.data.email,
-      role: res.data.role as any,
-      statut: (res.data.statutCode || res.data.statut || 'actif') as 'actif' | 'inactif',
-      structure: res.data.institutionId || newUser.value.structure,
-      derniereConnexion: res.data.derniereConnexion || '',
-    })
+    const created = res
     addDialog.value = false
     newUser.value = { prenom: '', nom: '', email: '', role: '', structure: '', notifs: ['email', 'inapp'] }
+    // Recharge la liste : le backend trie par createdAt desc → le nouveau
+    // compte apparaît en première ligne du tableau (visible sans pagination).
+    await chargerUtilisateurs()
+    actionSuccessMsg.value = `Compte ${created.email} créé — invitation envoyée`
+    actionSuccess.value = true
   } catch (e) {
     error.value = 'Impossible de créer le compte'
   }

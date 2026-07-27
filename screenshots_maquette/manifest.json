@@ -70,11 +70,11 @@
       "route": "/portail/dashboard",
       "url": "http://127.0.0.1:4174/portail/dashboard",
       "title": "OASE — Outil Automatisé de Suivi des Exonérations",
-      "persona": "par_persona/P1_beneficiaire",
-      "process": "par_processus/02_portail_beneficiaire",
+      "persona": "par_persona/P1_contribuable",
+      "process": "par_processus/02_portail_contribuable",
       "files": [
-        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P1_beneficiaire\\06_portail-dashboard.png",
-        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\02_portail_beneficiaire\\06_portail-dashboard.png"
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P1_contribuable\\06_portail-dashboard.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\02_portail_contribuable\\06_portail-dashboard.png"
       ]
     },
     {
@@ -82,11 +82,11 @@
       "route": "/portail/nouvelle-demande",
       "url": "http://127.0.0.1:4174/portail/nouvelle-demande",
       "title": "OASE — Outil Automatisé de Suivi des Exonérations",
-      "persona": "par_persona/P1_beneficiaire",
-      "process": "par_processus/02_portail_beneficiaire",
+      "persona": "par_persona/P1_contribuable",
+      "process": "par_processus/02_portail_contribuable",
       "files": [
-        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P1_beneficiaire\\07_portail-nouvelle-demande.png",
-        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\02_portail_beneficiaire\\07_portail-nouvelle-demande.png"
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P1_contribuable\\07_portail-nouvelle-demande.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\02_portail_contribuable\\07_portail-nouvelle-demande.png"
       ]
     },
     {
@@ -94,11 +94,11 @@
       "route": "/portail/demandes/DEMO-001",
       "url": "http://127.0.0.1:4174/portail/demandes/DEMO-001",
       "title": "OASE — Outil Automatisé de Suivi des Exonérations",
-      "persona": "par_persona/P1_beneficiaire",
-      "process": "par_processus/02_portail_beneficiaire",
+      "persona": "par_persona/P1_contribuable",
+      "process": "par_processus/02_portail_contribuable",
       "files": [
-        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P1_beneficiaire\\08_portail-demande-detail.png",
-        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\02_portail_beneficiaire\\08_portail-demande-detail.png"
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P1_contribuable\\08_portail-demande-detail.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\02_portail_contribuable\\08_portail-demande-detail.png"
       ]
     },
     {
@@ -106,11 +106,11 @@
       "route": "/portail/exonerations-actives",
       "url": "http://127.0.0.1:4174/portail/exonerations-actives",
       "title": "OASE — Outil Automatisé de Suivi des Exonérations",
-      "persona": "par_persona/P1_beneficiaire",
-      "process": "par_processus/02_portail_beneficiaire",
+      "persona": "par_persona/P1_contribuable",
+      "process": "par_processus/02_portail_contribuable",
       "files": [
-        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P1_beneficiaire\\09_portail-exonerations-actives.png",
-        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\02_portail_beneficiaire\\09_portail-exonerations-actives.png"
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P1_contribuable\\09_portail-exonerations-actives.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\02_portail_contribuable\\09_portail-exonerations-actives.png"
       ]
     },
     {
@@ -118,11 +118,11 @@
       "route": "/portail/profil",
       "url": "http://127.0.0.1:4174/portail/profil",
       "title": "OASE — Outil Automatisé de Suivi des Exonérations",
-      "persona": "par_persona/P1_beneficiaire",
-      "process": "par_processus/02_portail_beneficiaire",
+      "persona": "par_persona/P1_contribuable",
+      "process": "par_processus/02_portail_contribuable",
       "files": [
-        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P1_beneficiaire\\10_portail-profil.png",
-        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\02_portail_beneficiaire\\10_portail-profil.png"
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_persona\\P1_contribuable\\10_portail-profil.png",
+        "C:\\wamp64\\www\\oase\\maquette\\screenshots_maquette\\par_processus\\02_portail_contribuable\\10_portail-profil.png"
       ]
     },
     {

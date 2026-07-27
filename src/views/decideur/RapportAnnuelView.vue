@@ -252,7 +252,7 @@ const sections = ref([
   { key: 'inventaire', label: 'Inventaire des exonérations', selected: true, mockContent: 'Tableau exhaustif des 1 248 exonérations actives au 31/12/2025, réparties selon leur nature juridique (CGI, code sectoriel, LFI)…' },
   { key: 'cout', label: 'Coût budgétaire (FCFA)', selected: true, mockContent: 'Le coût total des dépenses fiscales s\'élève à 847,3 Mds FCFA pour l\'exercice 2025, en hausse de 12,4% par rapport à 2024…' },
   { key: 'evolution', label: 'Évolution pluriannuelle', selected: true, mockContent: 'Sur la période 2021–2025, les dépenses fiscales ont progressé en moyenne de 8,7% par an, passant de 571 Mds à 847 Mds FCFA…' },
-  { key: 'annexes', label: 'Annexes statistiques', selected: true, mockContent: 'Tableaux A1 à A12 : détail par secteur, région, nature juridique et catégorie de bénéficiaire…' },
+  { key: 'annexes', label: 'Annexes statistiques', selected: true, mockContent: 'Tableaux A1 à A12 : détail par secteur, région, nature juridique et catégorie de contribuable…' },
 ])
 
 const aiSections = ref([

@@ -136,7 +136,7 @@
           <v-card-text class="pa-4">
             <v-alert type="error" variant="tonal" rounded="lg" density="compact" class="mb-4" prepend-icon="mdi-alert-circle">
               Un rejet à n'importe quelle sous-étape renvoie le dossier au <strong>dépôt initial</strong>.
-              Aucune régularisation en cours de chaîne n'est possible. Le bénéficiaire doit redéposer une déclaration corrigée.
+              Aucune régularisation en cours de chaîne n'est possible. Le contribuable doit redéposer une déclaration corrigée.
             </v-alert>
             <v-data-table :headers="headersRejets" :items="rejetes" hover>
               <template #item.etapeRejet="{ item }">
@@ -299,7 +299,7 @@ function getSousEtapeIcon(dossier: typeof allDossiers[0], idx: number) {
 
 // ── Circuit complet (référence institutionnelle) ────────────────────────────
 const circuitComplet = [
-  { id: 'Entrée', titre: 'Saisie déclaration SYDONIAWORLD', acteur: 'Bénéficiaire / Transitaire', systeme: 'SYDONIAWORLD', icon: 'mdi-keyboard', color: 'primary', highlight: false },
+  { id: 'Entrée', titre: 'Saisie déclaration SYDONIAWORLD', acteur: 'Contribuable / Transitaire', systeme: 'SYDONIAWORLD', icon: 'mdi-keyboard', color: 'primary', highlight: false },
   { id: 'Étape 1', titre: 'Contrôle des pièces justificatives', acteur: 'CDDI / Agent de bureau', systeme: 'SYDONIAWORLD', icon: 'mdi-file-search', color: 'primary', highlight: false },
   { id: 'Étape 2', titre: 'Vérification conformité juridique', acteur: 'CDDI / Service juridique', systeme: 'SYDONIAWORLD', icon: 'mdi-gavel', color: 'primary', highlight: false },
   { id: '2a', titre: 'Validation — Vérificateur', acteur: 'Agent vérificateur', systeme: 'SYDONIAWORLD', icon: 'mdi-account-check', color: 'warning', highlight: true },

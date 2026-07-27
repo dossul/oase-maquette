@@ -28,7 +28,7 @@
       <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Parcours normé du dossier</v-card-title>
       <v-stepper model-value="4" alt-labels>
         <v-stepper-header>
-          <v-stepper-item title="1. Dépôt" subtitle="Bénéficiaire → CI" value="1" />
+          <v-stepper-item title="1. Dépôt" subtitle="Contribuable → CI" value="1" />
           <v-stepper-item title="2. Vérification" subtitle="< 5 jours" value="2" />
           <v-stepper-item title="3. Étude juridique" subtitle="Contentieux" value="3" />
           <v-stepper-item title="4. Validation DGE/DME" subtitle="Cumul < 10 jours" value="4" />
@@ -170,12 +170,12 @@ const headers = [
 ]
 
 const rows = [
-  { etape: '1', acteur: 'Bénéficiaire', action: 'Dépôt dossier complet → CI service gestionnaire', delai: '—', statut: 'Terminé' },
+  { etape: '1', acteur: 'Contribuable', action: 'Dépôt dossier complet → CI service gestionnaire', delai: '—', statut: 'Terminé' },
   { etape: '2', acteur: 'CI / Service gestionnaire', action: 'Vérification administrative complétude', delai: '< 5 jours', statut: 'En cours' },
   { etape: '3', acteur: 'CI / Service contentieux', action: 'Étude base juridique applicable (CGI / texte habilitant)', delai: '—', statut: 'À venir' },
   { etape: '4', acteur: 'DGE / DME', action: 'Validation hiérarchique', delai: 'Cumul < 10 jours', statut: 'À venir' },
   { etape: '5', acteur: 'Direction CI', action: 'Décision formelle : émission attestation signée', delai: 'Cumul < 15 jours', statut: 'À venir' },
-  { etape: '6', acteur: 'Bénéficiaire', action: 'Présentation attestation au guichet compétent (faire valoir droits)', delai: '—', statut: 'À venir' },
+  { etape: '6', acteur: 'Contribuable', action: 'Présentation attestation au guichet compétent (faire valoir droits)', delai: '—', statut: 'À venir' },
   { etape: '7', acteur: 'OTR', action: 'Suivi financier : comptabilisation E-TAX → DLFC → DAS', delai: 'Continu', statut: 'À venir' },
   { etape: '8', acteur: 'OTR → DGBF', action: 'Reporting mensuel via SIGFiP + DLFC (colonne exonérations)', delai: 'Mensuel', statut: 'À venir' },
 ]
@@ -192,7 +192,7 @@ const processMatrix = [
   { etape: 'Niveau 2', ci: 'Etude base juridique CGI/texte habilitant (contentieux)', vigilance: 'Reference juridique rattachee' },
   { etape: 'Niveau 3', ci: 'Validation hierarchique DGE/DME (cumul < 10 jours)', vigilance: 'Journal des validations' },
   { etape: 'Decision', ci: 'Attestation exoneration emise/signee Direction CI (cumul < 15 jours)', vigilance: 'Reference unique attestation + delai cumule' },
-  { etape: 'Execution', ci: 'Beneficiaire presente attestation au guichet competent', vigilance: 'Preuve de presentation pour faire valoir droits' },
+  { etape: 'Execution', ci: 'Contribuable presente attestation au guichet competent', vigilance: 'Preuve de presentation pour faire valoir droits' },
   { etape: 'Suivi', ci: 'OTR comptabilise montant exonere E-TAX → Base DLFC → DAS', vigilance: 'Lien attestation → execution SI' },
   { etape: 'Reporting', ci: 'OTR reporte mensuellement → DGBF via SIGFiP + Base DLFC', vigilance: 'Alimentation colonne exonerations situations recettes' },
 ]
@@ -222,7 +222,7 @@ const regimeVariants = [
     value: 'cgi',
     title: 'Mesures CGI / LFI classiques',
     subtitle: 'Parcours standard pour exonerations fiscales internes rattachees a une base legale explicite.',
-    circuit: 'Beneficiaire -> CI -> contentieux -> DGE/DME -> liquidation SI',
+    circuit: 'Contribuable -> CI -> contentieux -> DGE/DME -> liquidation SI',
     vigilance: 'Verifier la reference article / exercice et la duree exacte de validite.',
     points: ['Reference explicite article CGI ou LFI', 'Montant brut taxable et taux applique saisis', 'Attestation annuelle et reconduction tracees'],
   },
@@ -230,7 +230,7 @@ const regimeVariants = [
     value: 'invest',
     title: 'Code des investissements',
     subtitle: 'Mesures liees aux agrements, engagements et objectifs d investissement.',
-    circuit: 'Beneficiaire -> agence / ministere -> OTR -> decideur budgetaire',
+    circuit: 'Contribuable -> agence / ministere -> OTR -> decideur budgetaire',
     vigilance: 'Relier l attestation aux engagements emplois / investissements et a la date de debut d agrement.',
     points: ['Numero agrement rattache', 'Pieces second rang emplois / CAPEX', 'Controle echeance agrement et renouvellement'],
   },
@@ -238,7 +238,7 @@ const regimeVariants = [
     value: 'textile',
     title: 'Regime textile / habillement 2022-021',
     subtitle: 'Traitement des mesures specifiques du nouveau regime sectoriel textile.',
-    circuit: 'Beneficiaire -> structure sectorielle -> OTR -> budget / suivi sectoriel',
+    circuit: 'Contribuable -> structure sectorielle -> OTR -> budget / suivi sectoriel',
     vigilance: 'Verifier perimetre textile eligible et coherence avec les textes sectoriels actualises.',
     points: ['Reference loi 2022-021', 'Suivi emplois export et intrants', 'Lien avec reporting sectoriel ministeriel'],
   },

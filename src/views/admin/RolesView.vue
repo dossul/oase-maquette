@@ -415,17 +415,17 @@ const crudLabelMap: Record<CrudKey, string> = {
 }
 const crudLegend = crudKeys.map(k => ({ key: k, label: crudLabelMap[k], color: crudColorMap[k] }))
 
-const matrixRoles = ['Bénéficiaire', 'Agent OTR', 'Agent DGBF', 'Agence', 'Décideur', 'Auditeur', 'Admin']
+const matrixRoles = ['Contribuable', 'Agent OTR', 'Agent DGBF', 'Agence', 'Décideur', 'Auditeur', 'Admin']
 
 const roleColorMap: Record<string, string> = {
-  'Bénéficiaire': 'info', 'Agent OTR': 'primary', 'Agent DGBF': 'secondary',
+  'Contribuable': 'info', 'Agent OTR': 'primary', 'Agent DGBF': 'secondary',
   'Agence': 'warning', 'Décideur': 'purple', 'Auditeur': 'error', 'Admin': 'success',
 }
 const roleColor = (r: string) => roleColorMap[r] || 'primary'
 
 const matrixGroups = [
-  { label: 'PORTAIL BÉNÉFICIAIRE', perms: [
-    { key: 'portail_view', label: 'Accès portail bénéficiaire' },
+  { label: 'PORTAIL CONTRIBUABLE', perms: [
+    { key: 'portail_view', label: 'Accès portail contribuable' },
     { key: 'demande_create', label: 'Déposer une demande' },
     { key: 'demande_view', label: 'Voir ses dossiers' },
     { key: 'attestation_download', label: 'Télécharger attestation' },
@@ -471,7 +471,7 @@ const rde = (): CrudFlags => ({ c: false, r: true, u: false, d: false, e: true }
 const crud = (c: boolean, r: boolean, u: boolean, d: boolean, e: boolean): CrudFlags => ({ c, r, u, d, e })
 
 const crudMap = reactive<Record<string, Record<string, CrudFlags>>>({
-  'Bénéficiaire': {
+  'Contribuable': {
     portail_view: ro(), demande_create: crud(true, true, false, false, false),
     demande_view: rde(), attestation_download: crud(false, true, false, false, true),
     opendata_view: ro(), opendata_download: rde(),
@@ -522,7 +522,7 @@ function setFullCrud(role: string, permKey: string) {
 
 // ── Module access ──────────────────────────────────────────────────────────
 const moduleGroups = [
-  { label: 'PORTAIL BÉNÉFICIAIRE', icon: 'mdi-home-city', routes: [
+  { label: 'PORTAIL CONTRIBUABLE', icon: 'mdi-home-city', routes: [
     { path: '/portail/dashboard', label: 'Tableau de bord' },
     { path: '/portail/nouvelle-demande', label: 'Nouvelle demande' },
     { path: '/portail/demandes/:id', label: 'Suivi dossier' },
@@ -575,7 +575,7 @@ const moduleGroups = [
 ]
 
 const moduleAccess = reactive<Record<string, Set<string>>>({
-  'Bénéficiaire': new Set(['/portail/dashboard', '/portail/nouvelle-demande', '/portail/demandes/:id', '/portail/exonerations-actives', '/portail/profil', '/opendata']),
+  'Contribuable': new Set(['/portail/dashboard', '/portail/nouvelle-demande', '/portail/demandes/:id', '/portail/exonerations-actives', '/portail/profil', '/opendata']),
   'Agent OTR': new Set(['/backoffice/dashboard', '/backoffice/dossiers', '/backoffice/dossiers/:id/instruction', '/backoffice/dossiers/:id/validation', '/backoffice/controle']),
   'Agent DGBF': new Set(['/backoffice/dashboard', '/backoffice/dossiers', '/backoffice/dossiers/:id/instruction', '/backoffice/budget']),
   'Agence': new Set(['/agences/dashboard', '/agences/conventions', '/agences/agrements', '/agences/engagements', '/opendata']),

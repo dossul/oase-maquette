@@ -189,7 +189,7 @@
             <!-- Confirmation soumission -->
             <div v-if="submitted">
               <v-alert type="success" variant="tonal" rounded="lg" prepend-icon="mdi-check-circle">
-                Dossier rattaché à OASE — Référence : <strong>OASE-2026-{{ refSubmission }}</strong>
+                Dossier rattaché à OASE — Référence : <strong>{{ referenceFinale }}</strong>
                 <div class="text-caption mt-1">Le suivi GESTEXO est actif. Notification automatique à chaque changement de statut.</div>
               </v-alert>
               <v-btn variant="tonal" color="primary" class="mt-3" prepend-icon="mdi-download">Télécharger l'accusé de rattachement</v-btn>
@@ -265,7 +265,7 @@
         </v-card-text></v-card>
       </template>
 
-      <!-- ═══ STEP 2 — Identification bénéficiaire / déclarant ═══ -->
+      <!-- ═══ STEP 2 — Identification contribuable / déclarant ═══ -->
       <template #item.2>
         <v-card flat><v-card-text>
           <v-alert type="info" variant="tonal" rounded="lg" density="compact" class="mb-4">
@@ -409,7 +409,7 @@
                 <div>
                   <div class="text-body-2 font-weight-bold mb-1">La déclaration en détail est saisie dans SYDONIAWORLD</div>
                   <div class="text-body-2 text-medium-emphasis mb-3">
-                    Conformément au Processus n°2 (MRD 2024), la saisie initiale de la déclaration douanière (entrée du circuit) est opérée directement dans <strong>SYDONIAWORLD</strong> par le bénéficiaire ou son transitaire agréé. OASE supervise ensuite le traitement via GESTEXO (liquidation, quittancement, reporting).
+                    Conformément au Processus n°2 (MRD 2024), la saisie initiale de la déclaration douanière (entrée du circuit) est opérée directement dans <strong>SYDONIAWORLD</strong> par le contribuable ou son transitaire agréé. OASE supervise ensuite le traitement via GESTEXO (liquidation, quittancement, reporting).
                   </div>
                   <div class="d-flex flex-wrap ga-2">
                     <v-btn
@@ -614,7 +614,7 @@
               </v-col>
             </v-row>
             <v-row>
-              <v-col cols="12" md="6"><v-text-field v-model="siegeFields.nbPersonnel" label="Nombre de personnels bénéficiaires" type="number" hint="Liste nominative jointe en pièce" persistent-hint /></v-col>
+              <v-col cols="12" md="6"><v-text-field v-model="siegeFields.nbPersonnel" label="Nombre de personnels contribuables" type="number" hint="Liste nominative jointe en pièce" persistent-hint /></v-col>
               <v-col cols="12" md="6"><v-text-field v-model="siegeFields.nbVehicules" label="Nombre de véhicules diplomatiques/officiels" type="number" hint="Immatriculations à jour" persistent-hint /></v-col>
               <v-col cols="12" md="6"><v-text-field v-model="siegeFields.dateDebutAccord" label="Date de début de l'accord" type="date" /></v-col>
               <v-col cols="12" md="6"><v-text-field v-model="siegeFields.dateFinAccord" label="Date de fin / expiration" type="date" hint="Déclenchera alerte J-90 automatique dans OASE" persistent-hint /></v-col>
@@ -642,7 +642,7 @@
       <template #item.4>
         <v-card flat><v-card-text>
           <v-alert v-if="!['convention_miniere','accord_siege'].includes(selectedType)" type="error" variant="tonal" rounded="lg" density="compact" class="mb-4" prepend-icon="mdi-alert-circle">
-            <strong>Règle fiche 34 — Exigences obligatoires :</strong> Toute facture doit indiquer la base légale, la référence d'attestation et le NIF du bénéficiaire. La facture ne doit pas dater de plus de 3 ans à la date de dépôt. <strong>À défaut : rejet automatique.</strong>
+            <strong>Règle fiche 34 — Exigences obligatoires :</strong> Toute facture doit indiquer la base légale, la référence d'attestation et le NIF du contribuable. La facture ne doit pas dater de plus de 3 ans à la date de dépôt. <strong>À défaut : rejet automatique.</strong>
           </v-alert>
 
           <!-- Regime-specific document rules -->
@@ -778,7 +778,7 @@
             </v-col>
             <v-col cols="12" md="4">
               <v-card variant="outlined" rounded="lg" class="pa-3">
-                <div class="text-caption text-medium-emphasis">{{ selectedType==='accord_siege'?'Organisation':'Bénéficiaire' }}</div>
+                <div class="text-caption text-medium-emphasis">{{ selectedType==='accord_siege'?'Organisation':'Contribuable' }}</div>
                 <div class="font-weight-semibold">{{ benefForm.raisonSociale }}</div>
                 <div class="text-caption text-medium-emphasis">NIF : {{ benefForm.nif }}</div>
               </v-card>
@@ -890,9 +890,12 @@
 
           <v-divider class="my-3" />
           <v-checkbox v-model="certified" label="Je certifie sur l'honneur l'exactitude des informations déclarées et des pièces fournies. Toute fausse déclaration entraîne l'annulation de l'exonération." class="mt-2" />
+          <v-alert v-if="submitError && !submitted" type="error" variant="tonal" rounded="lg" class="mt-3" prepend-icon="mdi-alert-circle">
+            {{ submitError }}
+          </v-alert>
           <div v-if="submitted" class="mt-3">
             <v-alert type="success" variant="tonal" rounded="lg">
-              Demande soumise — Référence : <strong>OASE-2026-{{ refSubmission }}</strong>
+              Demande soumise — Référence : <strong>{{ referenceFinale }}</strong>
               <div class="text-caption mt-1">Récépissé envoyé par e-mail. {{ regimeConfig?.nextStep }}</div>
             </v-alert>
             <v-btn variant="tonal" color="primary" class="mt-3" prepend-icon="mdi-download">Télécharger le récépissé PDF</v-btn>
@@ -940,17 +943,25 @@
           Continuer
         </v-btn>
         <v-btn v-else-if="step < 5" icon="mdi-chevron-right" color="primary" size="large" @click="step++" aria-label="Suivant" />
-        <v-btn v-else-if="!submitted" icon="mdi-send" color="success" size="large" :disabled="!certified" @click="submitted = true" aria-label="Soumettre" />
+        <v-btn v-else-if="!submitted" icon="mdi-send" color="success" size="large" :disabled="!certified" :loading="submitting" @click="submitDemande" aria-label="Soumettre" />
       </template>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import DocumentUploadModal from '../../components/DocumentUploadModal.vue'
 import { FAMILLES_BASE_JURIDIQUE, TYPES_ACTE, TYPES_OPERATION_CI } from '../../data/referentielsOase'
+import {
+  getContribuableMe,
+  listerBasesJuridiques,
+  creerDemande,
+  soumettreDemande,
+  uploadPieceJointe,
+  type ApiBaseJuridiqueVersion,
+} from '../../services/portail'
 
 const step = ref(1)
 const cddiScreen = ref(0) // 0=stepper actif, 1=lancement SYDONIAWORLD, 2=consultation GESTEXO
@@ -964,7 +975,43 @@ const ciOperationType = ref<string>('general')
 const hasAgrement     = ref<boolean>(false)
 const certified = ref(false)
 const submitted = ref(false)
-const refSubmission = computed(() => String(Math.floor(1000 + Math.random() * 9000)))
+const submitting = ref(false)
+const submitError = ref('')
+const referenceFinale = ref('')
+
+// ── Données API : contribuable connecté + bases juridiques ──────────────────
+const contribuableId = ref('')
+const basesJuridiquesApi = ref<ApiBaseJuridiqueVersion[]>([])
+
+onMounted(async () => {
+  try {
+    const me = await getContribuableMe()
+    contribuableId.value = me.id
+    benefForm.value = {
+      ...benefForm.value,
+      rccm: me.rccm || benefForm.value.rccm,
+      nif: me.nif || benefForm.value.nif,
+      raisonSociale: me.raisonSociale || benefForm.value.raisonSociale,
+      adresse: me.adresse || benefForm.value.adresse,
+      secteur: me.secteur || benefForm.value.secteur,
+    }
+  } catch { /* profil indisponible : valeurs par défaut conservées */ }
+  try {
+    basesJuridiquesApi.value = await listerBasesJuridiques()
+  } catch { /* référentiel indisponible */ }
+})
+
+/** Résout la version de base juridique la plus pertinente pour le régime choisi. */
+function resolveBaseJuridiqueVersionId(): string {
+  const actives = basesJuridiquesApi.value.filter(b => b.estActive)
+  const parImpot: Record<string, string> = { fiscale_tva: 'TVA', fiscale_is: 'IS' }
+  const impot = parImpot[selectedType.value]
+  let found: ApiBaseJuridiqueVersion | undefined
+  if (impot) found = actives.find(b => b.impotConcerne === impot)
+  if (!found && selectedType.value === 'douaniere') found = actives.find(b => b.organeGestionCode === 'CDDI')
+  if (!found) found = actives[0]
+  return found?.id || ''
+}
 
 // ── Types d'exonération (8 processus MRD) ──────────────────────────────────
 const exoTypes = [
@@ -984,15 +1031,15 @@ const isStandardCI = computed(() => ['fiscale_tva', 'fiscale_is', 'sectorielle']
 // ── Step labels adaptatifs ──────────────────────────────────────────────────
 const stepLabelsMap: Record<string, string[]> = {
   douaniere:          ['Type',        'Déclarant',         'Déclaration CDDI',           'Documents CDDI',    'Récapitulatif'],
-  fiscale_tva:        ['Type',        'Bénéficiaire',      'Détails CI',                 'Documents CI',      'Récapitulatif'],
-  fiscale_is:         ['Type',        'Bénéficiaire',      'Détails CI',                 'Documents CI',      'Récapitulatif'],
+  fiscale_tva:        ['Type',        'Contribuable',      'Détails CI',                 'Documents CI',      'Récapitulatif'],
+  fiscale_is:         ['Type',        'Contribuable',      'Détails CI',                 'Documents CI',      'Récapitulatif'],
   zone_franche:       ['Type',        'Promoteur',         'Projet ZF',                  'Documents API-ZF',  'Récapitulatif'],
   code_investissement:['Type',        'Investisseur',      'Programme d\'invest.',       'Documents CI',      'Récapitulatif'],
   convention_miniere: ['Type',        'Opérateur',         'Convention & Phase',         'Documents DGMG',    'Récapitulatif'],
   accord_siege:       ['Type',        'Organisation',      'Base juridique & Avantages', 'Documents MAE',     'Récapitulatif'],
-  sectorielle:        ['Type',        'Bénéficiaire',      'Détails sectoriels',         'Documents',         'Récapitulatif'],
+  sectorielle:        ['Type',        'Contribuable',      'Détails sectoriels',         'Documents',         'Récapitulatif'],
 }
-const stepLabels = computed(() => stepLabelsMap[selectedType.value] || ['Type', 'Bénéficiaire', 'Détails', 'Documents', 'Récapitulatif'])
+const stepLabels = computed(() => stepLabelsMap[selectedType.value] || ['Type', 'Contribuable', 'Détails', 'Documents', 'Récapitulatif'])
 
 // ── Configuration par régime ────────────────────────────────────────────────
 interface RegimeConfig {
@@ -1076,7 +1123,7 @@ const regimeConfigs: Record<string, RegimeConfig> = {
 }
 const regimeConfig = computed(() => regimeConfigs[selectedType.value] || null)
 
-// ── Bénéficiaire ────────────────────────────────────────────────────────────
+// ── Contribuable ────────────────────────────────────────────────────────────
 const naturesJuridiques = [
   { value: 'lucratif',    title: 'Entreprise / Entité à but lucratif' },
   { value: 'nonlucratif', title: 'Entité à but non lucratif' },
@@ -1178,12 +1225,13 @@ type DocCtx = {
   siegeTypeOrg: string; siegeAvantages: string[]
 }
 type DocResult = { status: DocStatus; reason?: string }
-type DocFile = { name: string; metadata: Record<string, string> }
+type DocFile = { name: string; metadata: Record<string, string>; file?: File }
 type Doc = {
   id: string; label: string; uploaded: boolean; fileName: string; groupe: string
   obligatoire?: boolean; metadata?: Record<string, string>
   condition?: (ctx: DocCtx) => DocResult
   files?: DocFile[]
+  file?: File
 }
 
 const docsLucratif = ref<Doc[]>([
@@ -1262,7 +1310,7 @@ const docsDouaniere = ref<Doc[]>([
   { id: 'dou6',  label: 'Lettre de Transport Aérien — LTA (aérien)',                              uploaded: false, fileName: '', groupe: 'Documents de transport' },
   { id: 'dou7',  label: 'Autorisation d\'importation',                                            uploaded: false, fileName: '', groupe: 'Autorisations', obligatoire: false },
   { id: 'dou8',  label: 'Carte consulaire (corps diplomatique)',                                   uploaded: false, fileName: '', groupe: 'Autorisations diplomatiques' },
-  { id: 'dou9',  label: 'NIF du bénéficiaire',                                                    uploaded: false, fileName: '', groupe: 'Pièces obligatoires CDDI' },
+  { id: 'dou9',  label: 'NIF du contribuable',                                                    uploaded: false, fileName: '', groupe: 'Pièces obligatoires CDDI' },
 ])
 
 // Zone Franche (Processus 3 API-ZF)
@@ -1317,7 +1365,7 @@ const docsConventionMiniere = ref<Doc[]>([
 const docsAccordSiege = ref<Doc[]>([
   { id: 'as1', label: 'Accord de siège / Convention internationale (copie certifiée)', uploaded: false, fileName: '', groupe: 'Base juridique MAE' },
   { id: 'as2', label: 'Note verbale du Ministère des Affaires Étrangères',           uploaded: false, fileName: '', groupe: 'Base juridique MAE' },
-  { id: 'as3', label: 'Liste nominative du personnel bénéficiaire',                  uploaded: false, fileName: '', groupe: 'Listes annuelles' },
+  { id: 'as3', label: 'Liste nominative du personnel contribuable',                  uploaded: false, fileName: '', groupe: 'Listes annuelles' },
   { id: 'as4', label: 'Registre des immatriculations de véhicules diplomatiques/officiels', uploaded: false, fileName: '', groupe: 'Listes annuelles' },
   { id: 'as5', label: 'Carte consulaire des membres du corps diplomatique',          uploaded: false, fileName: '', groupe: 'Pièces diplomatiques',
     condition: (ctx) => ctx.siegeTypeOrg.includes('Ambassade') || ctx.siegeTypeOrg.includes('Consulat') || ctx.siegeTypeOrg.includes('diplomatique')
@@ -1498,7 +1546,7 @@ function openDocModal(doc: Doc) {
   docModalOpen.value   = true
 }
 
-function onDocConfirmed(doc: Doc, fileName: string, metadata: Record<string, string>, files?: DocFile[]) {
+function onDocConfirmed(doc: Doc, fileName: string, metadata: Record<string, string>, files?: DocFile[], file?: File) {
   // Retrouver le document réactif dans le bon tableau et le mettre à jour
   const allPools = [
     docsLucratif, docsNonLucratif, docsPublic, docsDouaniere,
@@ -1515,9 +1563,104 @@ function onDocConfirmed(doc: Doc, fileName: string, metadata: Record<string, str
         found.metadata = Object.fromEntries(
           Object.entries(metadata).filter(([, v]) => v && v !== 'undefined')
         )
+        if (file) found.file = file
       }
       break
     }
+  }
+}
+
+// ── Garde-fous de soumission + envoi réel à l'API ────────────────────────────
+// Pièces d'identité pré-fournies automatiquement (NIF/RCCM) — ne comptent pas
+// comme pièces justificatives de rang 1 déposées par le contribuable.
+const IDENTITY_PREFOURNIS = new Set(['l3', 'l8', 'n2', 'n5', 'p3', 'zf5', 'zf6', 'ci5', 'ci6', 'min6', 'dou9'])
+
+const piecesRang1 = computed(() =>
+  dynamicDocs.value.filter(d => docStatus(d) === 'obligatoire' && !IDENTITY_PREFOURNIS.has(d.id)),
+)
+const piecesRang1Fournies = computed(() => piecesRang1.value.filter(d => d.uploaded))
+
+const montantDemande = computed((): number => {
+  if (isStandardCI.value) return Number(details.value.montant) || 0
+  if (selectedType.value === 'douaniere') return Number(douaFields.value.droitsExoneres) || 0
+  if (selectedType.value === 'zone_franche') return Number(zfFields.value.montantInvest) || 0
+  if (selectedType.value === 'code_investissement') return Number(ciFields.value.montantCAPEX) || 0
+  if (selectedType.value === 'convention_miniere') return Number(mineFields.value.capexPhase) || 0
+  return 0
+})
+
+/** Validation métier avant soumission. Retourne la liste des erreurs bloquantes. */
+function validerSoumission(): string[] {
+  const erreurs: string[] = []
+  if (isStandardCI.value && (!(montantDemande.value > 0))) {
+    erreurs.push("Montant invalide : la valeur estimée de l'opération doit être un montant strictement positif (FCFA).")
+  }
+  if (piecesRang1.value.length > 0 && piecesRang1Fournies.value.length === 0) {
+    erreurs.push(
+      `Pièces obligatoires manquantes : déposez au moins une pièce justificative de rang 1 ` +
+      `(quitus fiscal, états financiers, DAS…) parmi les ${piecesRang1.value.length} requises avant la soumission.`,
+    )
+  }
+  return erreurs
+}
+
+/** Collecte les fichiers réels à téléverser (docs déposés via la modale). */
+function fichiersAUploades(): { doc: Doc; file: File; rangCode: 'premier' | 'second' }[] {
+  const result: { doc: Doc; file: File; rangCode: 'premier' | 'second' }[] = []
+  for (const doc of dynamicDocs.value) {
+    if (!doc.uploaded) continue
+    const rangCode = docStatus(doc) === 'obligatoire' ? 'premier' : 'second'
+    if (doc.files && doc.files.length > 0) {
+      for (const f of doc.files) if (f.file) result.push({ doc, file: f.file, rangCode })
+    } else if (doc.file) {
+      result.push({ doc, file: doc.file, rangCode })
+    }
+  }
+  return result
+}
+
+async function submitDemande() {
+  submitError.value = ''
+  const erreurs = validerSoumission()
+  if (erreurs.length > 0) {
+    submitError.value = erreurs.join(' ')
+    return
+  }
+  submitting.value = true
+  try {
+    const baseJuridiqueVersionId = resolveBaseJuridiqueVersionId()
+    if (!baseJuridiqueVersionId || !contribuableId.value) {
+      throw new Error('Dossier non recevable : base juridique ou profil contribuable introuvable. Réessayez dans un instant.')
+    }
+    // 1. Création du brouillon (POST /demandes)
+    const payload: Parameters<typeof creerDemande>[0] = {
+      baseJuridiqueVersionId,
+      contribuableId: contribuableId.value,
+      montantFcfa: montantDemande.value,
+      secteur: benefForm.value.secteur || undefined,
+    }
+    if (details.value.dateDebut && Number(details.value.duree) > 0) {
+      const d = new Date(details.value.dateDebut)
+      d.setMonth(d.getMonth() + Number(details.value.duree))
+      payload.dateEcheance = d.toISOString().slice(0, 10)
+    }
+    const created = await creerDemande(payload)
+
+    // 2. Upload réel des pièces jointes déposées
+    for (const { file, rangCode } of fichiersAUploades()) {
+      await uploadPieceJointe(created.id, file, rangCode)
+    }
+
+    // 3. Soumission effective (POST /demandes/:id/soumettre)
+    const soumise = await soumettreDemande(created.id)
+    referenceFinale.value = soumise.reference || created.reference
+    submitted.value = true
+  } catch (e) {
+    submitError.value = e instanceof Error
+      ? `Erreur lors de la soumission : ${e.message}`
+      : 'Erreur lors de la soumission de la demande.'
+  } finally {
+    submitting.value = false
   }
 }
 </script>

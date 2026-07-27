@@ -168,7 +168,7 @@
               <v-chip size="x-small" color="warning" variant="tonal">Non-respect</v-chip>
               <span class="text-caption">Si conditions du régime non respectées (contrôle annuel)</span>
             </div>
-            <div class="text-caption text-medium-emphasis">Objectif : éviter toute application d'avantages sur acte caduc — risque documenté MRD 2024 pour plusieurs bénéficiaires ZF.</div>
+            <div class="text-caption text-medium-emphasis">Objectif : éviter toute application d'avantages sur acte caduc — risque documenté MRD 2024 pour plusieurs contribuables ZF.</div>
             <v-divider class="my-2" />
             <div class="text-caption"><strong>Destinataires :</strong> UPF + OTR + API-ZF → Registre central OASE</div>
           </v-card-text>

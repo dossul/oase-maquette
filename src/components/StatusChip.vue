@@ -25,12 +25,16 @@ const chipColor = computed(() => STATUT_COLORS[props.statut])
 const chipLabel = computed(() => STATUT_LABELS[props.statut])
 const chipIcon = computed(() => {
   const icons: Record<StatutDemande, string> = {
-    en_cours: 'mdi-clock-outline',
-    approuve: 'mdi-check-circle',
+    brouillon: 'mdi-pencil-circle',
+    soumis: 'mdi-send-circle',
+    en_instruction: 'mdi-clock-outline',
     action_requise: 'mdi-alert-circle',
+    approuve: 'mdi-check-circle',
     rejete: 'mdi-close-circle',
     expire: 'mdi-calendar-remove',
-    brouillon: 'mdi-pencil-circle',
+    archive: 'mdi-archive',
+    // Alias legacy
+    en_cours: 'mdi-clock-outline',
   }
   return icons[props.statut]
 })

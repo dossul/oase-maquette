@@ -24,16 +24,17 @@
     <!-- Quick filter -->
     <div class="d-flex align-center ga-2 mb-4 flex-wrap">
       <span class="text-body-2 font-weight-medium text-medium-emphasis me-1">Filtrer :</span>
-      <v-chip
+      <v-btn
         v-for="f in filters"
         :key="f.value"
         :color="activeFilter === f.value ? 'primary' : 'default'"
         variant="tonal"
         size="small"
+        rounded="pill"
         @click="activeFilter = f.value"
       >
         {{ f.label }}
-      </v-chip>
+      </v-btn>
     </div>
 
     <!-- Recent requests list -->
@@ -100,12 +101,14 @@ import { EXO_TYPE_LABELS } from '../../types'
 import type { ExoType } from '../../types'
 
 const activeFilter = ref('all')
+// OASE [Recette E2E] : valeurs alignées sur les statuts CANONIQUES de l'API
+// (approuve, en_instruction, action_requise, archive — et non 'accordee'/'archivee').
 const filters = [
   { label: 'Toutes', value: 'all' },
-  { label: 'Actives', value: 'accordee' },
+  { label: 'Actives', value: 'approuve' },
   { label: 'En instruction', value: 'en_instruction' },
   { label: 'Action requise', value: 'action_requise' },
-  { label: 'Archivées', value: 'archivee' },
+  { label: 'Archivées', value: 'archive' },
 ]
 
 const demandesApi = ref<any[]>([])
@@ -136,10 +139,10 @@ const filteredDemandes = computed(() =>
 )
 
 const kpis = computed(() => [
-  { label: 'Demandes en cours', value: demandesApi.value.filter(d => d.statut === 'en_instruction').length, icon: 'mdi-clock-outline', color: 'info', to: '/portail/demandes/1' },
-  { label: 'Demandes approuvées actives', value: demandesApi.value.filter(d => d.statut === 'accordee').length, icon: 'mdi-check-circle', color: 'success', subtitle: '1 expire dans 30j', to: '/portail/exonerations-actives' },
+  { label: 'Demandes en cours', value: demandesApi.value.filter(d => ['soumis', 'en_instruction'].includes(d.statut)).length, icon: 'mdi-clock-outline', color: 'info', to: '/portail/demandes/1' },
+  { label: 'Demandes approuvées actives', value: demandesApi.value.filter(d => d.statut === 'approuve').length, icon: 'mdi-check-circle', color: 'success', subtitle: '1 expire dans 30j', to: '/portail/exonerations-actives' },
   { label: 'Actions requises', value: demandesApi.value.filter(d => d.statut === 'action_requise').length, icon: 'mdi-alert-circle', color: 'warning', to: '/portail/demandes/3' },
-  { label: 'Expirées / Clôturées', value: demandesApi.value.filter(d => ['archivee','rejetee'].includes(d.statut)).length, icon: 'mdi-archive', color: 'secondary', to: '/portail/exonerations-actives' },
+  { label: 'Expirées / Clôturées', value: demandesApi.value.filter(d => ['archive', 'rejete', 'expire'].includes(d.statut)).length, icon: 'mdi-archive', color: 'secondary', to: '/portail/exonerations-actives' },
 ])
 
 const recentNotifs = mockNotifications.slice(0, 4)

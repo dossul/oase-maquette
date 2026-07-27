@@ -15,7 +15,7 @@
         size="x-small" variant="tonal"
       >{{ selectedMission.statutLabel }}</v-chip>
       <v-chip color="secondary" size="x-small" variant="outlined" class="ms-1">
-        {{ selectedMission.beneficiaire }}
+        {{ selectedMission.contribuable }}
       </v-chip>
     </div>
 
@@ -48,7 +48,7 @@
                       <v-text-field v-model="selectedMission.ref" label="Référence de la mission" readonly/>
                     </v-col>
                     <v-col cols="12" md="6">
-                      <v-text-field v-model="selectedMission.beneficiaire" label="Bénéficiaire contrôlé" prepend-inner-icon="mdi-domain"/>
+                      <v-text-field v-model="selectedMission.contribuable" label="Contribuable contrôlé" prepend-inner-icon="mdi-domain"/>
                     </v-col>
                     <v-col cols="6">
                       <v-text-field v-model="selectedMission.dateDebut" label="Début de la période contrôlée" type="date"/>
@@ -439,7 +439,7 @@
                       <span class="text-body-2 font-weight-semibold">{{ s.type }}</span>
                     </template>
                     <template #subtitle>
-                      <div class="text-caption text-medium-emphasis">{{ s.beneficiaire }} · {{ s.detail }}</div>
+                      <div class="text-caption text-medium-emphasis">{{ s.contribuable }} · {{ s.detail }}</div>
                     </template>
                     <template #append>
                       <v-chip :color="s.statut==='execute'?'success':'warning'" size="x-small" variant="tonal">
@@ -581,7 +581,7 @@
                   </v-avatar>
                 </template>
                 <template #title><span class="text-caption font-weight-semibold">{{ s.type }}</span></template>
-                <template #subtitle><span class="text-caption text-medium-emphasis">{{ s.beneficiaire }}</span></template>
+                <template #subtitle><span class="text-caption text-medium-emphasis">{{ s.contribuable }}</span></template>
                 <template #append>
                   <v-chip :color="s.statut==='execute'?'success':'warning'" size="x-small" variant="tonal">
                     {{ s.statut==='execute'?'Exécuté':'En attente' }}
@@ -707,7 +707,7 @@
             label="Type de suite *"
             class="mb-3"
           />
-          <v-text-field v-model="suiteForm.beneficiaire" label="Bénéficiaire concerné" class="mb-3"/>
+          <v-text-field v-model="suiteForm.contribuable" label="Contribuable concerné" class="mb-3"/>
           <v-text-field v-model="suiteForm.detail" label="Détail / Montant / Durée" class="mb-3"/>
           <v-select v-model="suiteForm.statut" :items="[{title:'En attente',value:'en_attente'},{title:'Exécuté',value:'execute'}]" item-title="title" item-value="value" label="Statut"/>
         </v-card-text>
@@ -725,7 +725,7 @@
         <v-card-title class="pa-5">Créer une mission de contrôle</v-card-title>
         <v-card-text class="pa-5">
           <v-row>
-            <v-col cols="12"><v-text-field v-model="newMissionForm.beneficiaire" label="Bénéficiaire cible" prepend-inner-icon="mdi-domain"/></v-col>
+            <v-col cols="12"><v-text-field v-model="newMissionForm.contribuable" label="Contribuable cible" prepend-inner-icon="mdi-domain"/></v-col>
             <v-col cols="12"><v-select v-model="newMissionForm.typeMission" :items="['Sur pièces','Sur place','Mixte']" label="Type de contrôle"/></v-col>
             <v-col cols="6"><v-text-field v-model="newMissionForm.dateDebut" label="Date début" type="date"/></v-col>
             <v-col cols="6"><v-text-field v-model="newMissionForm.dateFin" label="Date fin" type="date"/></v-col>
@@ -766,7 +766,7 @@ interface Dossier { ref: string; type: string; montant: string; anomalie: boolea
 interface Document { nom: string; date: string }
 interface Mission {
   ref: string
-  beneficiaire: string
+  contribuable: string
   periode: string
   dateDebut: string
   dateFin: string
@@ -785,7 +785,7 @@ interface Mission {
 }
 interface Constat { id: string; dossierRef: string; typeIrregularite: string; gravite: string; montant: string; periode: string; baseLegale: string; description: string; observations: string }
 interface Recommandation { id: string; texte: string; responsable: string; priorite: string; echeance: string; suivi: string }
-interface Suite { id: string; type: string; beneficiaire: string; detail: string; statut: string; icon: string; color: string }
+interface Suite { id: string; type: string; contribuable: string; detail: string; statut: string; icon: string; color: string }
 
 // ── State ──
 const selectedMission = ref<Mission | null>(null)
@@ -828,7 +828,7 @@ const appreciations = [
 
 const missions = ref<Mission[]>([
   {
-    ref: 'CTRL-2026-001', beneficiaire: 'TOGO STEEL SARL', periode: 'Jan–Mar 2026',
+    ref: 'CTRL-2026-001', contribuable: 'TOGO STEEL SARL', periode: 'Jan–Mar 2026',
     dateDebut: '2026-01-01', dateFin: '2026-03-31', statut: 'en_cours', statutLabel: 'En cours',
     agents: ['K. ABALO', 'A. MENSAH'], objectifs: 'Vérifier l\'utilisation de l\'exonération douanière accordée en 2024 et 2025.',
     typeMission: 'Mixte', constats: 2,
@@ -846,7 +846,7 @@ const missions = ref<Mission[]>([
     signataire: 'K. ABALO',
   },
   {
-    ref: 'CTRL-2026-002', beneficiaire: 'LOMÉ TEXTILE ZF SAS', periode: 'Avr 2026',
+    ref: 'CTRL-2026-002', contribuable: 'LOMÉ TEXTILE ZF SAS', periode: 'Avr 2026',
     dateDebut: '2026-04-01', dateFin: '2026-04-30', statut: 'planifiee', statutLabel: 'Planifiée',
     agents: ['M. KOFFI'], objectifs: 'Contrôle des engagements ZFI (emploi, investissement).',
     typeMission: 'Sur place', constats: 0,
@@ -855,7 +855,7 @@ const missions = ref<Mission[]>([
     conclusions: '', appreciation: '', dateRapport: '', signataire: '',
   },
   {
-    ref: 'CTRL-2025-018', beneficiaire: 'AGRO-TOGO INVEST SA', periode: 'Oct–Déc 2025',
+    ref: 'CTRL-2025-018', contribuable: 'AGRO-TOGO INVEST SA', periode: 'Oct–Déc 2025',
     dateDebut: '2025-10-01', dateFin: '2025-12-31', statut: 'cloturee', statutLabel: 'Clôturée',
     agents: ['A. MENSAH', 'P. TCHALLA'],
     objectifs: 'Contrôle d\'ensemble de l\'exonération TVA accordée sous LFI 2024.',
@@ -875,7 +875,7 @@ const constats = ref<Constat[]>([
     id: 'c1', dossierRef: 'OASE-2025-0082', typeIrregularite: 'Dépassement de quota',
     gravite: 'critique', montant: '89 400 000 FCFA', periode: 'Jan 2025 – Déc 2025',
     baseLegale: 'CGI Art. 215 — Quota annuel exonération douanière',
-    description: 'Le montant d\'exonération douanière consommé dépasse de 340% le quota autorisé. Le bénéficiaire a utilisé 89,4M FCFA contre une autorisation de 26,2M FCFA.',
+    description: 'Le montant d\'exonération douanière consommé dépasse de 340% le quota autorisé. Le contribuable a utilisé 89,4M FCFA contre une autorisation de 26,2M FCFA.',
     observations: 'Documents douaniers SYDONIA confirment les montants.',
   },
   {
@@ -894,14 +894,14 @@ const recommandations = ref<Recommandation[]>([
 ])
 
 const suitesDonnees = ref<Suite[]>([
-  { id: 's1', type: 'Recouvrement amiable', beneficiaire: 'LOMÉ LOGISTICS SA', detail: '15,2M FCFA · Délai 60j', statut: 'en_attente', icon: 'mdi-bank-transfer', color: 'warning' },
-  { id: 's2', type: 'Suspension temporaire', beneficiaire: 'TOGO PHARMA ZF', detail: 'Convention ZFI-2020-005 — 6 mois', statut: 'execute', icon: 'mdi-pause-circle', color: 'error' },
-  { id: 's3', type: 'Main-levée accordée', beneficiaire: 'AGRO-TOGO INVEST SA', detail: 'Suite régularisation SIGTAS', statut: 'execute', icon: 'mdi-check-circle', color: 'success' },
+  { id: 's1', type: 'Recouvrement amiable', contribuable: 'LOMÉ LOGISTICS SA', detail: '15,2M FCFA · Délai 60j', statut: 'en_attente', icon: 'mdi-bank-transfer', color: 'warning' },
+  { id: 's2', type: 'Suspension temporaire', contribuable: 'TOGO PHARMA ZF', detail: 'Convention ZFI-2020-005 — 6 mois', statut: 'execute', icon: 'mdi-pause-circle', color: 'error' },
+  { id: 's3', type: 'Main-levée accordée', contribuable: 'AGRO-TOGO INVEST SA', detail: 'Suite régularisation SIGTAS', statut: 'execute', icon: 'mdi-check-circle', color: 'success' },
 ])
 
 const alertesRegles = [
   { id: 1, icon: 'mdi-timer-alert', label: 'Exonérations durée dépassée', details: '3 dossiers concernés' },
-  { id: 2, icon: 'mdi-bank-off', label: 'Bénéficiaires avec dettes fiscales', details: '2 signalements SIGTAS' },
+  { id: 2, icon: 'mdi-bank-off', label: 'Contribuables avec dettes fiscales', details: '2 signalements SIGTAS' },
   { id: 3, icon: 'mdi-chart-bar', label: 'Écarts quota > 200%', details: '1 dossier douanier' },
   { id: 4, icon: 'mdi-content-copy', label: 'Doublons SYDONIA/SIGTAS', details: '1 doublon détecté' },
 ]
@@ -909,8 +909,8 @@ const alertesRegles = [
 // ── Form state ──
 const constatForm = ref<Constat>({ id: '', dossierRef: '', typeIrregularite: '', gravite: 'elevee', montant: '', periode: '', baseLegale: '', description: '', observations: '' })
 const recoForm = ref<Recommandation>({ id: '', texte: '', responsable: 'OTR Douanes', priorite: 'haute', echeance: '', suivi: 'non' })
-const suiteForm = ref<Suite>({ id: '', type: '', beneficiaire: '', detail: '', statut: 'en_attente', icon: '', color: '' })
-const newMissionForm = ref({ beneficiaire: '', typeMission: 'Mixte', dateDebut: '', dateFin: '', objectifs: '', agents: [] as string[] })
+const suiteForm = ref<Suite>({ id: '', type: '', contribuable: '', detail: '', statut: 'en_attente', icon: '', color: '' })
+const newMissionForm = ref({ contribuable: '', typeMission: 'Mixte', dateDebut: '', dateFin: '', objectifs: '', agents: [] as string[] })
 
 // ── Computed ──
 const filteredMissions = computed(() =>
@@ -957,7 +957,7 @@ const kpis = computed(() => [
 
 // ── Methods ──
 const missionHeaders = [
-  { title: 'Référence', key: 'ref' }, { title: 'Bénéficiaire', key: 'beneficiaire' },
+  { title: 'Référence', key: 'ref' }, { title: 'Contribuable', key: 'contribuable' },
   { title: 'Période', key: 'periode' }, { title: 'Type', key: 'typeMission' },
   { title: 'Constats', key: 'constats' }, { title: 'Statut', key: 'statut' },
   { title: 'Actions', key: 'actions', sortable: false },
@@ -1026,14 +1026,14 @@ function saveSuite() {
   const meta = typeIconMap[suiteForm.value.type] || { icon: 'mdi-cog', color: 'secondary' }
   suitesDonnees.value.push({ ...suiteForm.value, id: Date.now().toString(), ...meta })
   suiteDialog.value = false
-  suiteForm.value = { id: '', type: '', beneficiaire: '', detail: '', statut: 'en_attente', icon: '', color: '' }
+  suiteForm.value = { id: '', type: '', contribuable: '', detail: '', statut: 'en_attente', icon: '', color: '' }
 }
 
 function createMission() {
   const ref = `CTRL-2026-00${missions.value.length + 3}`
   missions.value.push({
     ref,
-    beneficiaire: newMissionForm.value.beneficiaire,
+    contribuable: newMissionForm.value.contribuable,
     periode: `${newMissionForm.value.dateDebut} → ${newMissionForm.value.dateFin}`,
     dateDebut: newMissionForm.value.dateDebut,
     dateFin: newMissionForm.value.dateFin,
@@ -1045,7 +1045,7 @@ function createMission() {
     dossiers: [], documents: [], conclusions: '', appreciation: '', dateRapport: '', signataire: '',
   })
   newMissionDialog.value = false
-  newMissionForm.value = { beneficiaire: '', typeMission: 'Mixte', dateDebut: '', dateFin: '', objectifs: '', agents: [] }
+  newMissionForm.value = { contribuable: '', typeMission: 'Mixte', dateDebut: '', dateFin: '', objectifs: '', agents: [] }
 }
 
 function generateReport() {

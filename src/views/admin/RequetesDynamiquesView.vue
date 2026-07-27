@@ -17,7 +17,7 @@
           <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Constructeur</v-card-title>
           <v-card-text>
             <v-select :items="['Registre central', 'Archives', 'Rapprochements', 'Rapports CONEDEF']" label="Source" density="compact" class="mb-2" />
-            <v-select :items="['Mesure', 'Beneficiaire', 'Regime', 'Secteur', 'Montant exonere', 'Qualite donnee']" label="Colonnes visibles" multiple chips closable-chips density="compact" class="mb-2" />
+            <v-select :items="['Mesure', 'Contribuable', 'Regime', 'Secteur', 'Montant exonere', 'Qualite donnee']" label="Colonnes visibles" multiple chips closable-chips density="compact" class="mb-2" />
             <v-select :items="['Public', 'Interne', 'Restreint', 'Confidentiel']" label="Niveau de confidentialite" density="compact" class="mb-2" />
             <v-textarea label="Filtres logiques" rows="4" density="compact" model-value="regime = 'Zone franche' AND statut_rapprochement != 'Reconcile'" />
           </v-card-text>
@@ -59,15 +59,15 @@ import PageHeader from '../../components/PageHeader.vue'
 
 const headers = [
   { title: 'Mesure', key: 'mesure' },
-  { title: 'Beneficiaire', key: 'beneficiaire' },
+  { title: 'Contribuable', key: 'contribuable' },
   { title: 'Regime', key: 'regime' },
   { title: 'Montant exonere', key: 'montant' },
   { title: 'Qualite', key: 'qualite' },
 ]
 
 const rows = [
-  { mesure: 'MES-2026-00083', beneficiaire: 'Lome Textile ZF SAS', regime: 'Zone franche', montant: '780 000 000 FCFA', qualite: 'Certifie' },
-  { mesure: 'MES-2026-00124', beneficiaire: 'Mission diplomatique Canada', regime: 'Accord de siege', montant: '128 000 000 FCFA', qualite: 'Corrige' },
-  { mesure: 'MES-2025-00411', beneficiaire: 'Mines du Nord Togo', regime: 'Convention miniere', montant: '234 000 000 FCFA', qualite: 'Brut' },
+  { mesure: 'MES-2026-00083', contribuable: 'Lome Textile ZF SAS', regime: 'Zone franche', montant: '780 000 000 FCFA', qualite: 'Certifie' },
+  { mesure: 'MES-2026-00124', contribuable: 'Mission diplomatique Canada', regime: 'Accord de siege', montant: '128 000 000 FCFA', qualite: 'Corrige' },
+  { mesure: 'MES-2025-00411', contribuable: 'Mines du Nord Togo', regime: 'Convention miniere', montant: '234 000 000 FCFA', qualite: 'Brut' },
 ]
 </script>

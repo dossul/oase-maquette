@@ -87,7 +87,7 @@ const headers = [
 
 const rows = [
   { indicateur: 'Inventaire ouvert des bases juridiques', source: 'Référentiel juridique', statut: 'Prêt' },
-  { indicateur: 'Mesures actives par impôt / secteur / bénéficiaire', source: 'Registre central', statut: 'Prêt' },
+  { indicateur: 'Mesures actives par impôt / secteur / contribuable', source: 'Registre central', statut: 'Prêt' },
   { indicateur: 'Montants annuels agrégés par impôt / fonction budgétaire', source: 'Annexe budgetaire', statut: 'En validation' },
   { indicateur: 'Rapports CONEDEF 2019-2024', source: 'Bibliothèque rapports', statut: 'Prêt' },
   { indicateur: 'Indicateurs de qualité des données', source: 'Gouvernance données', statut: 'En validation' },

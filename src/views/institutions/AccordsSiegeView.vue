@@ -198,7 +198,7 @@ const processMatrix = [
   { etape: 'Exo. TVA', acteur: 'OTR CI → E-TAX', action: 'Exonération de TVA sur les achats locaux. Mode d\'application (remboursement ou exonération directe) dépend du type de base juridique invoqué.', niveau: 'Opérationnel' },
   { etape: 'Exo. IRPP', acteur: 'OTR CI → E-TAX', action: 'Exonération d\'IRPP pour les personnels de l\'organisation (agents non-résidents). Périmètre défini par la convention bilatérale.', niveau: 'Opérationnel' },
   { etape: 'Franchise douanière', acteur: 'OTR CDDI → SYDONIAWORLD + GESTEXO', action: 'Franchises douanières sur importation de matériel, équipements et véhicules diplomatiques. Traitement via SYDONIAWORLD avec suivi GESTEXO.', niveau: 'Opérationnel' },
-  { etape: 'Mise à jour', acteur: 'OI / Ambassade / ONG → OTR / OASE', action: 'Mise à jour annuelle des listes nominatives du personnel bénéficiaire et du registre des immatriculations de véhicules diplomatiques. Obligation annuelle.', niveau: 'Contrôle' },
+  { etape: 'Mise à jour', acteur: 'OI / Ambassade / ONG → OTR / OASE', action: 'Mise à jour annuelle des listes nominatives du personnel contribuable et du registre des immatriculations de véhicules diplomatiques. Obligation annuelle.', niveau: 'Contrôle' },
   { etape: 'Alerte', acteur: 'OASE → Registre central', action: 'Alerte OASE si non-mise à jour des listes (> 12 mois) ou expiration de l\'accord. Alerte automatique J-90.', niveau: 'OASE' },
 ]
 
@@ -231,7 +231,7 @@ const statusColor = (value: string) => ({ 'A jour': 'success', 'A completer': 'w
 const o2Rows = (item: (typeof rows)[number]) => [
   { label: 'id_mesure / reference accord', value: `MES-${item.reference} / ${item.reference}` },
   { label: 'base juridique / articles', value: 'Accord de siege + protocoles d application' },
-  { label: 'beneficiaire / type', value: `${item.organisation} / corps diplomatique ou OI` },
+  { label: 'contribuable / type', value: `${item.organisation} / corps diplomatique ou OI` },
   { label: 'code additionnel / systeme source', value: `${item.codeAdditionnel} / Sydonia + E-TAX` },
   { label: 'organe attribution / gestion', value: 'MAE / OTR' },
   { label: 'validite / horodatage', value: `${item.validite} / campagne 2026` },

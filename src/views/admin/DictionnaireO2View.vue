@@ -42,7 +42,7 @@
           <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Regles de completude visibles</v-card-title>
           <v-list density="compact" class="pa-2">
             <v-list-item title="Blocage si liquidation incomplete" prepend-icon="mdi-lock-alert-outline" />
-            <v-list-item title="Controle des pieces premier rang par type de beneficiaire" prepend-icon="mdi-file-certificate-outline" />
+            <v-list-item title="Controle des pieces premier rang par type de contribuable" prepend-icon="mdi-file-certificate-outline" />
             <v-list-item title="Controle brut taxable / taux applique / montant exonere" prepend-icon="mdi-calculator-variant-outline" />
             <v-list-item title="Horodatage, utilisateur de saisie et piece probante avec hash" prepend-icon="mdi-history" />
           </v-list>
@@ -105,7 +105,7 @@ const attributeHeaders = [
 const attributes = [
   { id: 1, nom: 'id_mesure', description: 'Identifiant unique de mesure derogatoire', obligatoire: true, statut: 'Visible' },
   { id: 2, nom: 'id_base_juridique + articles_concernes', description: 'Texte source et articles rattaches', obligatoire: true, statut: 'Visible' },
-  { id: 3, nom: 'id_beneficiaire + nif', description: 'Beneficiaire et identifiant fiscal', obligatoire: true, statut: 'Visible' },
+  { id: 3, nom: 'id_contribuable + nif', description: 'Contribuable et identifiant fiscal', obligatoire: true, statut: 'Visible' },
   { id: 4, nom: 'id_decision / numero_attestation', description: 'Decision d octroi ou reference acte', obligatoire: true, statut: 'Visible' },
   { id: 5, nom: 'code_additionnel', description: 'Code douane ou impots d aggregation SI', obligatoire: true, statut: 'Visible' },
   { id: 6, nom: 'id_systeme_source + numero_operation_si', description: 'Source technique et reference operationnelle', obligatoire: true, statut: 'Visible' },
@@ -125,7 +125,7 @@ const attributes = [
 const entities = [
   { nom: 'MESURE_DEROGATOIRE', description: 'Noyau de suivi de la mesure et de sa validite', champs: 'id_mesure, regime, duree, statut', vues: 'Registre central / tableaux', statut: 'Visible' },
   { nom: 'BASE_JURIDIQUE', description: 'Texte, article, type acte et famille juridique', champs: 'id_base_juridique, articles, type acte', vues: 'Registre / referentiel', statut: 'Visible' },
-  { nom: 'BENEFICIAIRE', description: 'Identite, NIF, typologie et confidentialite', champs: 'id_beneficiaire, nif, type', vues: 'Registre / formulaires', statut: 'Visible' },
+  { nom: 'CONTRIBUABLE', description: 'Identite, NIF, typologie et confidentialite', champs: 'id_contribuable, nif, type', vues: 'Registre / formulaires', statut: 'Visible' },
   { nom: 'DEMANDE_EXONERATION', description: 'Demande initiale, pieces et dates de depot', champs: 'numero dossier, depot, pieces', vues: 'Parcours portail / workflow', statut: 'Visible' },
   { nom: 'DECISION_OCTROI', description: 'Acte d octroi, attestation, agrement ou convention', champs: 'id_decision, numero attestation', vues: 'Workflow / validation', statut: 'Visible' },
   { nom: 'EXECUTION_LIQUIDATION', description: 'Operation SI et montant liquide ou exonere', champs: 'code additionnel, montant, date', vues: 'Workflow CDDI / registre', statut: 'Visible' },
@@ -146,7 +146,7 @@ const referentials = [
   { nom: 'R_TYPE_ACTE', description: 'Loi, decret, convention, accord, arrete, agrement', pointFocal: 'UPF', statut: 'Visible' },
   { nom: 'R_NATURE_MESURE', description: 'Nature de la mesure derogatoire', pointFocal: 'UPF', statut: 'Visible' },
   { nom: 'R_IMPOT_TAXE', description: 'Impot ou taxe concerne', pointFocal: 'OTR', statut: 'Visible' },
-  { nom: 'R_TYPE_BENEFICIAIRE', description: 'Entreprise, ONG, OI, corps diplomatique, projet', pointFocal: 'MEF', statut: 'Visible' },
+  { nom: 'R_TYPE_CONTRIBUABLE', description: 'Entreprise, ONG, OI, corps diplomatique, projet', pointFocal: 'MEF', statut: 'Visible' },
   { nom: 'R_SECTEUR_BRANCHE', description: 'Nomenclature NES secteur et branche', pointFocal: 'INSEED', statut: 'Visible' },
   { nom: 'R_OBJECTIF_POLITIQUE', description: 'Objectif fiscal, economique, social ou sectoriel', pointFocal: 'UPF', statut: 'Visible' },
   { nom: 'R_ORGANE', description: 'Organe attributaire, gestionnaire ou de controle', pointFocal: 'MEF / OTR', statut: 'Visible' },

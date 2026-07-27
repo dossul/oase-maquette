@@ -33,16 +33,16 @@
               </div>
               <v-progress-linear :model-value="(s.n2026/234)*100" color="primary" rounded height="10" bg-color="surface-light"/>
               <div v-if="filterSecteur===s.secteur" class="mt-2 ms-2">
-                <v-chip v-for="b in s.beneficiaires" :key="b" size="x-small" variant="outlined" class="me-1 mb-1">{{ b }}</v-chip>
+                <v-chip v-for="b in s.contribuables" :key="b" size="x-small" variant="outlined" class="me-1 mb-1">{{ b }}</v-chip>
               </div>
             </div>
           </v-card-text>
         </v-card>
         <v-card rounded="lg" elevation="1">
-          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Concentration — Les 5 premiers bénéficiaires</v-card-title>
+          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Concentration — Les 5 premiers contribuables</v-card-title>
           <v-card-text>
             <v-alert type="info" variant="tonal" density="compact" rounded="lg" class="mb-4">
-              Les 5 premiers bénéficiaires représentent <strong>47,3%</strong> du coût total des exonérations.
+              Les 5 premiers contribuables représentent <strong>47,3%</strong> du coût total des exonérations.
             </v-alert>
             <v-progress-linear :model-value="47.3" color="warning" rounded height="16" class="mb-2">
               <template #default><span style="font-size:0.7rem;font-weight:700;color:white">47,3%</span></template>
@@ -91,11 +91,11 @@ const filterStatut = ref('Toutes')
 const compareYear = ref('2026 vs 2025')
 const secteurs = ['Mines & Hydrocarbures','Zone Franche','Agriculture','Énergie','Numérique','Santé','Transport']
 const drillData = [
-  { secteur: 'Mines & Hydrocarbures', n2026: 234, variation: +18.2, beneficiaires: ['MINES DU NORD TOGO','PETRO-TOGO SA','GOLDEN MINES'] },
-  { secteur: 'Zone Franche', n2026: 198, variation: +5.4, beneficiaires: ['LOMÉ TEXTILE ZF SAS','AGRO-PROCESSING ZES'] },
-  { secteur: 'Agriculture', n2026: 145, variation: -2.1, beneficiaires: ['AGRO-TOGO INVEST SA','AGRI-PLUS TOGO'] },
-  { secteur: 'Énergie', n2026: 112, variation: +32.1, beneficiaires: ['ENERGIE SOLAIRE TOGO','VOLTALIA TOGO'] },
-  { secteur: 'Numérique', n2026: 89, variation: +14.7, beneficiaires: ['NUMERIQUE AFRIQUE SA','TOGO TELECOM'] },
+  { secteur: 'Mines & Hydrocarbures', n2026: 234, variation: +18.2, contribuables: ['MINES DU NORD TOGO','PETRO-TOGO SA','GOLDEN MINES'] },
+  { secteur: 'Zone Franche', n2026: 198, variation: +5.4, contribuables: ['LOMÉ TEXTILE ZF SAS','AGRO-PROCESSING ZES'] },
+  { secteur: 'Agriculture', n2026: 145, variation: -2.1, contribuables: ['AGRO-TOGO INVEST SA','AGRI-PLUS TOGO'] },
+  { secteur: 'Énergie', n2026: 112, variation: +32.1, contribuables: ['ENERGIE SOLAIRE TOGO','VOLTALIA TOGO'] },
+  { secteur: 'Numérique', n2026: 89, variation: +14.7, contribuables: ['NUMERIQUE AFRIQUE SA','TOGO TELECOM'] },
 ]
 const comparatif = [
   { label: 'Total exonérations', n1: 70, n2: 60, variation: 16.7 },

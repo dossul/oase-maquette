@@ -129,7 +129,7 @@ const filterAnnee = ref('2026')
 const secteurs = ['Mines','Zone Franche','Agriculture','Énergie','Numérique','Santé','Transport']
 const heroKpis = [
   { label: 'Total exonérations 2025', value: '724 Mds FCFA' },
-  { label: 'Bénéficiaires actifs', value: '1 102' },
+  { label: 'Contribuables actifs', value: '1 102' },
   { label: 'Types d\'exonération', value: '6' },
   { label: 'Taux / PIB', value: '3,8%' },
 ]
@@ -152,14 +152,14 @@ const indicatorHeaders = [
 ]
 const mandatoryIndicators = [
   { label: 'Inventaire des bases juridiques', frequence: 'Trimestrielle', statut: 'Publié' },
-  { label: 'Mesures actives par impôt / secteur / bénéficiaire agrégé', frequence: 'Trimestrielle', statut: 'Publié' },
+  { label: 'Mesures actives par impôt / secteur / contribuable agrégé', frequence: 'Trimestrielle', statut: 'Publié' },
   { label: 'Montants annuels agrégés par impôt / fonction budgétaire', frequence: 'Annuelle', statut: 'Publié' },
   { label: 'Rapports d évaluation des dépenses fiscales', frequence: 'Annuelle', statut: 'Publié' },
   { label: 'Indicateurs de qualité des données', frequence: 'Trimestrielle', statut: 'Publié' },
 ]
 const faqs = [
   { q: 'Qu\'est-ce qu\'une dépense fiscale ?', r: 'Une dépense fiscale est un avantage fiscal accordé à certains contribuables sous forme d\'exonération, de réduction ou de déduction, représentant un manque à gagner pour l\'État.' },
-  { q: 'Ces données identifient-elles les bénéficiaires ?', r: 'Non. Toutes les données publiées sont agrégées et anonymisées. Aucune information nominative sur les bénéficiaires n\'est visible.' },
+  { q: 'Ces données identifient-elles les contribuables ?', r: 'Non. Toutes les données publiées sont agrégées et anonymisées. Aucune information nominative sur les contribuables n\'est visible.' },
   { q: 'À quelle fréquence les données sont-elles mises à jour ?', r: 'Les données agrégées sont mises à jour trimestriellement. Le rapport annuel est publié chaque année avant le 31 mars.' },
   { q: 'Puis-je utiliser ces données dans mes recherches ?', r: 'Oui. Ces données sont publiées sous licence ouverte. Merci de mentionner la source : « OASE — MEF Togo ».' },
 ]

@@ -100,8 +100,8 @@ const headers = [
 ]
 
 const rows = [
-  { parcours: 'Suivi de dossier', usage: 'Beneficiaire / operateur', statut: 'Visible' },
-  { parcours: 'Reception des notifications', usage: 'Beneficiaire / agent', statut: 'Visible' },
+  { parcours: 'Suivi de dossier', usage: 'Contribuable / operateur', statut: 'Visible' },
+  { parcours: 'Reception des notifications', usage: 'Contribuable / agent', statut: 'Visible' },
   { parcours: 'Verification QR du document signe', usage: 'Controle terrain', statut: 'Visible' },
   { parcours: 'Saisie complete de demande', usage: 'Mobile avance', statut: 'Partiel' },
 ]

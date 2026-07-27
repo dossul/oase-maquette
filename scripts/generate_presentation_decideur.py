@@ -45,8 +45,8 @@ PROCESS_INFO = {
         "label": "1. Entree et securisation du parcours",
         "summary": "La demonstration montre comment l'acces au service reste simple pour l'usager tout en cadrant les habilitations et la continuité de compte.",
     },
-    "par_processus/02_portail_beneficiaire": {
-        "label": "2. Parcours du beneficiaire",
+    "par_processus/02_portail_contribuable": {
+        "label": "2. Parcours du contribuable",
         "summary": "La maquette couvre le depot, le suivi et la consultation des avantages accordes dans un parcours compréhensible et trace.",
     },
     "par_processus/03_instruction_validation_backoffice": {
@@ -97,11 +97,11 @@ SLIDE_DETAILS = {
     "02_mfa": ("Verification renforcee", "Confirme l'identite avant l'acces aux dossiers.", "Protege les operations sensibles sans alourdir le discours de presentation.", "Rassure sur la maitrise des acces."),
     "03_reset-password": ("Recuperation de compte", "Permet de reprendre rapidement la main sur un compte bloque.", "Reduit les interruptions de service pour les usagers et les equipes.", "Montre une continuité de service concrete."),
     "04_activate": ("Activation de compte", "Cadre la premiere connexion et l'entree dans le service.", "Facilite le demarrage des nouveaux usagers et partenaires.", "Montre une mise en service accompagnee."),
-    "06_portail-dashboard": ("Vue d'ensemble beneficiaire", "Synthese immediate de la situation du demandeur.", "Aide l'usager a comprendre ses demandes sans intermédiaire.", "Montre un service plus simple et plus lisible."),
+    "06_portail-dashboard": ("Vue d'ensemble contribuable", "Synthese immediate de la situation du demandeur.", "Aide l'usager a comprendre ses demandes sans intermédiaire.", "Montre un service plus simple et plus lisible."),
     "07_portail-nouvelle-demande": ("Depot d'une nouvelle demande", "Guide l'usager dans la preparation d'un dossier complet.", "Ameliore la qualite des depots et limite les allers-retours.", "Montre une administration plus accessible."),
     "08_portail-demande-detail": ("Suivi detaille du dossier", "Permet de suivre l'avancement et les attentes restantes.", "Reduit l'incertitude et les relances inutiles.", "Met en avant la transparence du traitement."),
     "09_portail-exonerations-actives": ("Exonerations en cours", "Affiche clairement les avantages deja actifs.", "Donne une lecture directe des decisions produisant effet.", "Aide a mesurer le stock d'avantages accordes."),
-    "10_portail-profil": ("Profil du beneficiaire", "Rassemble les informations de reference de l'usager.", "Fiabilise les echanges et les mises a jour futures.", "Montre une base commune partagee."),
+    "10_portail-profil": ("Profil du contribuable", "Rassemble les informations de reference de l'usager.", "Fiabilise les echanges et les mises a jour futures.", "Montre une base commune partagee."),
     "11_backoffice-dashboard": ("Pilotage de l'instruction", "Donne la vue de charge, des priorites et des delais.", "Aide les responsables a orienter l'action quotidienne.", "Montre la capacite de pilotage operationnel."),
     "12_backoffice-dossiers": ("Portefeuille de dossiers", "Liste les dossiers a traiter avec des reperes clairs.", "Accelere le tri et la priorisation.", "Montre une meilleure maitrise des files d'attente."),
     "13_backoffice-instruction": ("Instruction du dossier", "Rassemble les pieces, controles et points d'analyse.", "Facilite un examen plus homogene des demandes.", "Soutient la qualite de la decision."),
@@ -159,7 +159,7 @@ SLIDE_DETAILS = {
 
 PERSONA_LABELS = {
     "par_persona/00_entree_demo": "Entree de demonstration",
-    "par_persona/P1_beneficiaire": "Beneficiaire",
+    "par_persona/P1_contribuable": "Contribuable",
     "par_persona/P2_regie_financiere": "Regie financiere",
     "par_persona/P2bis_tresor_gudef": "Tresor et GUDEF",
     "par_persona/P3_agence": "Agence de promotion",

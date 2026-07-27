@@ -49,7 +49,7 @@
           <v-card-text>
             <div v-for="(m, i) in statsAnomalies" :key="i" class="mb-2 d-flex align-center ga-2">
               <span class="text-caption" style="width:40px">{{ m.mois }}</span>
-              <v-progress-linear :model-value="(m.count/12)*100" color="error" rounded height="8" class="flex-grow-1"/>
+              <v-progress-linear :model-value="(m.count/maxMensuel)*100" color="error" rounded height="8" class="flex-grow-1"/>
               <span class="text-caption font-weight-bold" style="width:20px">{{ m.count }}</span>
             </div>
           </v-card-text>
@@ -62,36 +62,65 @@
 import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
-import { listerAnomalies } from '../../services/anomalies'
-const anomalies = ref<any[]>([])
+import { listerAnomalies, type AnomalieAudit } from '../../services/audit'
+
+interface AnomalieLigne {
+  id: string
+  dossier: string
+  gravite: string
+  categorie: string
+  statut: string
+  description: string
+  dateDetection: string | null
+}
+
+const anomalies = ref<AnomalieLigne[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
+
+const POIDS_GRAVITE: Record<string, number> = { critique: 0, elevee: 1, moyenne: 2, faible: 3 }
+const STATUTS_CLOS = ['resolue', 'traitee', 'rejetee']
 
 onMounted(async () => {
   loading.value = true
   try {
-    const res = await listerAnomalies()
-    anomalies.value = res.data.map((a) => ({
-      ...a,
-      dossier: a.demandeId || a.reference || a.id,
-      gravite: a.graviteCode || a.gravite || 'moyenne',
-      categorie: a.categorieCode || a.categorie || 'procedurale',
-      statut: a.statutCode || a.statut || 'nouvelle',
+    const data = await listerAnomalies()
+    anomalies.value = data.map((a: AnomalieAudit) => ({
+      id: a.id,
+      dossier: a.demandes?.reference || a.demandeId || a.id,
+      gravite: a.graviteCode || 'moyenne',
+      categorie: a.categorieCode || 'procedurale',
+      statut: a.statutCode || 'nouvelle',
       description: a.description || 'Anomalie détectée',
+      dateDetection: a.dateDetection || null,
     }))
-  } catch (e) {
+  } catch {
     error.value = 'Impossible de charger les anomalies'
   } finally {
     loading.value = false
   }
 })
 
-const visibleAnomalies = computed(() => anomalies.value.filter(a => a.statut === 'nouvelle').slice(0, 4))
+const visibleAnomalies = computed(() =>
+  anomalies.value
+    .filter(a => !STATUTS_CLOS.includes(a.statut))
+    .slice()
+    .sort((x, y) => (POIDS_GRAVITE[x.gravite] ?? 9) - (POIDS_GRAVITE[y.gravite] ?? 9))
+    .slice(0, 4),
+)
+
+/** Taux de non-conformité calculé depuis GET /anomalies : part des anomalies non résolues. */
+const tauxNonConformite = computed(() => {
+  if (anomalies.value.length === 0) return '0%'
+  const nonResolues = anomalies.value.filter(a => !STATUTS_CLOS.includes(a.statut)).length
+  return `${Math.round((nonResolues / anomalies.value.length) * 100)}%`
+})
+
 const kpis = computed(() => [
   { label: 'Anomalies nouvelles', value: anomalies.value.filter(a => a.statut === 'nouvelle').length, icon: 'mdi-scale-unbalanced', color: 'error', to: '/audit/anomalies' },
-  { label: 'Bénéficiaires irréguliers', value: 7, icon: 'mdi-account-alert', color: 'warning', to: '/audit/anomalies' },
-  { label: 'Non notifiées SYDONIA', value: 3, icon: 'mdi-api-off', color: 'error', to: '/audit/journal' },
-  { label: 'Taux mise en œuvre', value: '68%', icon: 'mdi-check-circle', color: 'success', to: '/audit/missions' },
+  { label: 'Critiques', value: anomalies.value.filter(a => a.gravite === 'critique').length, icon: 'mdi-alert-octagon', color: 'warning', to: '/audit/anomalies' },
+  { label: 'Élevées', value: anomalies.value.filter(a => a.gravite === 'elevee').length, icon: 'mdi-alert', color: 'error', to: '/audit/anomalies' },
+  { label: 'Taux de non-conformité', value: tauxNonConformite.value, icon: 'mdi-check-circle', color: 'success', to: '/audit/anomalies' },
 ])
 const missionHeaders = [{ title: 'Mission', key: 'ref' }, { title: 'Institution', key: 'institution' }, { title: 'Période', key: 'periode' }, { title: 'Statut', key: 'statut' }]
 const missions = [
@@ -99,11 +128,24 @@ const missions = [
   { ref: 'AUDIT-CC-2026-002', institution: 'DGBF', periode: 'Avr 2026', statut: 'Planifiée' },
 ]
 const graviteColor = (g: string) => ({ critique: 'error', elevee: 'warning', moyenne: 'info', faible: 'success' }[g] || 'default')
-const categorieColor = (c: string) => ({ juridique: 'error', financiere: 'warning', procedurale: 'info', temporelle: 'secondary' }[c] || 'default')
-const statsAnomalies = [
-  { mois: 'Mai', count: 5 }, { mois: 'Jun', count: 3 }, { mois: 'Jul', count: 7 },
-  { mois: 'Aoû', count: 4 }, { mois: 'Sep', count: 6 }, { mois: 'Oct', count: 8 },
-  { mois: 'Nov', count: 5 }, { mois: 'Déc', count: 9 }, { mois: 'Jan', count: 7 },
-  { mois: 'Fév', count: 4 }, { mois: 'Mar', count: 6 }, { mois: 'Avr', count: 8 },
-]
+const categorieColor = (c: string) => ({ juridique: 'error', financiere: 'warning', procedurale: 'info', temporelle: 'secondary', quota: 'warning' }[c] || 'default')
+
+/** Répartition mensuelle réelle des détections sur les 12 derniers mois. */
+const MOIS_FR = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
+const statsAnomalies = computed(() => {
+  const maintenant = new Date()
+  const buckets: { mois: string; count: number }[] = []
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(maintenant.getFullYear(), maintenant.getMonth() - i, 1)
+    buckets.push({ mois: MOIS_FR[d.getMonth()], count: 0 })
+  }
+  for (const a of anomalies.value) {
+    if (!a.dateDetection) continue
+    const d = new Date(a.dateDetection)
+    const diff = (maintenant.getFullYear() - d.getFullYear()) * 12 + (maintenant.getMonth() - d.getMonth())
+    if (diff >= 0 && diff < 12) buckets[11 - diff].count++
+  }
+  return buckets
+})
+const maxMensuel = computed(() => Math.max(1, ...statsAnomalies.value.map(m => m.count)))
 </script>

@@ -72,7 +72,7 @@ const kpis = [
 
 const headers = [
   { title: 'Mesure', key: 'mesure' },
-  { title: 'Beneficiaire', key: 'beneficiaire' },
+  { title: 'Contribuable', key: 'contribuable' },
   { title: 'Type', key: 'type' },
   { title: 'Echeance', key: 'echeance' },
   { title: 'Statut', key: 'statut' },
@@ -80,10 +80,10 @@ const headers = [
 ]
 
 const archives = [
-  { mesure: 'MES-2024-00977', beneficiaire: 'Programme logement social', type: 'LFI / loi speciale', echeance: '31/12/2024', statut: 'Archivee' },
-  { mesure: 'MES-2026-00124', beneficiaire: 'Mission diplomatique Canada', type: 'Accord de siege', echeance: '31/12/2026', statut: 'Renouvellement' },
-  { mesure: 'MES-2025-00411', beneficiaire: 'Mines du Nord Togo', type: 'Convention miniere', echeance: '15/03/2030', statut: 'Suivi phase' },
-  { mesure: 'MES-2025-00210', beneficiaire: 'Zone franche textile Kara', type: 'Zone franche', echeance: '30/09/2026', statut: 'A archiver' },
+  { mesure: 'MES-2024-00977', contribuable: 'Programme logement social', type: 'LFI / loi speciale', echeance: '31/12/2024', statut: 'Archivee' },
+  { mesure: 'MES-2026-00124', contribuable: 'Mission diplomatique Canada', type: 'Accord de siege', echeance: '31/12/2026', statut: 'Renouvellement' },
+  { mesure: 'MES-2025-00411', contribuable: 'Mines du Nord Togo', type: 'Convention miniere', echeance: '15/03/2030', statut: 'Suivi phase' },
+  { mesure: 'MES-2025-00210', contribuable: 'Zone franche textile Kara', type: 'Zone franche', echeance: '30/09/2026', statut: 'A archiver' },
 ]
 
 const lots = [

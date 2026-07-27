@@ -108,7 +108,7 @@
             <v-expansion-panel title="GET /exonerations — Liste des exonérations agrégées">
               <template #text>
                 <div class="pa-3 rounded-lg" style="background:#1E293B;font-family:monospace;font-size:0.75rem;color:#E2E8F0">
-                  { "data": [ { "secteur": "Mines", "type": "douaniere", "annee": 2025, "montant_mds_fcfa": 234.1, "nb_beneficiaires": 12 } ], "total": 1102, "page": 1 }
+                  { "data": [ { "secteur": "Mines", "type": "douaniere", "annee": 2025, "montant_mds_fcfa": 234.1, "nb_contribuables": 12 } ], "total": 1102, "page": 1 }
                 </div>
               </template>
             </v-expansion-panel>

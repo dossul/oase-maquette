@@ -1,0 +1,29 @@
+# Dependances
+node_modules
+npm-debug.log*
+
+# Builds / tests
+dist
+dist-ssr
+e2e
+e2e-report
+playwright-report
+test-results
+*.local
+
+# IDE / OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Screenshots / assets lourds
+screenshots_maquette

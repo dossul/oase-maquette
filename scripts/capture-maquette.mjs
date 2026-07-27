@@ -7,7 +7,7 @@ const rootDir = path.resolve('screenshots_maquette')
 
 const personaDirs = {
   demo: 'par_persona/00_entree_demo',
-  p1: 'par_persona/P1_beneficiaire',
+  p1: 'par_persona/P1_contribuable',
   p2: 'par_persona/P2_regie_financiere',
   p2bis: 'par_persona/P2bis_tresor_gudef',
   p3: 'par_persona/P3_agence',
@@ -26,7 +26,7 @@ const personaDirs = {
 
 const processDirs = {
   auth: 'par_processus/01_auth_et_entree',
-  portail: 'par_processus/02_portail_beneficiaire',
+  portail: 'par_processus/02_portail_contribuable',
   backoffice: 'par_processus/03_instruction_validation_backoffice',
   workflows: 'par_processus/04_workflows_regimes',
   agences: 'par_processus/05_agences_conventions_engagements',

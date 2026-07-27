@@ -17,8 +17,8 @@
         </div>
       </div>
 
-      <!-- Persona switcher (mock) -->
-      <div v-if="!rail" class="px-3 py-2" style="border-bottom:1px solid rgba(255,255,255,0.08)">
+      <!-- Persona switcher (mock) — visible uniquement en mode démo / développeur -->
+      <div v-if="!rail && isDemoMode" class="px-3 py-2" style="border-bottom:1px solid rgba(255,255,255,0.08)">
         <v-select
           v-model="currentPersona"
           :items="personas"
@@ -73,8 +73,8 @@
 
       <v-spacer />
 
-      <!-- Persona badge -->
-      <v-chip v-if="currentPersonaLabel" size="small" color="primary" variant="tonal" class="me-2 d-none d-md-flex">
+      <!-- Persona badge — visible uniquement en mode démo / développeur -->
+      <v-chip v-if="isDemoMode && currentPersonaLabel" size="small" color="primary" variant="tonal" class="me-2 d-none d-md-flex">
         {{ currentPersonaLabel }}
       </v-chip>
 
@@ -120,15 +120,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTheme } from 'vuetify'
 import { mockNotifications } from '../mock/data'
+import { api } from '../services/api'
 import type { NavItem } from '../types'
+import { useDemoMode } from '../composables/useDemoMode'
+import { useAuthStore } from '../stores/auth'
+import { isAdminRole, normalizeRole } from '../composables/useDefaultRoute'
 
 const route = useRoute()
 const router = useRouter()
 const theme = useTheme()
+const { isDemoMode } = useDemoMode()
+const auth = useAuthStore()
 const drawer = ref(true)
 const rail = ref(false)
 
@@ -136,28 +142,47 @@ const toggleTheme = () => {
   theme.global.name.value = theme.global.current.value.dark ? 'oaseLight' : 'oaseDark'
 }
 
-const unreadCount = computed(() => mockNotifications.filter(n => !n.lu).length)
+// OASE-112 / OASE-114 [QA] Phase 2 & 4 :
+// - En démo (VITE_DEMO_MODE=true) : on lit mockNotifications
+// - En prod : on fetch /notifications/unread-count
+// - Avant que le back ne réponde, on retombe sur 0 silencieusement
+const unreadCount = ref(0)
+
+async function loadUnreadCount() {
+  if (isDemoMode) {
+    unreadCount.value = mockNotifications.filter(n => !n.lu).length
+    return
+  }
+  try {
+    const res = await api<{ count?: number; unread?: number }>('/notifications/unread-count')
+    unreadCount.value = res.count ?? res.unread ?? 0
+  } catch {
+    unreadCount.value = 0
+  }
+}
+
+onMounted(loadUnreadCount)
 
 interface PersonaOption { label: string; value: string; route: string }
 
 const personas: PersonaOption[] = [
-  { label: 'P1 — Contribuable', value: 'beneficiaire', route: '/portail/dashboard' },
-  { label: 'P2 — Régie financière (OTR)', value: 'agent_otr', route: '/backoffice/dashboard' },
+  { label: 'P1 — Contribuable', value: 'contribuable', route: '/portail/dashboard' },
+  { label: 'P2 — Régie financière (OTR)', value: 'agent_ci', route: '/backoffice/dashboard' },
   { label: 'P2 — DGBF', value: 'agent_dgbf', route: '/backoffice/budget' },
   { label: 'P2 — DGTCP / GUDEF', value: 'agent_dgtcp', route: '/tresor/dashboard' },
-  { label: 'P3 — Agence de promotion', value: 'agence', route: '/agences/dashboard' },
-  { label: 'P3bis — Ministère sectoriel', value: 'ministere_sectoriel', route: '/ministeres/dashboard' },
+  { label: 'P3 — Agence de promotion', value: 'agent_agence', route: '/agences/dashboard' },
+  { label: 'P3bis — Ministère sectoriel', value: 'agent_ministere', route: '/ministeres/dashboard' },
   { label: 'P3ter — MAE / Accords de siège', value: 'agent_mae', route: '/mae/accords-siege' },
   { label: 'P3quater — DGMG / Extractif', value: 'agent_dgmg', route: '/extractif/dashboard' },
   { label: 'P4 — Décideur (UPF/MEF)', value: 'decideur', route: '/decideur/dashboard' },
   { label: 'P4bis — CONEDEF', value: 'agent_conedef', route: '/conedef/dashboard' },
   { label: 'P5 — Organe de contrôle', value: 'auditeur', route: '/audit/dashboard' },
-  { label: 'P7 — Administrateur système', value: 'admin', route: '/admin/utilisateurs' },
+  { label: 'P7 — Administrateur système', value: 'admin_si', route: '/admin/utilisateurs' },
   { label: 'P7bis — DSI / MEF', value: 'agent_dsi_mef', route: '/dsi/dashboard' },
   { label: 'Projection mobile OASE', value: 'mobile_mvp', route: '/mobile/mvp' },
 ]
 
-const currentPersona = ref('beneficiaire')
+const currentPersona = ref('contribuable')
 
 const currentPersonaLabel = computed(() => {
   const meta = route.meta.persona as string
@@ -170,7 +195,7 @@ const onPersonaChange = (val: string) => {
 }
 
 const navByPersona: Record<string, NavItem[]> = {
-  beneficiaire: [
+  contribuable: [
     { title: 'Tableau de bord', icon: 'mdi-view-dashboard', to: '/portail/dashboard' },
     { title: 'Nouvelle demande', icon: 'mdi-plus-circle', to: '/portail/nouvelle-demande' },
     { title: 'Mes demandes', icon: 'mdi-file-document-multiple', to: '/portail/demandes/1' },
@@ -178,7 +203,7 @@ const navByPersona: Record<string, NavItem[]> = {
     { title: 'Mon profil entreprise', icon: 'mdi-domain', to: '/portail/profil' },
     { title: 'Notifications', icon: 'mdi-bell', to: '/notifications' },
   ],
-  agent_otr: [
+  agent_ci: [
     { title: 'Tableau de bord', icon: 'mdi-view-dashboard', to: '/backoffice/dashboard' },
     { title: 'File des dossiers', icon: 'mdi-folder-multiple', to: '/backoffice/dossiers' },
     { title: 'Instruction dossier', icon: 'mdi-file-search', to: '/backoffice/dossiers/1/instruction' },
@@ -200,14 +225,15 @@ const navByPersona: Record<string, NavItem[]> = {
     { title: 'Archives & renouvellements', icon: 'mdi-archive-clock', to: '/tresor/archives' },
     { title: 'Notifications', icon: 'mdi-bell', to: '/notifications' },
   ],
-  agence: [
+  agent_agence: [
     { title: 'Tableau de bord', icon: 'mdi-view-dashboard', to: '/agences/dashboard' },
-    { title: 'Gestion des conventions', icon: 'mdi-file-certificate', to: '/agences/conventions' },
+    { title: 'Dossiers à instruire', icon: 'mdi-folder-search', to: '/agences/dossiers' },
+    { title: 'Conventions', icon: 'mdi-file-certificate', to: '/agences/conventions' },
     { title: 'Instruction agréments', icon: 'mdi-clipboard-text', to: '/agences/agrements' },
     { title: 'Suivi des engagements', icon: 'mdi-chart-timeline', to: '/agences/engagements' },
     { title: 'Notifications', icon: 'mdi-bell', to: '/notifications' },
   ],
-  ministere_sectoriel: [
+  agent_ministere: [
     { title: 'Tableau de bord', icon: 'mdi-office-building', to: '/ministeres/dashboard' },
     { title: 'Notifications', icon: 'mdi-bell', to: '/notifications' },
   ],
@@ -240,7 +266,7 @@ const navByPersona: Record<string, NavItem[]> = {
     { title: 'Missions de contrôle', icon: 'mdi-briefcase-search', to: '/audit/missions' },
     { title: 'Notifications', icon: 'mdi-bell', to: '/notifications' },
   ],
-  admin: [
+  admin_si: [
     { title: 'Gestion utilisateurs', icon: 'mdi-account-multiple', to: '/admin/utilisateurs' },
     { title: 'Rôles & habilitations', icon: 'mdi-shield-key', to: '/admin/roles' },
     { title: 'Connecteurs SI', icon: 'mdi-api', to: '/admin/connecteurs' },
@@ -267,16 +293,49 @@ const navByPersona: Record<string, NavItem[]> = {
   ],
 }
 
+// OASE [Recette E2E] : alias entre rôles canoniques et legacy, et menus partagés.
+// - agent_cddi partage le menu back-office de agent_ci (instruction OTR).
+// - Les anciens noms (agent_otr, agence, admin, ministere_sectoriel) pointent
+//   vers le menu de leur équivalent canonique, pour les mocks/anciens comptes.
+navByPersona.agent_cddi = navByPersona.agent_ci
+navByPersona.agent_otr = navByPersona.agent_ci
+navByPersona.agence = navByPersona.agent_agence
+navByPersona.admin = navByPersona.admin_si
+navByPersona.ministere_sectoriel = navByPersona.agent_ministere
+
 const currentNavItems = computed(() => {
-  const meta = route.meta.role as string
-  if (meta && navByPersona[meta]) return navByPersona[meta]
+  // OASE [BUG #4] fix : la sidebar est pilotée par le RÔLE de l'utilisateur
+  // connecté (source de vérité = auth.user.role), pas seulement par la route.
+  // Avant, on ne lisait que route.meta.role, ce qui faisait qu'un admin qui
+  // atterrissait par défaut sur une page d'un autre persona voyait le mauvais
+  // menu (ex: menu contribuable au lieu de menu admin).
+  //
+  // Ordre de résolution :
+  //   1. admin (admin_si ou legacy admin) → toujours menu admin (peu importe la route)
+  //   2. role du user (normalisé vers le canonique) → menu correspondant
+  //   3. meta.role / meta.roles de la route → fallback si pas authentifié (mode démo)
+  //   4. préfixe de la route → dernier fallback
+  const userRole = auth.user?.role
+  if (isAdminRole(userRole)) {
+    return navByPersona.admin_si
+  }
+  if (userRole) {
+    const key = normalizeRole(userRole)
+    if (navByPersona[key]) return navByPersona[key]
+    if (navByPersona[userRole]) return navByPersona[userRole]
+  }
+  const metaRoles = (route.meta.roles as string[] | undefined) ?? (route.meta.role ? [route.meta.role as string] : [])
+  for (const meta of metaRoles) {
+    const key = normalizeRole(meta)
+    if (navByPersona[key]) return navByPersona[key]
+  }
   // Fallback: detect from current route prefix
   const path = route.path
-  if (path.startsWith('/portail')) return navByPersona.beneficiaire
-  if (path.startsWith('/backoffice')) return navByPersona.agent_otr
+  if (path.startsWith('/portail')) return navByPersona.contribuable
+  if (path.startsWith('/backoffice')) return navByPersona.agent_ci
   if (path.startsWith('/tresor')) return navByPersona.agent_dgtcp
-  if (path.startsWith('/agences')) return navByPersona.agence
-  if (path.startsWith('/ministeres')) return navByPersona.ministere_sectoriel
+  if (path.startsWith('/agences')) return navByPersona.agent_agence
+  if (path.startsWith('/ministeres')) return navByPersona.agent_ministere
   if (path.startsWith('/mae')) return navByPersona.agent_mae
   if (path.startsWith('/extractif')) return navByPersona.agent_dgmg
   if (path.startsWith('/decideur')) return navByPersona.decideur
@@ -284,12 +343,31 @@ const currentNavItems = computed(() => {
   if (path.startsWith('/audit')) return navByPersona.auditeur
   if (path.startsWith('/dsi')) return navByPersona.agent_dsi_mef
   if (path.startsWith('/mobile')) return navByPersona.mobile_mvp
-  if (path.startsWith('/admin')) return navByPersona.admin
-  return navByPersona.beneficiaire
+  if (path.startsWith('/admin')) return navByPersona.admin_si
+  return navByPersona.contribuable
 })
 
-const currentUser = ref({ prenom: 'Kofi', nom: 'ABALO', role: 'Agent OTR' })
-const userInitials = computed(() => `${currentUser.value.prenom[0]}${currentUser.value.nom[0]}`)
+// OASE-112 [QA][Phase 2] : currentUser doit venir du store d'auth (réel),
+// avec un fallback démo (K. ABALO) pour qu'on garde une UX lisible
+// quand on parcourt la maquette sans être loggué.
+const currentUser = computed(() => {
+  if (auth.user) {
+    return {
+      prenom: auth.user.prenom,
+      nom: auth.user.nom,
+      role: auth.user.role,
+    }
+  }
+  if (isDemoMode) {
+    return { prenom: 'Kofi', nom: 'ABALO', role: 'Agent OTR' }
+  }
+  return { prenom: '', nom: '', role: '' }
+})
+const userInitials = computed(() => {
+  const u = currentUser.value
+  if (!u.prenom || !u.nom) return '?'
+  return `${u.prenom[0]}${u.nom[0]}`
+})
 
 const breadcrumbs = computed(() => {
   const parts = route.path.split('/').filter(Boolean)

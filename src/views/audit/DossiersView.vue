@@ -14,7 +14,7 @@
       <v-card-text class="pa-4">
         <v-row dense>
           <v-col cols="12" md="5">
-            <v-text-field v-model="search" label="Référence, NIF, bénéficiaire…" prepend-inner-icon="mdi-magnify" hide-details clearable/>
+            <v-text-field v-model="search" label="Référence, NIF, contribuable…" prepend-inner-icon="mdi-magnify" hide-details clearable/>
           </v-col>
           <v-col cols="6" md="3">
             <v-select v-model="filterInstitution" :items="['OTR Douanes','OTR Impôts','DGBF','API-ZF','Toutes']" label="Institution" hide-details/>
@@ -49,7 +49,7 @@
         <div class="d-flex align-center justify-space-between px-4 py-3" style="border-bottom:1px solid rgba(0,0,0,0.08)">
           <div>
             <div class="font-weight-bold text-body-1">{{ selectedDossier.reference }}</div>
-            <div class="text-caption text-medium-emphasis">{{ selectedDossier.beneficiaire }}</div>
+            <div class="text-caption text-medium-emphasis">{{ selectedDossier.contribuable }}</div>
           </div>
           <v-btn icon="mdi-close" size="x-small" variant="text" @click="detailPanel=false"/>
         </div>
@@ -70,8 +70,8 @@
               Consultation confidentielle — journalisée
             </v-alert>
             <div class="mb-3">
-              <div class="text-caption text-medium-emphasis text-uppercase font-weight-bold mb-1">Bénéficiaire</div>
-              <div class="font-weight-semibold">{{ selectedDossier.beneficiaire }}</div>
+              <div class="text-caption text-medium-emphasis text-uppercase font-weight-bold mb-1">Contribuable</div>
+              <div class="font-weight-semibold">{{ selectedDossier.contribuable }}</div>
             </div>
             <div class="mb-3">
               <div class="text-caption text-medium-emphasis text-uppercase font-weight-bold mb-1">NIF</div>
@@ -220,7 +220,7 @@ const dossiers = mockDemandes
 
 const headers = [
   { title: 'Référence', key: 'reference' },
-  { title: 'Bénéficiaire', key: 'beneficiaire' },
+  { title: 'Contribuable', key: 'contribuable' },
   { title: 'Type', key: 'type' },
   { title: 'Statut', key: 'statut' },
   { title: 'Montant', key: 'montantFCFA' },
@@ -241,7 +241,7 @@ function buildDocs(d: Demande): MockDoc[] {
   const base: MockDoc[] = [
     { id: `${d.id}-req`, nom: `Demande_${d.reference}.pdf`, type: 'PDF', pages: 2, taille: '184 Ko' },
     { id: `${d.id}-id`, nom: `Statuts_societe_${d.nif}.pdf`, type: 'PDF', pages: 4, taille: '312 Ko' },
-    { id: `${d.id}-fin`, nom: `Bilan_financier_2025_${d.beneficiaire.replace(/ /g, '_')}.pdf`, type: 'PDF', pages: 6, taille: '824 Ko' },
+    { id: `${d.id}-fin`, nom: `Bilan_financier_2025_${d.contribuable.replace(/ /g, '_')}.pdf`, type: 'PDF', pages: 6, taille: '824 Ko' },
   ]
   if (d.statut === 'approuve') {
     base.push({ id: `${d.id}-att`, nom: `Attestation_${d.reference}.pdf`, type: 'PDF', pages: 3, taille: '156 Ko' })
@@ -306,7 +306,7 @@ function renderDocPage(doc: MockDoc, page: number): string {
           <div style="font-size:11px;color:#64748B">Référence OASE : <strong>${d.reference}</strong></div>
         </div>
         <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px">
-          <tr style="background:#F4F6F9"><td style="padding:8px;font-weight:600;border:1px solid #CBD5E1;width:40%">Dénomination sociale</td><td style="padding:8px;border:1px solid #CBD5E1">${d.beneficiaire}</td></tr>
+          <tr style="background:#F4F6F9"><td style="padding:8px;font-weight:600;border:1px solid #CBD5E1;width:40%">Dénomination sociale</td><td style="padding:8px;border:1px solid #CBD5E1">${d.contribuable}</td></tr>
           <tr><td style="padding:8px;font-weight:600;border:1px solid #CBD5E1">NIF</td><td style="padding:8px;border:1px solid #CBD5E1">${d.nif}</td></tr>
           <tr style="background:#F4F6F9"><td style="padding:8px;font-weight:600;border:1px solid #CBD5E1">RCCM</td><td style="padding:8px;border:1px solid #CBD5E1">${d.rccm || '—'}</td></tr>
           <tr><td style="padding:8px;font-weight:600;border:1px solid #CBD5E1">Secteur d'activité</td><td style="padding:8px;border:1px solid #CBD5E1">${d.secteur}</td></tr>
@@ -318,7 +318,7 @@ function renderDocPage(doc: MockDoc, page: number): string {
       `,
       2: `
         <div style="font-size:13px;font-weight:700;margin-bottom:16px;color:#1A2332">JUSTIFICATION ÉCONOMIQUE ET IMPACT PRÉVU</div>
-        <p style="font-size:12px;line-height:1.8;margin-bottom:12px">La société <strong>${d.beneficiaire}</strong> sollicite cette exonération dans le cadre du développement de ses activités dans le secteur <strong>${d.secteur}</strong> conformément aux dispositions de <strong>${d.baseJuridique}</strong>.</p>
+        <p style="font-size:12px;line-height:1.8;margin-bottom:12px">La société <strong>${d.contribuable}</strong> sollicite cette exonération dans le cadre du développement de ses activités dans le secteur <strong>${d.secteur}</strong> conformément aux dispositions de <strong>${d.baseJuridique}</strong>.</p>
         <div style="margin-bottom:16px">
           <div style="font-size:12px;font-weight:600;margin-bottom:8px">Impacts économiques attendus :</div>
           <ul style="font-size:12px;line-height:2;padding-left:20px">
@@ -346,7 +346,7 @@ function renderDocPage(doc: MockDoc, page: number): string {
           <div style="font-size:13px;font-weight:700;color:#1A2332;border-bottom:2px solid #2774AE;padding-bottom:8px;margin-bottom:8px">ATTESTATION D'EXONÉRATION N° ${d.reference}</div>
           <div style="font-size:11px;color:#64748B">Conformément à ${d.baseJuridique}</div>
         </div>
-        <p style="font-size:12px;line-height:1.8;margin-bottom:16px">Le Directeur Général de l'Office Togolais des Recettes <strong>ATTESTE</strong> que la société <strong>${d.beneficiaire}</strong>, NIF <strong>${d.nif}</strong>, bénéficie d'une exonération fiscale accordée conformément aux dispositions suivantes :</p>
+        <p style="font-size:12px;line-height:1.8;margin-bottom:16px">Le Directeur Général de l'Office Togolais des Recettes <strong>ATTESTE</strong> que la société <strong>${d.contribuable}</strong>, NIF <strong>${d.nif}</strong>, bénéficie d'une exonération fiscale accordée conformément aux dispositions suivantes :</p>
         <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px">
           <tr style="background:#F4F6F9"><td style="padding:8px;font-weight:600;border:1px solid #CBD5E1">Nature</td><td style="padding:8px;border:1px solid #CBD5E1">${d.type}</td></tr>
           <tr><td style="padding:8px;font-weight:600;border:1px solid #CBD5E1">Montant accordé</td><td style="padding:8px;border:1px solid #CBD5E1"><strong>${(d.montantFCFA / 1e6).toFixed(0)} 000 000 FCFA</strong></td></tr>
@@ -397,9 +397,9 @@ function renderDocPage(doc: MockDoc, page: number): string {
       <div style="text-align:center;margin-bottom:28px">
         <div style="font-size:11px;color:#64748B;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px">REPUBLIQUE TOGOLAISE</div>
         <div style="font-size:14px;font-weight:700;color:#1A2332;border-bottom:2px solid #2774AE;padding-bottom:8px">CONVENTION D'INVESTISSEMENT</div>
-        <div style="font-size:11px;color:#64748B;margin-top:6px">Entre la République Togolaise et ${d.beneficiaire}</div>
+        <div style="font-size:11px;color:#64748B;margin-top:6px">Entre la République Togolaise et ${d.contribuable}</div>
       </div>
-      <p style="font-size:12px;line-height:1.8;margin-bottom:12px">La présente convention est conclue entre l'État Togolais, représenté par le Ministre de l'Économie et des Finances, et la société <strong>${d.beneficiaire}</strong> dans le cadre du régime <strong>${d.type}</strong>.</p>
+      <p style="font-size:12px;line-height:1.8;margin-bottom:12px">La présente convention est conclue entre l'État Togolais, représenté par le Ministre de l'Économie et des Finances, et la société <strong>${d.contribuable}</strong> dans le cadre du régime <strong>${d.type}</strong>.</p>
       <div style="font-size:12px;font-weight:600;margin-bottom:8px">ARTICLE 1 — ENGAGEMENTS DE L'INVESTISSEUR</div>
       <ul style="font-size:12px;line-height:2;padding-left:20px;margin-bottom:16px">
         <li>Investissement minimum : ${(d.montantFCFA / 1e6).toFixed(0)} M FCFA</li>
@@ -421,11 +421,11 @@ function renderDocPage(doc: MockDoc, page: number): string {
     return `
       <div style="text-align:center;margin-bottom:28px">
         <div style="font-size:14px;font-weight:700;color:#1A2332;border-bottom:2px solid #2774AE;padding-bottom:8px">STATUTS DE LA SOCIÉTÉ</div>
-        <div style="font-size:12px;color:#475569;margin-top:8px">${d.beneficiaire}</div>
+        <div style="font-size:12px;color:#475569;margin-top:8px">${d.contribuable}</div>
       </div>
-      <p style="font-size:12px;line-height:1.8;margin-bottom:16px">La société <strong>${d.beneficiaire}</strong>, constituée sous forme de ${d.type.includes('zone') ? 'SAS' : 'SARL'}, immatriculée au RCCM sous le numéro <strong>${d.rccm || 'N/A'}</strong> et au registre fiscal sous le NIF <strong>${d.nif}</strong>.</p>
+      <p style="font-size:12px;line-height:1.8;margin-bottom:16px">La société <strong>${d.contribuable}</strong>, constituée sous forme de ${d.type.includes('zone') ? 'SAS' : 'SARL'}, immatriculée au RCCM sous le numéro <strong>${d.rccm || 'N/A'}</strong> et au registre fiscal sous le NIF <strong>${d.nif}</strong>.</p>
       <div style="font-size:12px;font-weight:600;margin-bottom:8px">ARTICLE 1 — DÉNOMINATION</div>
-      <p style="font-size:12px;line-height:1.8;margin-bottom:12px">La société prend la dénomination sociale : <strong>${d.beneficiaire}</strong></p>
+      <p style="font-size:12px;line-height:1.8;margin-bottom:12px">La société prend la dénomination sociale : <strong>${d.contribuable}</strong></p>
       <div style="font-size:12px;font-weight:600;margin-bottom:8px">ARTICLE 2 — SIÈGE SOCIAL</div>
       <p style="font-size:12px;line-height:1.8;margin-bottom:12px">Le siège social est établi à Lomé, République Togolaise. Il peut être transféré en tout autre lieu par décision de l'assemblée générale extraordinaire.</p>
       <div style="font-size:12px;font-weight:600;margin-bottom:8px">ARTICLE 3 — OBJET SOCIAL</div>
@@ -440,7 +440,7 @@ function renderDocPage(doc: MockDoc, page: number): string {
       <div style="font-size:11px;color:#64748B;margin-top:8px">Dossier : ${d.reference}</div>
     </div>
     <p style="font-size:12px;line-height:1.8;color:#475569">
-      Document relatif au dossier <strong>${d.reference}</strong> — <strong>${d.beneficiaire}</strong>.<br>
+      Document relatif au dossier <strong>${d.reference}</strong> — <strong>${d.contribuable}</strong>.<br>
       Secteur : ${d.secteur} · Base juridique : ${d.baseJuridique}<br>
       Page ${page} sur ${doc.pages}.
     </p>

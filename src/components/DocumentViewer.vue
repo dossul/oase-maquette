@@ -356,7 +356,7 @@ function mockPageContent(page: number): string {
       <p style="font-size:11px;line-height:1.8;color:#475569">Cette attestation est délivrée pour servir et valoir ce que de droit. Elle est valable exclusivement pour les opérations visées ci-dessus et doit être présentée à toute réquisition des services fiscaux ou douaniers compétents.</p>
     `,
     2: `
-      <div style="font-size:13px;font-weight:700;margin-bottom:16px;color:#1A2332">CONDITIONS ET OBLIGATIONS DU BÉNÉFICIAIRE</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:16px;color:#1A2332">CONDITIONS ET OBLIGATIONS DU CONTRIBUABLE</div>
       <p style="font-size:12px;line-height:1.8;margin-bottom:12px">Le bénéfice de cette exonération est subordonné au respect des obligations suivantes :</p>
       <ol style="font-size:12px;line-height:2;padding-left:20px">
         <li>Tenir à jour une comptabilité régulière et sincère permettant de distinguer les opérations exonérées des autres opérations ;</li>

@@ -51,7 +51,7 @@
         <!-- Top secteurs -->
         <v-col cols="12" md="6">
           <v-card rounded="lg" elevation="1" class="h-100">
-            <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Top secteurs bénéficiaires {{ annee }}</v-card-title>
+            <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Top secteurs contribuables {{ annee }}</v-card-title>
             <v-card-text>
               <div v-for="(s,i) in topSecteurs" :key="s.secteur" class="mb-3">
                 <div class="d-flex justify-space-between text-caption mb-1">
@@ -102,7 +102,7 @@ const annee = ref('2025')
 const kpis = [
   { label: 'Coût total dépenses fiscales', value: '724 Mds FCFA', icon: 'mdi-currency-usd', color: 'primary' },
   { label: '% du PIB', value: '3,8%', icon: 'mdi-chart-line', color: 'info' },
-  { label: 'Nombre de bénéficiaires', value: '1 102', icon: 'mdi-domain', color: 'success' },
+  { label: 'Nombre de contribuables', value: '1 102', icon: 'mdi-domain', color: 'success' },
   { label: 'Types d\'exonérations', value: 6, icon: 'mdi-label-multiple', color: 'secondary' },
 ]
 const evolutionAnnuelle = [

@@ -1,39 +1,75 @@
-export type StatutDemande = 'en_cours' | 'approuve' | 'action_requise' | 'rejete' | 'expire' | 'brouillon'
+/**
+ * Statuts CANONIQUES des demandes, alignés sur l'API (enum StatutDemande du backend :
+ * brouillon, soumis, en_instruction, action_requise, approuve, rejete, expire, archive).
+ * 'en_cours' est conservé comme alias LEGACY (encore utilisé par les mocks et
+ * quelques vues métier en attente de câblage API).
+ */
+export type StatutDemande =
+  | 'brouillon'
+  | 'soumis'
+  | 'en_instruction'
+  | 'action_requise'
+  | 'approuve'
+  | 'rejete'
+  | 'expire'
+  | 'archive'
+  // Alias legacy (à ne plus utiliser dans du nouveau code)
+  | 'en_cours'
 export type ExoType = 'douaniere' | 'fiscale_is' | 'fiscale_tva' | 'zone_franche' | 'code_investissement' | 'sectorielle'
+/**
+ * Rôles CANONIQUES renvoyés par le backend (JWT + réponse /auth/login).
+ * Les 5 derniers sont des alias LEGACY encore présents dans les mocks :
+ * agent_otr → agent_ci, agence → agent_agence, admin → admin_si,
+ * ministere_sectoriel → agent_ministere, agent_dsi_mef (pas d'équivalent canonique).
+ */
 export type Role =
-  | 'beneficiaire'
-  | 'agent_otr'
+  | 'contribuable'
+  | 'agent_ci'
+  | 'agent_cddi'
   | 'agent_dgbf'
   | 'agent_dgtcp'
-  | 'agence'
-  | 'decideur'
-  | 'auditeur'
-  | 'admin'
-  | 'ministere_sectoriel'
+  | 'agent_agence'
   | 'agent_mae'
   | 'agent_dgmg'
+  | 'agent_ministere'
   | 'agent_conedef'
+  | 'decideur'
+  | 'auditeur'
+  | 'admin_si'
+  // Alias legacy
+  | 'agent_otr'
+  | 'agence'
+  | 'admin'
+  | 'ministere_sectoriel'
   | 'agent_dsi_mef'
 export type ConnecteurStatut = 'actif' | 'erreur' | 'maintenance'
 export type AnomalieCategorie = 'juridique' | 'financiere' | 'procedurale' | 'temporelle'
 export type AnomalieGravite = 'faible' | 'moyenne' | 'elevee' | 'critique'
 
 export const STATUT_COLORS: Record<StatutDemande, string> = {
-  en_cours: 'info',
-  approuve: 'success',
+  brouillon: 'secondary',
+  soumis: 'primary',
+  en_instruction: 'info',
   action_requise: 'warning',
+  approuve: 'success',
   rejete: 'error',
   expire: 'default',
-  brouillon: 'secondary',
+  archive: 'default',
+  // Alias legacy
+  en_cours: 'info',
 }
 
 export const STATUT_LABELS: Record<StatutDemande, string> = {
-  en_cours: 'En cours',
-  approuve: 'Approuvé',
+  brouillon: 'Brouillon',
+  soumis: 'Soumis',
+  en_instruction: 'En instruction',
   action_requise: 'Action requise',
+  approuve: 'Approuvé',
   rejete: 'Rejeté',
   expire: 'Expiré',
-  brouillon: 'Brouillon',
+  archive: 'Archivé',
+  // Alias legacy
+  en_cours: 'En cours',
 }
 
 export const EXO_TYPE_LABELS: Record<ExoType, string> = {
@@ -49,7 +85,7 @@ export interface Demande {
   id: string
   reference: string
   type: ExoType
-  beneficiaire: string
+  contribuable: string
   nif: string
   rccm: string
   statut: StatutDemande
@@ -109,7 +145,7 @@ export interface Anomalie {
 export interface Convention {
   id: string
   reference: string
-  beneficiaire: string
+  contribuable: string
   regime: string
   statut: 'active' | 'suspendue' | 'resiliee' | 'expiree'
   dateDebut: string

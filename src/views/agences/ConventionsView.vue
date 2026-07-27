@@ -5,6 +5,8 @@
         <ExportButton size="small" @export="() => {}"/>
       </template>
     </PageHeader>
+    <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
+    <v-alert v-if="loadError" type="error" variant="tonal" density="compact" class="mb-4">{{ loadError }}</v-alert>
     <v-row>
       <v-col cols="12" md="8">
         <v-card rounded="lg" elevation="1" class="mb-4">
@@ -31,7 +33,7 @@
         <v-card v-if="selectedConvention" rounded="lg" elevation="1">
           <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">{{ selectedConvention.reference }}</v-card-title>
           <v-card-text class="pa-4">
-            <div class="mb-3"><div class="label-micro text-medium-emphasis">Bénéficiaire</div><div class="font-weight-semibold">{{ selectedConvention.beneficiaire }}</div></div>
+            <div class="mb-3"><div class="label-micro text-medium-emphasis">Contribuable</div><div class="font-weight-semibold">{{ selectedConvention.contribuable }}</div></div>
             <div class="mb-3"><div class="label-micro text-medium-emphasis">Régime</div><div>{{ selectedConvention.regime }}</div></div>
             <div class="mb-3"><div class="label-micro text-medium-emphasis">Durée</div><div>{{ formatDate(selectedConvention.dateDebut) }} → {{ formatDate(selectedConvention.dateFin) }}</div></div>
             <div class="mb-3"><div class="label-micro text-medium-emphasis">Montant estimé</div><div class="font-weight-bold text-primary">{{ (selectedConvention.montantEstime/1e9).toFixed(2) }} Mds FCFA</div></div>
@@ -95,7 +97,7 @@
         <v-toolbar color="secondary" density="compact">
           <v-btn icon="mdi-close" @click="previewDialog=false"/>
           <v-toolbar-title class="text-body-2">
-            Convention type — {{ selectedConvention?.reference }} · {{ selectedConvention?.beneficiaire }}
+            Convention type — {{ selectedConvention?.reference }} · {{ selectedConvention?.contribuable }}
           </v-toolbar-title>
           <v-spacer/>
           <v-btn prepend-icon="mdi-download" size="small" variant="tonal" color="white" class="me-2">Télécharger</v-btn>
@@ -124,12 +126,12 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import ExportButton from '../../components/ExportButton.vue'
 import DocumentViewer from '../../components/DocumentViewer.vue'
-import { mockConventions } from '../../mock/data'
 import type { Convention } from '../../types'
+import { listerConventionsReelles } from '../../services/backoffice'
 const search = ref('')
 const filterRegime = ref(null)
 const filterStatut = ref(null)
@@ -137,14 +139,42 @@ const notifDialog = ref(false)
 const previewDialog = ref(false)
 const specialTab = ref('zf')
 const selectedConvention = ref<Convention | null>(null)
+const conventions = ref<Convention[]>([])
+const loading = ref(false)
+const loadError = ref<string | null>(null)
 const regimes = ['Zone Franche Industrielle','Zone Économique Spéciale','Code des investissements']
 const headers = [
-  { title: 'Référence', key: 'reference' }, { title: 'Bénéficiaire', key: 'beneficiaire' },
+  { title: 'Référence', key: 'reference' }, { title: 'Contribuable', key: 'contribuable' },
   { title: 'Régime', key: 'regime' }, { title: 'Statut', key: 'statut' },
   { title: 'Montant estimé', key: 'montantEstime' }, { title: 'Actions', key: 'actions', sortable: false },
 ]
-const filteredConventions = computed(() => mockConventions.filter(c => {
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    const data = await listerConventionsReelles()
+    conventions.value = data.map((c) => ({
+      id: c.id,
+      reference: c.reference,
+      contribuable: c.contribuables?.raisonSociale ?? '—',
+      regime: c.regimeCode ?? '—',
+      statut: (c.statutCode || 'active') as Convention['statut'],
+      dateDebut: c.dateDebut,
+      dateFin: c.dateFin,
+      montantEstime: Number(c.montantEstime ?? 0),
+      emploisEngages: c.emploisEngages ?? 0,
+      emploisCrees: c.emploisCrees ?? 0,
+    }))
+  } catch (e) {
+    loadError.value = e instanceof Error ? e.message : 'Impossible de charger les conventions'
+  } finally {
+    loading.value = false
+  }
+})
+
+const filteredConventions = computed(() => conventions.value.filter(c => {
   if (filterStatut.value && c.statut !== filterStatut.value) return false
+  if (filterRegime.value && c.regime !== filterRegime.value) return false
   return true
 }))
 const formatDate = (d: string) => new Date(d).toLocaleDateString('fr-FR')
@@ -155,7 +185,7 @@ const conventionMeta = (item: Convention) => ({
 })
 const o2Rows = (item: Convention) => [
   { label: 'id_mesure / id_decision', value: `${item.reference} / DEC-${item.reference}` },
-  { label: 'beneficiaire / regime', value: `${item.beneficiaire} / ${item.regime}` },
+  { label: 'contribuable / regime', value: `${item.contribuable} / ${item.regime}` },
   { label: 'code additionnel / SI', value: `${conventionMeta(item).codeAdditionnel} / Sydonia + E-TAX + GUDEF` },
   { label: 'montant estime / emplois', value: `${(item.montantEstime/1e9).toFixed(2)} Mds FCFA / ${item.emploisEngages}` },
   { label: 'piece probante / hash', value: conventionMeta(item).piece },

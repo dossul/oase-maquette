@@ -47,7 +47,7 @@
                   <v-chip :color="d.priorite==='haute'?'error':'info'" size="x-small" variant="tonal">{{ d.priorite }}</v-chip>
                 </div>
               </template>
-              <template #subtitle><span class="text-caption">{{ d.beneficiaire }} · {{ d.type }} · Reçu {{ d.date }}</span></template>
+              <template #subtitle><span class="text-caption">{{ d.contribuable }} · {{ d.type }} · Reçu {{ d.date }}</span></template>
               <template #append>
                 <div class="text-end">
                   <div class="text-caption text-medium-emphasis">Délai restant</div>
@@ -92,6 +92,7 @@ import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
 import AlertBanner from '../../components/AlertBanner.vue'
 import { listerDemandes } from '../../services/demandes'
+import { STATUT_LABELS, type StatutDemande } from '../../types'
 const showNewAlert = ref(true)
 const demandes = ref<any[]>([])
 const loading = ref(false)
@@ -105,6 +106,7 @@ onMounted(async () => {
       ...d,
       reference: d.reference || d.id,
       type: d.impotConcerne || d.type || 'TVA',
+      contribuable: (d as any).contribuable?.raisonSociale ?? '—',
       date: d.dateDepot ? new Date(d.dateDepot).toLocaleDateString('fr-FR') : '-',
       delai: '15j',
       priorite: 'normale',
@@ -117,10 +119,13 @@ onMounted(async () => {
   }
 })
 
+// Comptage par statut CANONIQUE (taxonomie centralisée src/types — STATUT_LABELS).
+const countBy = (...codes: StatutDemande[]) => demandes.value.filter((d) => codes.includes(d.statutCode)).length
+
 const kpis = computed(() => [
-  { label: 'En attente d\'instruction', value: demandes.value.filter(d => d.statutCode === 'en_instruction').length, icon: 'mdi-inbox', color: 'info', to: '/backoffice/dossiers' },
+  { label: `En attente (${STATUT_LABELS.soumis} / ${STATUT_LABELS.en_instruction})`, value: countBy('soumis', 'en_instruction'), icon: 'mdi-inbox', color: 'info', to: '/backoffice/dossiers' },
   { label: 'En retard réglementaire', value: 0, icon: 'mdi-alert', color: 'error', to: '/backoffice/dossiers' },
-  { label: 'Traités ce mois', value: demandes.value.filter(d => d.statutCode === 'accordee').length, icon: 'mdi-check-circle', color: 'success', to: '/backoffice/dossiers' },
+  { label: `${STATUT_LABELS.approuve}s ce mois`, value: countBy('approuve'), icon: 'mdi-check-circle', color: 'success', to: '/backoffice/dossiers' },
   { label: 'Alertes moteur règles', value: 0, icon: 'mdi-cog-play', color: 'warning', to: '/backoffice/controle' },
 ])
 const queue = computed(() => demandes.value.slice(0, 6))

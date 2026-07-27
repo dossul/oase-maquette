@@ -9,7 +9,7 @@ export interface KpiP4 {
 export interface KpiP5 {
   totalAccorde: number
   parImpot: { impotConcerne: string; _sum: { montantExonerationAccorde: number } }[]
-  nombreBeneficiaires: number
+  nombreContribuables: number
 }
 
 export function getKpisP4(): Promise<{ data: KpiP4 }> {

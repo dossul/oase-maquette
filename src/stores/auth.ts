@@ -10,8 +10,19 @@ export interface User {
   institutionId?: string
 }
 
+const USER_KEY = 'oase_user'
+
+function loadUser(): User | null {
+  try {
+    const raw = localStorage.getItem(USER_KEY)
+    return raw ? (JSON.parse(raw) as User) : null
+  } catch {
+    return null
+  }
+}
+
 export const useAuthStore = defineStore('auth', () => {
-  const user = ref<User | null>(null)
+  const user = ref<User | null>(loadUser())
   const token = ref<string | null>(localStorage.getItem('oase_token'))
   const isAuthenticated = computed(() => !!token.value && !!user.value)
 
@@ -19,12 +30,14 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = newToken
     user.value = newUser
     localStorage.setItem('oase_token', newToken)
+    localStorage.setItem(USER_KEY, JSON.stringify(newUser))
   }
 
   function clearSession() {
     token.value = null
     user.value = null
     localStorage.removeItem('oase_token')
+    localStorage.removeItem(USER_KEY)
   }
 
   function hasRole(roles: string[]) {

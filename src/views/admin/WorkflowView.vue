@@ -18,6 +18,13 @@
       <v-icon icon="mdi-check-circle" class="me-2"/>Workflow enregistré — v{{ version }}
     </v-snackbar>
 
+    <v-alert type="info" variant="tonal" density="compact" rounded="lg" class="mb-3" closable>
+      <span class="text-caption">
+        {{ apiTemplates.length }} template(s) actif(s) chargé(s) depuis l'API (GET /workflow/templates).
+        L'API ne propose aucun endpoint de mise à jour d'un template (PUT/PATCH) — l'enregistrement incrémente la version localement, sans persistance.
+      </span>
+    </v-alert>
+
     <v-tabs v-model="mainTab" color="primary" density="compact" class="mb-3">
       <v-tab value="builder" prepend-icon="mdi-sitemap">Éditeur</v-tab>
       <v-tab value="notifs" prepend-icon="mdi-bell-cog">
@@ -69,7 +76,7 @@
             </v-card>
 
             <!-- Versions -->
-            <v-card rounded="lg" elevation="1">
+            <v-card rounded="lg" elevation="1" class="mb-3">
               <v-card-title class="pa-3 pb-2 text-body-2 font-weight-semibold">Versions</v-card-title>
               <v-list density="compact" class="pa-2">
                 <v-list-item
@@ -83,6 +90,24 @@
               <div class="pa-2 pt-0">
                 <v-btn size="x-small" variant="tonal" prepend-icon="mdi-history" block>Historique</v-btn>
               </div>
+            </v-card>
+
+            <!-- Templates réels chargés depuis l'API (lecture seule) -->
+            <v-card rounded="lg" elevation="1">
+              <v-card-title class="pa-3 pb-2 text-body-2 font-weight-semibold d-flex align-center ga-1">
+                <v-icon icon="mdi-api" size="16"/>Templates API (lecture)
+              </v-card-title>
+              <v-progress-linear v-if="apiTemplatesLoading" indeterminate color="primary"/>
+              <v-list v-else-if="apiTemplates.length" density="compact" class="pa-2">
+                <v-list-item
+                  v-for="t in apiTemplates" :key="t.id"
+                  :title="t.nom"
+                  :subtitle="`${t.code} · ${t.workflowTemplateEtapes?.length ?? 0} étape(s)`"
+                  prepend-icon="mdi-file-document-outline"
+                  rounded="lg" class="mb-1"
+                />
+              </v-list>
+              <div v-else class="pa-3 text-caption text-medium-emphasis">Aucun template actif retourné par l'API.</div>
             </v-card>
           </v-col>
 
@@ -228,7 +253,7 @@
                                         <v-text-field v-model="node.notifs.email.subject" label="Sujet de l'e-mail" density="compact" hide-details class="mb-2" prepend-inner-icon="mdi-format-title"/>
                                         <v-select v-model="node.notifs.email.template" :items="emailTemplates" label="Template e-mail" density="compact" hide-details class="mb-2"/>
                                         <v-alert type="info" variant="tonal" density="compact" rounded="lg" class="mt-2">
-                                          <span class="text-caption" v-pre>Variables disponibles : <code>{{dossier_ref}}</code>, <code>{{beneficiaire}}</code>, <code>{{etape}}</code>, <code>{{lien_dossier}}</code></span>
+                                          <span class="text-caption" v-pre>Variables disponibles : <code>{{dossier_ref}}</code>, <code>{{contribuable}}</code>, <code>{{etape}}</code>, <code>{{lien_dossier}}</code></span>
                                         </v-alert>
                                       </div>
                                     </v-expand-transition>
@@ -744,7 +769,7 @@
                 Relances automatiques
               </v-card-title>
               <v-card-text class="pa-4">
-                <v-switch v-model="sla.autoRelance" label="Relance bénéficiaire si inactif" color="primary" hide-details density="compact" class="mb-3"/>
+                <v-switch v-model="sla.autoRelance" label="Relance contribuable si inactif" color="primary" hide-details density="compact" class="mb-3"/>
                 <v-row dense v-if="sla.autoRelance">
                   <v-col cols="6">
                     <v-text-field v-model="sla.relanceDelai" label="Délai inactivité" density="compact" hide-details placeholder="7j"/>
@@ -862,8 +887,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
+import { listerWorkflowTemplates, type WorkflowTemplate } from '../../services/admin'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 type NodeType = 'trigger' | 'action' | 'auto' | 'condition' | 'notification' | 'delay' | 'end'
@@ -898,14 +924,14 @@ const nodeTypes = Object.entries(nodeTypeMap).map(([type, v]) => ({
   desc: { trigger: 'Dépôt, API, planifié', action: 'Instruction, validation', auto: 'OASE automatique', condition: 'Branchement IF/ELSE', notification: 'Envoi multi-canal', delay: 'Attente temporisée', end: 'Clôture du circuit' }[type] || '',
 }))
 
-const acteurs = ['Bénéficiaire', 'Agent OTR Douanes', 'Agent OTR Impôts', 'Agent DGBF', 'Agent DGTCP', 'Directeur OTR', 'Ministre MEF', 'Agent API-ZF', 'Système OASE']
-const notifDestinataires = ['Bénéficiaire', 'Agent instructeur', 'Superviseur', 'Agent DGBF', "Responsable d'escalade"]
+const acteurs = ['Contribuable', 'Agent OTR Douanes', 'Agent OTR Impôts', 'Agent DGBF', 'Agent DGTCP', 'Directeur OTR', 'Ministre MEF', 'Agent API-ZF', 'Système OASE']
+const notifDestinataires = ['Contribuable', 'Agent instructeur', 'Superviseur', 'Agent DGBF', "Responsable d'escalade"]
 const condFields = ['montant_fcfa', 'type_exoneration', 'statut_fiscal', 'statut_douanier', 'secteur', 'nb_emplois', 'zone_geographique', 'date_depot', 'nb_jours_traitement']
 const condOperators = ['==', '!=', '>', '<', '>=', '<=', 'contient', 'ne contient pas']
-const emailTemplates = ['Notification dépôt dossier', 'Dossier en cours d\'instruction', 'Demande de complément', 'Décision approuvée', 'Décision de rejet', 'Relance bénéficiaire', 'Escalade SLA', 'Attestation disponible']
+const emailTemplates = ['Notification dépôt dossier', 'Dossier en cours d\'instruction', 'Demande de complément', 'Décision approuvée', 'Décision de rejet', 'Relance contribuable', 'Escalade SLA', 'Attestation disponible']
 const smsTemplates = ['SMS dépôt confirmé', 'SMS mise en instruction', 'SMS décision disponible', 'SMS relance', 'SMS escalade urgente']
 const waTemplates = ['oase_depot_confirme', 'oase_instruction_lancee', 'oase_decision_approuvee', 'oase_document_disponible']
-const templateVars = ['{{dossier_ref}}', '{{beneficiaire}}', '{{montant}}', '{{etape}}', '{{acteur}}', '{{delai}}', '{{lien_dossier}}', '{{date}}', '{{decision}}', '{{agent_nom}}']
+const templateVars = ['{{dossier_ref}}', '{{contribuable}}', '{{montant}}', '{{etape}}', '{{acteur}}', '{{delai}}', '{{lien_dossier}}', '{{date}}', '{{decision}}', '{{agent_nom}}']
 
 const mkNotif = (): NotifConfig => ({
   email: { enabled: false, template: '', subject: '' },
@@ -918,15 +944,15 @@ const mkCond = (): ConditionConfig => ({ conditions: [], andOr: 'AND', trueLabel
 // ── Workflow nodes ───────────────────────────────────────────────────────────
 const workflow = ref<WorkflowNode[]>([
   {
-    id: 'n1', type: 'trigger', label: 'Dépôt du dossier', acteur: 'Bénéficiaire', delai: '—',
-    icon: 'mdi-upload-box', description: "Le bénéficiaire soumet sa demande via le portail OASE.", destinataires: ['Agent instructeur'],
+    id: 'n1', type: 'trigger', label: 'Dépôt du dossier', acteur: 'Contribuable', delai: '—',
+    icon: 'mdi-upload-box', description: "Le contribuable soumet sa demande via le portail OASE.", destinataires: ['Agent instructeur'],
     expanded: false, activeTab: 'general',
-    notifs: { email: { enabled: true, template: 'Notification dépôt dossier', subject: '[OASE] Votre dossier {{dossier_ref}} a été reçu' }, sms: { enabled: true, template: 'SMS dépôt confirmé' }, whatsapp: { enabled: false, template: '' }, inapp: { enabled: true, type: 'info', title: 'Nouveau dossier reçu', message: 'Dossier {{dossier_ref}} — {{beneficiaire}} — à instruire' } },
+    notifs: { email: { enabled: true, template: 'Notification dépôt dossier', subject: '[OASE] Votre dossier {{dossier_ref}} a été reçu' }, sms: { enabled: true, template: 'SMS dépôt confirmé' }, whatsapp: { enabled: false, template: '' }, inapp: { enabled: true, type: 'info', title: 'Nouveau dossier reçu', message: 'Dossier {{dossier_ref}} — {{contribuable}} — à instruire' } },
     condition: mkCond(),
   },
   {
     id: 'n2', type: 'action', label: 'Instruction OTR', acteur: 'Agent OTR Douanes', delai: '15j ouvrés',
-    icon: 'mdi-file-search-outline', description: "Vérification de la recevabilité et des pièces. Contrôle SYDONIA.", destinataires: ['Bénéficiaire', 'Agent instructeur'],
+    icon: 'mdi-file-search-outline', description: "Vérification de la recevabilité et des pièces. Contrôle SYDONIA.", destinataires: ['Contribuable', 'Agent instructeur'],
     expanded: false, activeTab: 'general',
     notifs: { email: { enabled: true, template: "Dossier en cours d'instruction", subject: '[OASE] Dossier {{dossier_ref}} en cours d\'instruction' }, sms: { enabled: false, template: '' }, whatsapp: { enabled: false, template: '' }, inapp: { enabled: true, type: 'warning', title: 'Dossier en attente d\'instruction', message: '{{dossier_ref}} — Délai: 15j ouvrés — Acteur: Agent OTR' } },
     condition: mkCond(),
@@ -947,14 +973,14 @@ const workflow = ref<WorkflowNode[]>([
   },
   {
     id: 'n5', type: 'action', label: 'Signature Directeur OTR', acteur: 'Directeur OTR', delai: '5j ouvrés',
-    icon: 'mdi-file-sign', description: "Signature officielle et émission de l'attestation d'exonération.", destinataires: ['Bénéficiaire', 'Agent instructeur'],
+    icon: 'mdi-file-sign', description: "Signature officielle et émission de l'attestation d'exonération.", destinataires: ['Contribuable', 'Agent instructeur'],
     expanded: false, activeTab: 'general',
     notifs: { email: { enabled: true, template: 'Décision approuvée', subject: '[OASE] Décision — {{dossier_ref}}' }, sms: { enabled: true, template: 'SMS décision disponible' }, whatsapp: { enabled: true, template: 'oase_decision_approuvee' }, inapp: { enabled: true, type: 'info', title: 'Décision disponible', message: 'Dossier {{dossier_ref}} — Décision signée par le Directeur' } },
     condition: mkCond(),
   },
   {
-    id: 'n6', type: 'notification', label: 'Notification finale bénéficiaire', acteur: 'Système OASE', delai: 'Auto',
-    icon: 'mdi-bell-ring-outline', description: "Notification automatique multi-canal avec le lien de téléchargement de l'attestation.", destinataires: ['Bénéficiaire'],
+    id: 'n6', type: 'notification', label: 'Notification finale contribuable', acteur: 'Système OASE', delai: 'Auto',
+    icon: 'mdi-bell-ring-outline', description: "Notification automatique multi-canal avec le lien de téléchargement de l'attestation.", destinataires: ['Contribuable'],
     expanded: false, activeTab: 'notifs',
     notifs: { email: { enabled: true, template: 'Attestation disponible', subject: '[OASE] Votre attestation {{dossier_ref}} est disponible' }, sms: { enabled: true, template: 'SMS décision disponible' }, whatsapp: { enabled: true, template: 'oase_document_disponible' }, inapp: { enabled: true, type: 'info', title: 'Attestation disponible', message: 'Téléchargez votre attestation d\'exonération {{dossier_ref}}' } },
     condition: mkCond(),
@@ -1015,7 +1041,7 @@ const slaJournal = ref([
 
 // ── Templates ────────────────────────────────────────────────────────────────
 const allTemplates = ref<Template[]>([
-  { id: 't1', name: 'Notification dépôt dossier', channel: 'email', type: 'Dépôt dossier', subject: '[OASE] Votre dossier {{dossier_ref}} a été reçu', body: `Bonjour {{beneficiaire}},\n\nNous accusons réception de votre demande d'exonération référencée **{{dossier_ref}}**.\n\nVotre dossier est désormais en cours de traitement. Vous pouvez suivre l'avancement de votre demande en vous connectant sur la plateforme OASE :\n\n{{lien_dossier}}\n\nCordialement,\nL'équipe OASE — Ministère de l'Économie et des Finances du Togo` },
+  { id: 't1', name: 'Notification dépôt dossier', channel: 'email', type: 'Dépôt dossier', subject: '[OASE] Votre dossier {{dossier_ref}} a été reçu', body: `Bonjour {{contribuable}},\n\nNous accusons réception de votre demande d'exonération référencée **{{dossier_ref}}**.\n\nVotre dossier est désormais en cours de traitement. Vous pouvez suivre l'avancement de votre demande en vous connectant sur la plateforme OASE :\n\n{{lien_dossier}}\n\nCordialement,\nL'équipe OASE — Ministère de l'Économie et des Finances du Togo` },
   { id: 't2', name: 'SMS dépôt confirmé', channel: 'sms', type: 'Dépôt dossier', subject: '', body: 'OASE-MEF: Dossier {{dossier_ref}} recu. Traitement sous 15j ouvres. Suivi: oase.mef.tg' },
   { id: 't3', name: 'SMS décision disponible', channel: 'sms', type: 'Notification finale', subject: '', body: 'OASE-MEF: Decision dossier {{dossier_ref}} disponible. Connexion: oase.mef.tg' },
   { id: 't4', name: 'oase_depot_confirme', channel: 'whatsapp', type: 'Dépôt dossier', subject: '', body: 'Votre dossier {{dossier_ref}} a bien été reçu par la plateforme OASE. Délai de traitement: 15 jours ouvrés. 🟢' },
@@ -1030,10 +1056,28 @@ function snack(msg: string, color: 'success' | 'error' = 'success') {
 }
 
 function saveWorkflow() {
+  // ⚠ L'API ne propose aucun endpoint de sauvegarde d'un template existant
+  // (pas de PUT/PATCH /workflow/templates/:id — vérifié dans le Swagger).
+  // L'enregistrement reste donc local : incrément de version uniquement.
   const v = parseFloat(version.value)
   version.value = (Math.round((v + 0.1) * 10) / 10).toFixed(1)
   saved.value = true
 }
+
+// ── Templates réels (API) ────────────────────────────────────────────────────
+const apiTemplates = ref<WorkflowTemplate[]>([])
+const apiTemplatesLoading = ref(false)
+
+onMounted(async () => {
+  apiTemplatesLoading.value = true
+  try {
+    apiTemplates.value = await listerWorkflowTemplates()
+  } catch {
+    apiTemplates.value = []
+  } finally {
+    apiTemplatesLoading.value = false
+  }
+})
 
 function addNodeFromPalette(type: NodeType) {
   const def = nodeTypeMap[type]
@@ -1110,7 +1154,7 @@ function runSandbox() {
     { msg: '✓ Dossier mock OASE-2026-0042 chargé', type: 'success' },
     { msg: '✓ Acteur simulé : Agent OTR Douanes', type: 'success' },
     { msg: '→ Étape 1 — Dépôt du dossier... OK', type: 'success' },
-    { msg: '  📧 E-mail envoyé (simulation) à beneficiaire@test.tg', type: 'info' },
+    { msg: '  📧 E-mail envoyé (simulation) à contribuable@test.tg', type: 'info' },
     { msg: '  📱 SMS envoyé (simulation) au +228 90000001', type: 'info' },
     { msg: '→ Étape 2 — Instruction OTR... OK', type: 'success' },
     { msg: '  🔔 Alerte dashboard créée pour Agent OTR', type: 'info' },
