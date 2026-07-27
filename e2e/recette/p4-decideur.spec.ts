@@ -85,6 +85,13 @@ test.describe('P4 — Décideur', () => {
     await loginAs(page, 'p4')
     await page.goto('/decideur/dashboard')
     await expect(page.getByText('Tableau de bord stratégique')).toBeVisible()
+    // La file d'approbation se charge en async (latence réseau prod) : attendre
+    // explicitement qu'au moins une action soit rendue avant de compter.
+    await page
+      .getByRole('button', { name: /approuv|décision|signer/i })
+      .first()
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => {})
 
     const actionsDashboard = await page
       .getByRole('button', { name: /approuv|décision|signer/i })

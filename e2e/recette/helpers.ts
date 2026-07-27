@@ -6,7 +6,7 @@ import { expect, type Page, type APIRequestContext } from '@playwright/test'
  * base locale seedée (comptes de docs/CREDENTIALS.md, mot de passe unique Oase@2026!).
  */
 
-export const API = 'http://localhost:3001/api/v1'
+export const API = process.env.TEST_API_URL || 'http://localhost:3001/api/v1'
 export const PASSWORD = 'Oase@2026!'
 export const PIN = '123456'
 

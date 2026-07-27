@@ -171,12 +171,13 @@ test.describe('P5 — Audit & Contrôle', () => {
     await premiereLigne.click()
 
     // Panneau de détail : informations complètes affichées
+    // (chargement async du détail — latence prod → timeouts élargis)
     const drawer = page.locator('.v-navigation-drawer')
-    await expect(drawer.getByText('Contribuable', { exact: true })).toBeVisible()
-    await expect(drawer.getByText('NIF', { exact: true })).toBeVisible()
-    await expect(drawer.getByText('Montant', { exact: true })).toBeVisible()
-    await expect(drawer.getByText('Base juridique', { exact: true })).toBeVisible()
-    await expect(drawer.getByText('Consultation confidentielle — journalisée')).toBeVisible()
+    await expect(drawer.getByText('Contribuable', { exact: true })).toBeVisible({ timeout: 15000 })
+    await expect(drawer.getByText('NIF', { exact: true })).toBeVisible({ timeout: 10000 })
+    await expect(drawer.getByText('Montant', { exact: true })).toBeVisible({ timeout: 10000 })
+    await expect(drawer.getByText('Base juridique', { exact: true })).toBeVisible({ timeout: 10000 })
+    await expect(drawer.getByText('Consultation confidentielle — journalisée')).toBeVisible({ timeout: 10000 })
 
     // Onglet Documents accessible
     await drawer.getByRole('tab', { name: /Documents/ }).click()

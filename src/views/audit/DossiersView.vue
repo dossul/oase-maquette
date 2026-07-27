@@ -20,15 +20,20 @@
             <v-select v-model="filterInstitution" :items="['OTR Douanes','OTR Impôts','DGBF','API-ZF','Toutes']" label="Institution" hide-details/>
           </v-col>
           <v-col cols="6" md="4">
-            <v-select v-model="filterStatut" :items="['en_cours','approuve','rejete','expire','Tous']" label="Statut" hide-details/>
+            <v-select v-model="filterStatut" :items="['soumis','en_instruction','action_requise','approuve','rejete','Tous']" label="Statut" hide-details/>
           </v-col>
         </v-row>
       </v-card-text>
 
+      <v-alert v-if="loadError" type="error" variant="tonal" density="compact" class="mx-4 mb-2">
+        Impossible de charger les dossiers : {{ loadError }}
+      </v-alert>
+
       <v-data-table
         :headers="headers"
-        :items="dossiers"
+        :items="dossiersFiltres"
         :search="search"
+        :loading="loading"
         hover
         @click:row="(_, {item}) => openDossier(item)"
       >
@@ -198,25 +203,99 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import StatusChip from '../../components/StatusChip.vue'
 import DocumentViewer from '../../components/DocumentViewer.vue'
-import { mockDemandes } from '../../mock/data'
-import type { Demande } from '../../types'
+import { api } from '../../services/api'
+import type { StatutDemande } from '../../types'
+
+// ── Données réelles (API) ────────────────────────────────────────────────────
+interface DemandeApiRow {
+  id: string
+  reference: string
+  statutCode: StatutDemande
+  montantFcfa: string | number
+  secteur: string | null
+  dateDepot: string | null
+  dateEcheance?: string | null
+  contribuable?: { raisonSociale: string; nif: string; rccm?: string | null } | null
+  baseJuridiqueVersion?: { code?: string; libelle?: string } | null
+  etapeActuelle?: string | null
+}
+
+interface DossierRow {
+  id: string
+  reference: string
+  contribuable: string
+  nif: string
+  rccm?: string | null
+  secteur: string
+  type: string
+  statut: StatutDemande
+  montantFCFA: number
+  dateDepot: string
+  dateEcheance?: string | null
+  etapeActuelle: string
+  baseJuridique: string
+}
+
+function mapRow(d: DemandeApiRow): DossierRow {
+  const bjv = d.baseJuridiqueVersion
+  return {
+    id: d.id,
+    reference: d.reference,
+    contribuable: d.contribuable?.raisonSociale ?? '—',
+    nif: d.contribuable?.nif ?? '—',
+    rccm: d.contribuable?.rccm ?? null,
+    secteur: d.secteur ?? '—',
+    type: bjv?.code ?? '—',
+    statut: d.statutCode,
+    montantFCFA: Number(d.montantFcfa ?? 0),
+    dateDepot: d.dateDepot ? new Date(d.dateDepot).toLocaleDateString('fr-FR') : '—',
+    dateEcheance: d.dateEcheance ?? null,
+    etapeActuelle: d.etapeActuelle ?? d.statutCode,
+    baseJuridique: bjv?.libelle ?? bjv?.code ?? '—',
+  }
+}
 
 // ── State ──────────────────────────────────────────────────────────────────
 const search = ref('')
 const filterInstitution = ref('Toutes')
 const filterStatut = ref('Tous')
-const selectedDossier = ref<Demande | null>(null)
+const selectedDossier = ref<DossierRow | null>(null)
 const detailPanel = ref(false)
 const detailTab = ref<'info' | 'docs'>('info')
 const selectedDoc = ref<MockDoc | null>(null)
 const viewerDialog = ref(false)
 const viewerRef = ref<InstanceType<typeof DocumentViewer> | null>(null)
 
-const dossiers = mockDemandes
+const dossiers = ref<DossierRow[]>([])
+const loading = ref(false)
+const loadError = ref('')
+
+const dossiersFiltres = computed(() =>
+  filterStatut.value === 'Tous'
+    ? dossiers.value
+    : dossiers.value.filter((d) => d.statut === filterStatut.value),
+)
+
+async function loadDossiers() {
+  loading.value = true
+  loadError.value = ''
+  try {
+    const res = await api<{ data?: DemandeApiRow[] } | DemandeApiRow[]>('/demandes?limit=200')
+    const rows = Array.isArray(res) ? res : (res.data ?? [])
+    dossiers.value = rows.map(mapRow)
+  } catch (e) {
+    loadError.value = e instanceof Error ? e.message : 'Erreur de chargement'
+    dossiers.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadDossiers)
 
 const headers = [
   { title: 'Référence', key: 'reference' },
@@ -228,7 +307,7 @@ const headers = [
   { title: '', key: 'actions', sortable: false },
 ]
 
-// ── Mock document pieces per dossier ───────────────────────────────────────
+// ── Pièces jointes réelles par dossier ─────────────────────────────────────
 interface MockDoc {
   id: string
   nom: string
@@ -237,27 +316,36 @@ interface MockDoc {
   taille: string
 }
 
-function buildDocs(d: Demande): MockDoc[] {
-  const base: MockDoc[] = [
-    { id: `${d.id}-req`, nom: `Demande_${d.reference}.pdf`, type: 'PDF', pages: 2, taille: '184 Ko' },
-    { id: `${d.id}-id`, nom: `Statuts_societe_${d.nif}.pdf`, type: 'PDF', pages: 4, taille: '312 Ko' },
-    { id: `${d.id}-fin`, nom: `Bilan_financier_2025_${d.contribuable.replace(/ /g, '_')}.pdf`, type: 'PDF', pages: 6, taille: '824 Ko' },
-  ]
-  if (d.statut === 'approuve') {
-    base.push({ id: `${d.id}-att`, nom: `Attestation_${d.reference}.pdf`, type: 'PDF', pages: 3, taille: '156 Ko' })
-  }
-  if (d.type === 'zone_franche' || d.type === 'code_investissement') {
-    base.push({ id: `${d.id}-conv`, nom: `Convention_${d.reference}.pdf`, type: 'PDF', pages: 8, taille: '540 Ko' })
-  }
-  if (d.statut === 'rejete') {
-    base.push({ id: `${d.id}-rej`, nom: `Décision_rejet_${d.reference}.pdf`, type: 'PDF', pages: 2, taille: '98 Ko' })
-  }
-  return base
+interface PieceApi {
+  id: string
+  nomFichier?: string
+  nom?: string
+  typeDocumentCode?: string
+  tailleOctets?: number | string | null
 }
 
-const dossierDocs = computed<MockDoc[]>(() =>
-  selectedDossier.value ? buildDocs(selectedDossier.value) : []
-)
+const dossierDocs = ref<MockDoc[]>([])
+
+function formatTaille(octets?: number | string | null): string {
+  const n = Number(octets ?? 0)
+  if (!n) return '—'
+  if (n > 1e6) return `${(n / 1e6).toFixed(1)} Mo`
+  return `${Math.max(1, Math.round(n / 1024))} Ko`
+}
+
+async function loadPieces(demandeId: string) {
+  try {
+    const res = await api<{ data?: PieceApi[] } | PieceApi[]>(`/demandes/${demandeId}/pieces-jointes`)
+    const rows = Array.isArray(res) ? res : (res.data ?? [])
+    dossierDocs.value = rows.map((p) => {
+      const nom = p.nomFichier ?? p.nom ?? 'pièce.pdf'
+      const ext = nom.split('.').pop()?.toUpperCase() ?? 'PDF'
+      return { id: p.id, nom, type: ext, pages: 1, taille: formatTaille(p.tailleOctets) }
+    })
+  } catch {
+    dossierDocs.value = []
+  }
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function docIcon(type: string) {
@@ -267,10 +355,12 @@ function docColor(type: string) {
   return type === 'PDF' ? 'error' : type === 'XLSX' ? 'success' : 'primary'
 }
 
-function openDossier(item: Demande) {
+function openDossier(item: DossierRow) {
   selectedDossier.value = item
   detailPanel.value = true
   detailTab.value = 'info'
+  dossierDocs.value = []
+  loadPieces(item.id)
 }
 
 function viewDocument(doc: MockDoc) {
