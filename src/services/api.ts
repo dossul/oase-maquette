@@ -29,8 +29,15 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   })
 
   if (res.status === 401) {
-    auth.clearSession()
-    window.location.href = '/login'
+    // Ne purger/rediriger que si une session existait réellement : un 401
+    // sur un appel anonyme (page de login, boot avant route prête) ne doit
+    // pas provoquer de rechargement (boucle infinie sur /login).
+    if (auth.token) {
+      auth.clearSession()
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login'
+      }
+    }
     throw new ApiError(401, 'Session expirée')
   }
 

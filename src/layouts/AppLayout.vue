@@ -149,6 +149,14 @@ const toggleTheme = () => {
 const unreadCount = ref(0)
 
 async function loadUnreadCount() {
+  // Ne jamais appeler l'API sans session : le layout peut être monté
+  // transitoirement avant la résolution de la route initiale (layout par
+  // défaut d'App.vue), y compris sur /login — un 401 ici purgerait la
+  // session et provoquerait une boucle de rechargements.
+  if (!auth.isAuthenticated) {
+    unreadCount.value = 0
+    return
+  }
   if (isDemoMode) {
     unreadCount.value = mockNotifications.filter(n => !n.lu).length
     return
