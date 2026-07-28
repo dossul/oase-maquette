@@ -40,6 +40,7 @@ const router = createRouter({
     // Portail Contribuable — Persona 1
     { path: '/portail/dashboard', component: () => import('../views/portail/DashboardView.vue'), meta: { layout: 'app', persona: 'P1 — Contribuable', role: 'contribuable' } },
     { path: '/portail/nouvelle-demande', component: () => import('../views/portail/NewDemandeView.vue'), meta: { layout: 'app', persona: 'P1 — Contribuable', role: 'contribuable' } },
+    { path: '/portail/demandes', component: () => import('../views/portail/MesDemandesView.vue'), meta: { layout: 'app', persona: 'P1 — Contribuable', role: 'contribuable' } },
     { path: '/portail/demandes/:id', component: () => import('../views/portail/DemandeDetailView.vue'), meta: { layout: 'app', persona: 'P1 — Contribuable', role: 'contribuable' } },
     { path: '/portail/exonerations-actives', component: () => import('../views/portail/ExonerationsActivesView.vue'), meta: { layout: 'app', persona: 'P1 — Contribuable', role: 'contribuable' } },
     { path: '/portail/profil', component: () => import('../views/portail/ProfilView.vue'), meta: { layout: 'app', persona: 'P1 — Contribuable', role: 'contribuable' } },

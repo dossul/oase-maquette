@@ -200,12 +200,15 @@ function impotVersType(impot?: string | null): ExoType {
 onMounted(async () => {
   loading.value = true
   try {
-    const [d, bj, pj, et] = await Promise.all([
+    // Les étapes du workflow n'existent qu'après soumission (instance démarrée
+    // côté backend). Inutile d'appeler /workflow/.../etapes pour un brouillon :
+    // cela évite un 404 INSTANCE_INEXISTANTE systématique en console.
+    const [d, bj, pj] = await Promise.all([
       getDemande(demandeId),
       listerBasesJuridiques().catch(() => []),
       listerPiecesJointes(demandeId).catch(() => [] as ApiPieceJointe[]),
-      listerEtapesWorkflow(demandeId),
     ])
+    const et = d.statutCode === 'brouillon' ? [] : await listerEtapesWorkflow(demandeId)
     const base = bj.find(b => b.id === d.baseJuridiqueVersionId)
     demande.value = mapDemande(d, impotVersType(base?.impotConcerne), base?.libelle || '—')
     pieces.value = pj

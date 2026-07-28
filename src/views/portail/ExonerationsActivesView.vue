@@ -2,7 +2,7 @@
   <div>
     <PageHeader title="Mes exonérations actives" subtitle="Gérez vos exonérations en vigueur et anticipez les renouvellements" icon="mdi-check-decagram">
       <template #actions>
-        <ExportButton label="Exporter" size="small" @export="() => {}" />
+        <ExportButton label="Exporter" size="small" :disabled-formats="['pdf']" @export="onExport" />
       </template>
     </PageHeader>
     <v-alert v-if="expiringSoonCount > 0" type="warning" variant="tonal" rounded="lg" density="compact" class="mb-5" prepend-icon="mdi-alarm">
@@ -156,7 +156,7 @@ import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import ExportButton from '../../components/ExportButton.vue'
 import { EXO_TYPE_LABELS, type ExoType } from '../../types'
-import { listerMesDemandes, listerBasesJuridiques, telechargerAttestation } from '../../services/portail'
+import { listerMesDemandes, listerBasesJuridiques, telechargerAttestation, exporterMesDemandes } from '../../services/portail'
 
 interface ExoActive {
   id: string
@@ -212,6 +212,16 @@ async function downloadAttestation(id: string) {
     downloadError.value = e instanceof Error ? e.message : "Échec du téléchargement de l'attestation"
   } finally {
     downloadingId.value = null
+  }
+}
+
+/** US-P1-11 — export CSV/XLSX généré côté serveur (bouton « Exporter »). */
+async function onExport(format: string) {
+  downloadError.value = ''
+  try {
+    await exporterMesDemandes(format === 'excel' ? 'xlsx' : 'csv')
+  } catch (e) {
+    downloadError.value = e instanceof Error ? e.message : "Échec de l'export des demandes"
   }
 }
 

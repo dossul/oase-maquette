@@ -204,6 +204,37 @@ export async function telechargerAttestation(demandeId: string): Promise<void> {
   URL.revokeObjectURL(url)
 }
 
+// ── Export des demandes (US-P1-11) ───────────────────────────────────────────
+
+/** Télécharge l'export CSV/XLSX généré côté serveur (GET /demandes/export/mes-demandes). */
+export async function exporterMesDemandes(format: 'csv' | 'xlsx'): Promise<void> {
+  const auth = useAuthStore()
+  const res = await fetch(`${API_BASE}/demandes/export/mes-demandes?format=${format}`, {
+    headers: auth.token ? { Authorization: `Bearer ${auth.token}` } : {},
+  })
+  if (res.status === 401) {
+    auth.clearSession()
+    window.location.href = '/login'
+    throw new Error('Session expirée')
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }))
+    throw new Error(err.message || `Export indisponible (${res.status})`)
+  }
+  const disposition = res.headers.get('Content-Disposition') || ''
+  const match = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(disposition)
+  const filename = match ? decodeURIComponent(match[1].replace(/"$/, '')) : `oase_demandes.${format}`
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 // ── Contribuable ─────────────────────────────────────────────────────────────
 
 export async function getContribuableMe(): Promise<ApiContribuableMe> {

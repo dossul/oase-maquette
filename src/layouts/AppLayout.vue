@@ -206,7 +206,7 @@ const navByPersona: Record<string, NavItem[]> = {
   contribuable: [
     { title: 'Tableau de bord', icon: 'mdi-view-dashboard', to: '/portail/dashboard' },
     { title: 'Nouvelle demande', icon: 'mdi-plus-circle', to: '/portail/nouvelle-demande' },
-    { title: 'Mes demandes', icon: 'mdi-file-document-multiple', to: '/portail/demandes/1' },
+    { title: 'Mes demandes', icon: 'mdi-file-document-multiple', to: '/portail/demandes' },
     { title: 'Exonérations actives', icon: 'mdi-check-decagram', to: '/portail/exonerations-actives' },
     { title: 'Mon profil entreprise', icon: 'mdi-domain', to: '/portail/profil' },
     { title: 'Notifications', icon: 'mdi-bell', to: '/notifications' },
