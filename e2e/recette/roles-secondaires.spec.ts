@@ -93,6 +93,12 @@ const ROLES: RoleSmoke[] = [
     routeParDefaut: /\/conedef\/dashboard/,
     ecrans: [{ path: '/conedef/dashboard', titre: /Tableau de bord CONEDEF/ }],
   },
+  {
+    nom: 'agent_dsi_mef',
+    email: 'agent.dsi.mef@oase.tg',
+    routeParDefaut: /\/dsi\/dashboard/,
+    ecrans: [{ path: '/dsi/dashboard', titre: /Tableau de bord DSI/ }],
+  },
 ]
 
 test.describe('SMOKE — Rôles secondaires (login → écrans métier → 0 erreur)', () => {

@@ -48,6 +48,12 @@
                     <v-chip size="small" variant="tonal" color="info">Code valide {{ Math.round(mfaConfig.ttlSeconds / 60) }} min</v-chip>
                     <v-chip size="small" variant="tonal" color="warning">{{ mfaConfig.maxAttempts }} tentatives max</v-chip>
                   </div>
+                  <!-- Activation/désactivation persistante (PATCH /admin/mfa/config) -->
+                  <div class="d-flex align-center flex-wrap ga-3 mt-3">
+                    <v-switch v-model="mfaConfig.enabled" label="MFA activé pour toute la plateforme" color="success" hide-details density="compact"/>
+                    <v-select v-model="mfaConfig.defaultChannel" :items="['totp','email']" label="Canal par défaut" density="compact" hide-details style="max-width:170px"/>
+                    <v-btn color="primary" size="small" prepend-icon="mdi-content-save" :loading="mfaSaving" @click="sauvegarderMfa">Enregistrer MFA</v-btn>
+                  </div>
                 </template>
                 <div v-else class="text-caption text-medium-emphasis">Configuration MFA indisponible.</div>
               </v-card-text>
@@ -388,6 +394,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import {
   getMfaConfig,
+  updateMfaConfig,
   getParametres,
   majParametres,
   getInseed,
@@ -425,6 +432,27 @@ const sec = ref({
 // Configuration MFA réelle (GET /admin/mfa/config).
 const mfaConfig = ref<MfaConfig | null>(null)
 const mfaLoading = ref(false)
+const mfaSaving = ref(false)
+
+/** Persiste la config MFA (PATCH /admin/mfa/config) — activation/désactivation plateforme. */
+async function sauvegarderMfa() {
+  if (!mfaConfig.value) return
+  mfaSaving.value = true
+  try {
+    mfaConfig.value = await updateMfaConfig({
+      enabled: mfaConfig.value.enabled,
+      defaultChannel: mfaConfig.value.defaultChannel,
+      channels: mfaConfig.value.channels,
+    })
+    snackMsg.value = `MFA ${mfaConfig.value.enabled ? 'activé' : 'désactivé'} (PATCH /admin/mfa/config)`
+    snack.value = true
+  } catch {
+    snackMsg.value = 'Échec de l’enregistrement MFA'
+    snack.value = true
+  } finally {
+    mfaSaving.value = false
+  }
+}
 
 // ── LDAP ──────────────────────────────────────────────────────────────────
 // TODO(endpoint): pas d'endpoint de configuration LDAP dans l'API v1 — non configuré.

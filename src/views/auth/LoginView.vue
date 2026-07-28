@@ -114,14 +114,19 @@ const handleLogin = async () => {
   attempts.value++
 
   try {
-    const res = await api<{ access_token?: string; refresh_token?: string; mfa_required?: boolean; user?: any }>('/auth/login', {
+    const res = await api<{ access_token?: string; refresh_token?: string; mfa_required?: boolean; mfa_token?: string; canal?: string; user?: any }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email: email.value, password: password.value }),
     })
 
-    if (res.mfa_required && res.user) {
-      auth.setSession('mfa-pending-' + Date.now(), res.user)
-      localStorage.setItem('mfa_pending', 'true')
+    // OASE [BUG #11] fix : le backend renvoie { mfa_required, mfa_token, canal } SANS
+    // champ user — l'ancienne condition (res.mfa_required && res.user) n'était jamais
+    // vraie et l'utilisateur MFA recevait « identifiants incorrects ». On stocke le
+    // mfa_token temporaire pour la page /mfa (pas de session tant que le code n'est
+    // pas vérifié).
+    if (res.mfa_required && res.mfa_token) {
+      sessionStorage.setItem('oase_mfa_token', res.mfa_token)
+      sessionStorage.setItem('oase_mfa_canal', res.canal ?? 'totp')
       return router.push('/mfa')
     }
 

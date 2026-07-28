@@ -25,3 +25,4 @@ dist-ssr
 
 .vercel
 .env*
+e2e/recette/assets/mail.local.json

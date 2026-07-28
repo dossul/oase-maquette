@@ -148,6 +148,17 @@ export function getMfaConfig(): Promise<MfaConfig> {
   return api<MfaConfig>('/admin/mfa/config')
 }
 
+/** PATCH /admin/mfa/config — active/désactive le MFA et choisit le canal par défaut. */
+export function updateMfaConfig(dto: {
+  enabled?: boolean
+  channels?: string[]
+  defaultChannel?: string
+  ttlSeconds?: number
+  maxAttempts?: number
+}): Promise<MfaConfig> {
+  return api<MfaConfig>('/admin/mfa/config', { method: 'PATCH', body: JSON.stringify(dto) })
+}
+
 export interface JobsHeartbeat {
   lastHeartbeat: string
   healthy: boolean

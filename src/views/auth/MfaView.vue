@@ -55,10 +55,15 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { api } from '../../services/api'
+import { useAuthStore } from '../../stores/auth'
+import { getDefaultRouteForRole } from '../../composables/useDefaultRoute'
 
 const router = useRouter()
+const auth = useAuthStore()
 const otp = ref('')
-const channel = ref<'sms'|'totp'>('sms')
+// OASE [BUG #11] fix : canal réel renvoyé par POST /auth/login (stocké en sessionStorage)
+const channel = ref<'sms'|'totp'>((sessionStorage.getItem('oase_mfa_canal') as 'sms'|'totp') || 'totp')
 const timer = ref(272)
 const loading = ref(false)
 const otpError = ref(false)
@@ -68,12 +73,30 @@ let interval: ReturnType<typeof setInterval>
 onMounted(() => { interval = setInterval(() => { if (timer.value > 0) timer.value-- }, 1000) })
 onUnmounted(() => clearInterval(interval))
 
-const handleOtp = () => {
+// OASE [BUG #11] fix : vraie vérification POST /auth/mfa/verify (auparavant : mock
+// qui redirigeait sans appel API après 700 ms — n'importe quel code « passait »).
+const handleOtp = async () => {
+  otpError.value = false
+  const mfaToken = sessionStorage.getItem('oase_mfa_token')
+  if (!mfaToken || otp.value.length !== 6) {
+    otpError.value = true
+    return
+  }
   loading.value = true
-  setTimeout(() => {
+  try {
+    const res = await api<{ access_token: string; user: any }>('/auth/mfa/verify', {
+      method: 'POST',
+      body: JSON.stringify({ mfa_token: mfaToken, code: otp.value, canal: channel.value }),
+    })
+    auth.setSession(res.access_token, res.user)
+    sessionStorage.removeItem('oase_mfa_token')
+    sessionStorage.removeItem('oase_mfa_canal')
+    router.push(getDefaultRouteForRole(res.user.role))
+  } catch {
+    otpError.value = true
+  } finally {
     loading.value = false
-    router.push('/portail/dashboard')
-  }, 700)
+  }
 }
 
 const resendCode = () => { timer.value = 120 }
