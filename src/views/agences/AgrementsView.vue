@@ -210,7 +210,6 @@
             <div class="text-body-2">La generation du document de convention sera branchee sur le backend (module documents) dans une prochaine version.</div>
           </div>
         </div>
-        </div>
       </v-card>
     </v-dialog>
 
