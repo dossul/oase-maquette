@@ -47,16 +47,24 @@
 import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import { listerRapports, labelTypeRapport, tailleDataUri, type RapportApi } from '../../services/rapports'
+import { useAuthStore } from '../../stores/auth'
 
+const auth = useAuthStore()
 const search = ref('')
 const filterAnnee = ref<string | null>(null)
 
-// Rapports réels (GET /rapports). Endpoint authentifié : en accès anonyme, état vide honnête.
+// Rapports réels (GET /rapports). Endpoint AUTHENTIFIÉ : en accès anonyme on n'appelle
+// PAS l'API (un appel sans session produirait un 401 garanti — détecté par la recette
+// TC-P6-04) et on affiche l'état « connexion requise » à la place.
 const loading = ref(false)
 const error = ref<string | null>(null)
 const rapports = ref<RapportApi[]>([])
 
 onMounted(async () => {
+  if (!auth.isAuthenticated) {
+    error.value = 'La bibliothèque de rapports n\'est pas accessible sans connexion.'
+    return
+  }
   loading.value = true
   try {
     rapports.value = await listerRapports()
