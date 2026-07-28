@@ -24,9 +24,16 @@
       </v-col>
     </v-row>
 
+    <!-- Encart documentation normative : les tableaux ci-dessous décrivent le processus MRD,
+         pas des chiffres d'activité réels. -->
+    <v-alert type="info" variant="tonal" rounded="lg" density="compact" class="mb-4" prepend-icon="mdi-book-open-outline">
+      <strong>Documentation normative.</strong> Le parcours, la matrice en 8 étapes et les variantes par régime ci-dessous
+      décrivent le processus institutionnel MRD (référentiel). Seuls les indicateurs ci-dessus sont calculés sur des données réelles.
+    </v-alert>
+
     <v-card rounded="lg" elevation="1" class="mb-4">
       <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Parcours normé du dossier</v-card-title>
-      <v-stepper model-value="4" alt-labels>
+      <v-stepper model-value="1" alt-labels>
         <v-stepper-header>
           <v-stepper-item title="1. Dépôt" subtitle="Contribuable → CI" value="1" />
           <v-stepper-item title="2. Vérification" subtitle="< 5 jours" value="2" />
@@ -52,9 +59,6 @@
           <v-data-table :headers="headers" :items="rows" hover>
             <template #item.delai="{ item }">
               <v-chip :color="delayColor(item.delai)" size="x-small" variant="tonal">{{ item.delai }}</v-chip>
-            </template>
-            <template #item.statut="{ item }">
-              <v-chip :color="statusColor(item.statut)" size="x-small" variant="outlined">{{ item.statut }}</v-chip>
             </template>
           </v-data-table>
         </v-card>
@@ -147,37 +151,62 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
 import ExportButton from '../../components/ExportButton.vue'
+import { api } from '../../services/api'
+import { listerDemandes } from '../../services/backoffice'
 
 const tab = ref('lucratif')
 const regimeTab = ref('cgi')
-const kpis = [
-  { label: 'Dossiers CI en cours', value: '86', icon: 'mdi-file-document-edit-outline', color: 'primary', subtitle: 'Campagne courante' },
-  { label: 'SLA < 5 jours', value: '73%', icon: 'mdi-clock-outline', color: 'info', subtitle: 'Vérification initiale' },
-  { label: 'SLA < 15 jours', value: '61%', icon: 'mdi-timer-check-outline', color: 'warning', subtitle: 'Attestations émises' },
-  { label: 'Alertes de dépassement', value: '9', icon: 'mdi-alert-circle-outline', color: 'error', subtitle: 'Escalade active' },
-]
+
+interface StatutCount { statutCode: string; count: number }
+const parStatut = ref<StatutCount[]>([])
+
+onMounted(async () => {
+  try {
+    // GET /demandes/stats/par-statut (rôles decideur/conedef/auditeur/admin)
+    parStatut.value = await api<StatutCount[]>('/demandes/stats/par-statut')
+  } catch {
+    try {
+      // Repli pour les rôles backoffice : calcul depuis GET /demandes
+      const demandes = await listerDemandes({ limit: 100 })
+      const groupes = new Map<string, number>()
+      for (const d of demandes) groupes.set(d.statutCode, (groupes.get(d.statutCode) || 0) + 1)
+      parStatut.value = [...groupes.entries()].map(([statutCode, count]) => ({ statutCode, count }))
+    } catch {
+      parStatut.value = []
+    }
+  }
+})
+
+const countStatut = (...codes: string[]) =>
+  parStatut.value.filter((s) => codes.includes(s.statutCode)).reduce((acc, s) => acc + s.count, 0)
+
+const kpis = computed(() => [
+  { label: 'Dossiers CI en cours', value: String(countStatut('soumis', 'en_instruction', 'action_requise')), icon: 'mdi-file-document-edit-outline', color: 'primary', subtitle: 'Données réelles (API)' },
+  { label: 'Dossiers approuvés', value: String(countStatut('approuve')), icon: 'mdi-check-circle-outline', color: 'success', subtitle: 'Attestations émises' },
+  { label: 'Dossiers rejetés', value: String(countStatut('rejete')), icon: 'mdi-close-circle-outline', color: 'error', subtitle: 'Décisions de rejet' },
+  { label: 'Total dossiers', value: String(parStatut.value.reduce((acc, s) => acc + s.count, 0)), icon: 'mdi-folder-multiple-outline', color: 'info', subtitle: 'Tous statuts confondus' },
+])
 
 const headers = [
   { title: 'Étape', key: 'etape' },
   { title: 'Acteur', key: 'acteur' },
   { title: 'Action', key: 'action' },
   { title: 'Délai', key: 'delai' },
-  { title: 'Statut', key: 'statut' },
 ]
 
 const rows = [
-  { etape: '1', acteur: 'Contribuable', action: 'Dépôt dossier complet → CI service gestionnaire', delai: '—', statut: 'Terminé' },
-  { etape: '2', acteur: 'CI / Service gestionnaire', action: 'Vérification administrative complétude', delai: '< 5 jours', statut: 'En cours' },
-  { etape: '3', acteur: 'CI / Service contentieux', action: 'Étude base juridique applicable (CGI / texte habilitant)', delai: '—', statut: 'À venir' },
-  { etape: '4', acteur: 'DGE / DME', action: 'Validation hiérarchique', delai: 'Cumul < 10 jours', statut: 'À venir' },
-  { etape: '5', acteur: 'Direction CI', action: 'Décision formelle : émission attestation signée', delai: 'Cumul < 15 jours', statut: 'À venir' },
-  { etape: '6', acteur: 'Contribuable', action: 'Présentation attestation au guichet compétent (faire valoir droits)', delai: '—', statut: 'À venir' },
-  { etape: '7', acteur: 'OTR', action: 'Suivi financier : comptabilisation E-TAX → DLFC → DAS', delai: 'Continu', statut: 'À venir' },
-  { etape: '8', acteur: 'OTR → DGBF', action: 'Reporting mensuel via SIGFiP + DLFC (colonne exonérations)', delai: 'Mensuel', statut: 'À venir' },
+  { etape: '1', acteur: 'Contribuable', action: 'Dépôt dossier complet → CI service gestionnaire', delai: '—' },
+  { etape: '2', acteur: 'CI / Service gestionnaire', action: 'Vérification administrative complétude', delai: '< 5 jours' },
+  { etape: '3', acteur: 'CI / Service contentieux', action: 'Étude base juridique applicable (CGI / texte habilitant)', delai: '—' },
+  { etape: '4', acteur: 'DGE / DME', action: 'Validation hiérarchique', delai: 'Cumul < 10 jours' },
+  { etape: '5', acteur: 'Direction CI', action: 'Décision formelle : émission attestation signée', delai: 'Cumul < 15 jours' },
+  { etape: '6', acteur: 'Contribuable', action: 'Présentation attestation au guichet compétent (faire valoir droits)', delai: '—' },
+  { etape: '7', acteur: 'OTR', action: 'Suivi financier : comptabilisation E-TAX → DLFC → DAS', delai: 'Continu' },
+  { etape: '8', acteur: 'OTR → DGBF', action: 'Reporting mensuel via SIGFiP + DLFC (colonne exonérations)', delai: 'Mensuel' },
 ]
 
 const processHeaders = [
@@ -253,5 +282,4 @@ const regimeVariants = [
 ]
 
 const delayColor = (value: string) => (value.includes('5') ? 'info' : value.includes('10') ? 'warning' : value.includes('15') ? 'error' : 'secondary')
-const statusColor = (value: string) => ({ 'Terminé': 'success', 'En cours': 'info', 'À venir': 'secondary' } as Record<string, string>)[value] || 'secondary'
 </script>

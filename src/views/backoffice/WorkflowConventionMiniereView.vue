@@ -17,6 +17,13 @@
       </v-col>
     </v-row>
 
+    <!-- Encart documentation normative : parcours, matrice et avantages par phase décrivent
+         le référentiel du processus n° 5, pas des chiffres d'activité. -->
+    <v-alert type="info" variant="tonal" rounded="lg" density="compact" class="mb-4" prepend-icon="mdi-book-open-outline">
+      <strong>Documentation normative.</strong> Parcours, matrice d'approbation et avantages par phase ci-dessous sont le
+      référentiel du processus n° 5 (DGMG). Seuls les indicateurs et le suivi des conventions proviennent de données réelles.
+    </v-alert>
+
     <!-- Parcours normé -->
     <v-card rounded="lg" elevation="1" class="mb-4">
       <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Parcours normé — Processus n° 5 (DGMG)</v-card-title>
@@ -89,6 +96,11 @@
                 {{ item.alerte ? 'J-90 actif' : 'OK' }}
               </v-chip>
             </template>
+            <template #no-data>
+              <div class="text-center pa-6 text-medium-emphasis text-body-2">
+                {{ conventionsErreur ? 'Accès aux conventions non autorisé pour votre profil.' : 'Aucune convention enregistrée.' }}
+              </div>
+            </template>
           </v-data-table>
         </v-card>
       </v-col>
@@ -155,16 +167,67 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
 import ExportButton from '../../components/ExportButton.vue'
+import { listerConventionsReelles } from '../../services/backoffice'
 
-const kpis = [
-  { label: 'Conventions actives', value: '22', icon: 'mdi-file-document-outline', color: 'primary', subtitle: 'Mines et hydrocarbures' },
-  { label: 'En phase recherche', value: '9', icon: 'mdi-magnify-scan', color: 'info', subtitle: 'CDDI (équipements)' },
-  { label: 'En phase exploitation', value: '11', icon: 'mdi-factory', color: 'success', subtitle: 'CI (IS / IRPP)' },
-  { label: 'Alertes J-90 actives', value: '3', icon: 'mdi-bell-ring', color: 'error', subtitle: 'Changement de phase imminent' },
-]
+interface ConventionLigne {
+  ref: string
+  operateur: string
+  phase: string
+  echeance: string
+  alerte: boolean
+}
+
+const conventions = ref<ConventionLigne[]>([])
+const conventionsErreur = ref(false)
+const conventionsNonAutorise = ref(false)
+
+const J90_MS = 90 * 24 * 3600 * 1000
+
+onMounted(async () => {
+  try {
+    // GET /conventions — accessible aux rôles agent_ci/agent_cddi (RBAC élargi, vague C backend)
+    // → repli état vide honnête conservé si jamais l'accès est refusé.
+    // NB : le régime « minier » n'est pas identifiable de façon fiable via regimeCode,
+    // on affiche donc toutes les conventions du périmètre.
+    const data = await listerConventionsReelles()
+    conventions.value = data.map((c) => {
+      const fin = c.dateFin ? new Date(c.dateFin).getTime() - Date.now() : null
+      return {
+        ref: c.reference,
+        operateur: c.contribuables?.raisonSociale ?? '—',
+        phase: '—', // TODO(endpoint): phase active non exposée par GET /conventions (vague B backend)
+        echeance: c.dateFin ? new Date(c.dateFin).toLocaleDateString('fr-FR') : '—',
+        alerte: fin !== null && fin > 0 && fin <= J90_MS,
+      }
+    })
+  } catch {
+    conventions.value = []
+    conventionsErreur.value = true
+    conventionsNonAutorise.value = true
+  }
+})
+
+const kpis = computed(() => [
+  {
+    label: 'Conventions actives',
+    value: conventionsNonAutorise.value ? '—' : String(conventions.value.length),
+    icon: 'mdi-file-document-outline', color: 'primary',
+    subtitle: conventionsNonAutorise.value ? 'Accès conventions non autorisé' : 'Registre OASE (API)',
+  },
+  // TODO(endpoint): la répartition par phase n'est pas exposée par l'API — masqué (vague B backend)
+  { label: 'En phase recherche', value: '—', icon: 'mdi-magnify-scan', color: 'info', subtitle: 'CDDI (équipements)' },
+  { label: 'En phase exploitation', value: '—', icon: 'mdi-factory', color: 'success', subtitle: 'CI (IS / IRPP)' },
+  {
+    label: 'Alertes J-90 actives',
+    value: conventionsNonAutorise.value ? '—' : String(conventions.value.filter((c) => c.alerte).length),
+    icon: 'mdi-bell-ring', color: 'error',
+    subtitle: 'Changement de phase imminent',
+  },
+])
 
 const processHeaders = [
   { title: 'Étape', key: 'etape' },
@@ -216,12 +279,6 @@ const convHeaders = [
   { title: 'Phase active', key: 'phase' },
   { title: 'Échéance phase', key: 'echeance' },
   { title: 'Alerte J-90', key: 'alerte' },
-]
-const conventions = [
-  { ref: 'CM-2025-17', operateur: 'Mines du Nord Togo', phase: 'Recherche', echeance: '15/03/2026', alerte: true },
-  { ref: 'CP-2024-08', operateur: 'Petro Togo SA', phase: 'Exploitation', echeance: '01/12/2059', alerte: false },
-  { ref: 'CM-2026-02', operateur: 'Golden Mines', phase: 'Construction', echeance: '09/09/2027', alerte: false },
-  { ref: 'CM-2023-12', operateur: 'Phosphates du Togo', phase: 'Exploitation', echeance: '31/12/2048', alerte: false },
 ]
 
 const niveauColor = (n: string) => ({ Opérateur: 'info', Administratif: 'primary', Exécutif: 'warning', Législatif: 'error', Opérationnel: 'success', Contrôle: 'info', OASE: 'error' } as Record<string, string>)[n] || 'secondary'

@@ -8,8 +8,13 @@
       </template>
     </PageHeader>
 
-    <!-- Alert: expiring soon -->
-    <AlertBanner type="warning" title="Exonération arrivant à expiration" text="Votre exonération OASE-2025-0098 (Convention Investissement — Énergie Solaire) expire dans 28 jours. Pensez à demander un renouvellement." />
+    <!-- Alert: expiring soon — calculée sur les échéances réelles des demandes -->
+    <AlertBanner
+      v-if="expirationsProches.length > 0"
+      type="warning"
+      title="Exonération arrivant à expiration"
+      :text="`${expirationsProches.length} demande(s) arrivent à échéance dans moins de 30 jours (prochaine : ${expirationsProches[0].reference}, le ${formatDate(expirationsProches[0].dateEcheance)}). Pensez à demander un renouvellement.`"
+    />
 
     <!-- KPI cards -->
     <v-row class="mb-6">
@@ -75,15 +80,18 @@
       </v-card-text>
     </v-card>
 
-    <!-- Feed -->
+    <!-- Feed — notifications réelles (GET /notifications) -->
     <v-card rounded="lg" elevation="1" class="mt-4">
       <v-card-title class="pa-4 pb-0 text-body-1 font-weight-semibold">Notifications récentes</v-card-title>
       <v-card-text class="pa-0">
-        <v-list density="compact" class="pa-0">
+        <v-list v-if="recentNotifs.length > 0" density="compact" class="pa-0">
           <v-list-item v-for="n in recentNotifs" :key="n.id" :prepend-icon="notifIcon(n.type)" :subtitle="formatDate(n.date)" class="py-2">
             <template #title><span class="text-body-2">{{ n.message }}</span></template>
           </v-list-item>
         </v-list>
+        <div v-else class="pa-4 text-center text-medium-emphasis text-body-2">
+          Aucune notification récente
+        </div>
       </v-card-text>
     </v-card>
   </div>
@@ -95,8 +103,8 @@ import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
 import StatusChip from '../../components/StatusChip.vue'
 import AlertBanner from '../../components/AlertBanner.vue'
-import { mockNotifications } from '../../mock/data'
 import { listerDemandes } from '../../services/demandes'
+import { listerNotifications, mapTypeNotification } from '../../services/notifications'
 import { EXO_TYPE_LABELS } from '../../types'
 import type { ExoType } from '../../types'
 
@@ -115,6 +123,14 @@ const demandesApi = ref<any[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 
+interface NotifRecente {
+  id: string
+  type: 'action' | 'info' | 'alerte' | 'systeme'
+  message: string
+  date: string
+}
+const recentNotifs = ref<NotifRecente[]>([])
+
 onMounted(async () => {
   loading.value = true
   try {
@@ -132,20 +148,35 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+  try {
+    const notifs = await listerNotifications()
+    recentNotifs.value = notifs.slice(0, 4).map((n) => ({
+      id: n.id,
+      type: mapTypeNotification(n.typeNotificationCode),
+      message: n.corps || n.titre,
+      date: n.createdAt,
+    }))
+  } catch { /* flux de notifications indisponible : état vide affiché */ }
 })
 
 const filteredDemandes = computed(() =>
   activeFilter.value === 'all' ? demandesApi.value : demandesApi.value.filter(d => d.statut === activeFilter.value)
 )
 
+/** Demandes dont l'échéance réelle intervient dans moins de 30 jours. */
+const expirationsProches = computed(() => {
+  const dans30j = Date.now() + 30 * 24 * 3600 * 1000
+  return demandesApi.value
+    .filter(d => d.dateEcheance && new Date(d.dateEcheance).getTime() > Date.now() && new Date(d.dateEcheance).getTime() <= dans30j)
+    .sort((a, b) => new Date(a.dateEcheance).getTime() - new Date(b.dateEcheance).getTime())
+})
+
 const kpis = computed(() => [
-  { label: 'Demandes en cours', value: demandesApi.value.filter(d => ['soumis', 'en_instruction'].includes(d.statut)).length, icon: 'mdi-clock-outline', color: 'info', to: '/portail/demandes/1' },
-  { label: 'Demandes approuvées actives', value: demandesApi.value.filter(d => d.statut === 'approuve').length, icon: 'mdi-check-circle', color: 'success', subtitle: '1 expire dans 30j', to: '/portail/exonerations-actives' },
-  { label: 'Actions requises', value: demandesApi.value.filter(d => d.statut === 'action_requise').length, icon: 'mdi-alert-circle', color: 'warning', to: '/portail/demandes/3' },
+  { label: 'Demandes en cours', value: demandesApi.value.filter(d => ['soumis', 'en_instruction'].includes(d.statut)).length, icon: 'mdi-clock-outline', color: 'info' },
+  { label: 'Demandes approuvées actives', value: demandesApi.value.filter(d => d.statut === 'approuve').length, icon: 'mdi-check-circle', color: 'success', subtitle: expirationsProches.value.length > 0 ? `${expirationsProches.value.length} expire(nt) dans 30j` : undefined, to: '/portail/exonerations-actives' },
+  { label: 'Actions requises', value: demandesApi.value.filter(d => d.statut === 'action_requise').length, icon: 'mdi-alert-circle', color: 'warning' },
   { label: 'Expirées / Clôturées', value: demandesApi.value.filter(d => ['archive', 'rejete', 'expire'].includes(d.statut)).length, icon: 'mdi-archive', color: 'secondary', to: '/portail/exonerations-actives' },
 ])
-
-const recentNotifs = mockNotifications.slice(0, 4)
 
 const typeIcon = (type: ExoType) => {
   const m: Record<ExoType, string> = { douaniere: 'mdi-truck', fiscale_is: 'mdi-bank', fiscale_tva: 'mdi-percent', zone_franche: 'mdi-factory', code_investissement: 'mdi-handshake', sectorielle: 'mdi-domain' }

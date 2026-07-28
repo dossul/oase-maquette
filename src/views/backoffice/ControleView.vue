@@ -81,7 +81,7 @@
                     <v-col cols="12" md="6">
                       <v-select
                         v-model="selectedMission.typeMission"
-                        :items="['Sur pièces','Sur place','Mixte']"
+                        :items="['Sur pièces','Sur place','Mixte','Audit','Contrôle']"
                         label="Type de contrôle"
                       />
                     </v-col>
@@ -503,6 +503,12 @@
         </template>
       </PageHeader>
 
+      <!-- Missions réelles (GET /missions) ; constats issus des anomalies réellement détectées par le moteur de règles -->
+      <v-progress-linear v-if="missionsLoading" indeterminate color="primary" class="mb-4"/>
+      <v-alert v-if="missionsError" type="error" variant="tonal" rounded="lg" density="compact" class="mb-4" prepend-icon="mdi-alert-circle">
+        {{ missionsError }}
+      </v-alert>
+
       <!-- KPIs -->
       <v-row class="mb-4">
         <v-col v-for="k in kpis" :key="k.label" cols="6" md="3">
@@ -525,6 +531,7 @@
             <v-data-table
               :headers="missionHeaders"
               :items="filteredMissions"
+              :loading="missionsLoading"
               hover
               density="comfortable"
               @click:row="(_, {item}) => openMission(item)"
@@ -746,7 +753,7 @@
       <v-card rounded="xl">
         <v-card-title class="pa-5">Ajouter un dossier examiné</v-card-title>
         <v-card-text class="pa-5">
-          <v-select :items="['OASE-2026-0042','OASE-2026-0039','OASE-2026-0035','OASE-2025-0082','OASE-2024-0156']" label="Référence dossier" class="mb-3"/>
+          <v-select :items="refsDossiers" label="Référence dossier" class="mb-3" :disabled="refsDossiers.length===0" :hint="refsDossiers.length===0?'Aucun dossier disponible':''" persistent-hint/>
           <v-select :items="['Douanière','TVA','IS','Zone Franche']" label="Type d'exonération"/>
         </v-card-text>
         <v-card-actions class="pa-4"><v-spacer/><v-btn variant="text" @click="addDossierDialog=false">Annuler</v-btn><v-btn color="primary" @click="addDossierDialog=false">Ajouter</v-btn></v-card-actions>
@@ -757,9 +764,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
+import { listerAnomalies } from '../../services/audit'
+import { listerUtilisateurs, listerAnnuaire } from '../../services/utilisateurs'
+import { listerDemandes, type DemandeApi } from '../../services/backoffice'
+import { listerMissions, type MissionApi } from '../../services/missions'
 
 // ── Types ──
 interface Dossier { ref: string; type: string; montant: string; anomalie: boolean }
@@ -803,7 +814,95 @@ const editingConstat = ref<Constat | null>(null)
 const editingReco = ref<Recommandation | null>(null)
 
 // ── Data ──
-const agentsDisponibles = ['K. ABALO', 'A. MENSAH', 'M. KOFFI', 'P. TCHALLA', 'Y. DOSSOU']
+// Agents chargés depuis GET /utilisateurs/annuaire (rôles internes) —
+// repli sur GET /utilisateurs (ADMIN_SI) si l'annuaire est indisponible.
+const agentsDisponibles = ref<string[]>([])
+// Références de dossiers réelles (GET /demandes) pour le dialog « Ajouter un dossier examiné ».
+const refsDossiers = ref<string[]>([])
+
+/** Mappe une mission API vers le modèle d'affichage local (enrichie des demandes réelles). */
+function mapMissionControle(m: MissionApi, parId: Map<string, DemandeApi>): Mission {
+  const d = m.demandeId ? parId.get(m.demandeId) : undefined
+  const dateDebut = m.dateDebut?.slice(0, 10) ?? ''
+  const dateFin = m.dateFin?.slice(0, 10) ?? ''
+  return {
+    ref: m.reference,
+    contribuable: d?.contribuable?.raisonSociale ?? m.demande?.reference ?? '—',
+    periode: dateDebut ? `${dateDebut} → ${dateFin || '…'}` : '—',
+    dateDebut,
+    dateFin,
+    statut: m.statut === 'terminee' ? 'cloturee' : m.statut,
+    statutLabel: m.statut === 'terminee' ? 'Clôturée' : m.statut === 'en_cours' ? 'En cours' : 'Planifiée',
+    agents: m.auditeur ? [`${m.auditeur.prenom} ${m.auditeur.nom}`.trim()] : [],
+    objectifs: m.titre,
+    typeMission: m.type === 'audit' ? 'Audit' : 'Contrôle',
+    constats: m.constats ? 1 : 0,
+    dossiers: m.demande
+      ? [{
+          ref: m.demande.reference,
+          type: m.type === 'audit' ? 'Audit' : 'Contrôle',
+          montant: d ? `${Number(d.montantFcfa).toLocaleString('fr-FR')} FCFA` : '—',
+          anomalie: false,
+        }]
+      : [],
+    documents: [],
+    conclusions: m.constats ?? '',
+    appreciation: '',
+    dateRapport: '',
+    signataire: '',
+  }
+}
+
+onMounted(async () => {
+  // Constats réels : anomalies détectées par le moteur de règles (GET /anomalies).
+  try {
+    const data = await listerAnomalies()
+    constats.value = data.map((a) => ({
+      id: a.id,
+      dossierRef: a.demandes?.reference || a.demandeId || '—',
+      typeIrregularite: a.categorieCode || 'procedurale',
+      gravite: a.graviteCode || 'moyenne',
+      montant: '—', // TODO(endpoint): montant en cause non exposé par GET /anomalies
+      periode: a.dateDetection ? new Date(a.dateDetection).toLocaleDateString('fr-FR') : '—',
+      baseLegale: '—', // TODO(endpoint): base légale violée non exposée par GET /anomalies
+      description: a.description || 'Anomalie détectée',
+      observations: a.commentaire || '',
+    }))
+  } catch {
+    constats.value = []
+  }
+  // Missions réelles (GET /missions), enrichies des demandes réelles (GET /demandes).
+  missionsLoading.value = true
+  missionsError.value = null
+  try {
+    const [ms, ds] = await Promise.all([
+      listerMissions(),
+      listerDemandes().catch(() => [] as Awaited<ReturnType<typeof listerDemandes>>),
+    ])
+    refsDossiers.value = ds.map((d) => d.reference).filter(Boolean)
+    const parId = new Map(ds.map((d) => [d.id, d]))
+    missions.value = ms.map((m) => mapMissionControle(m, parId))
+  } catch (e) {
+    missionsError.value = e instanceof Error ? e.message : 'Impossible de charger les missions (GET /missions)'
+    missions.value = []
+  } finally {
+    missionsLoading.value = false
+  }
+  // Agents disponibles : annuaire des rôles internes (GET /utilisateurs/annuaire).
+  try {
+    const annuaire = await listerAnnuaire()
+    agentsDisponibles.value = annuaire
+      .filter((u) => u.role !== 'contribuable')
+      .map((u) => `${u.prenom} ${u.nom}`.trim())
+  } catch {
+    try {
+      const res = await listerUtilisateurs()
+      agentsDisponibles.value = res.data.map((u) => `${u.prenom} ${u.nom}`.trim())
+    } catch {
+      agentsDisponibles.value = []
+    }
+  }
+})
 const statutOptions = [
   { label: 'Planifiée', value: 'planifiee' },
   { label: 'En cours', value: 'en_cours' },
@@ -826,85 +925,40 @@ const appreciations = [
   { label: '🔴 Fraude avérée', value: 'fraude', icon: 'mdi-shield-alert', color: 'error' },
 ]
 
-const missions = ref<Mission[]>([
-  {
-    ref: 'CTRL-2026-001', contribuable: 'TOGO STEEL SARL', periode: 'Jan–Mar 2026',
-    dateDebut: '2026-01-01', dateFin: '2026-03-31', statut: 'en_cours', statutLabel: 'En cours',
-    agents: ['K. ABALO', 'A. MENSAH'], objectifs: 'Vérifier l\'utilisation de l\'exonération douanière accordée en 2024 et 2025.',
-    typeMission: 'Mixte', constats: 2,
-    dossiers: [
-      { ref: 'OASE-2024-0200', type: 'Douanière', montant: '310M FCFA', anomalie: true },
-      { ref: 'OASE-2025-0082', type: 'Douanière', montant: '89M FCFA', anomalie: true },
-    ],
-    documents: [
-      { nom: 'Lettre de mission CTRL-2026-001.pdf', date: '02/01/2026' },
-      { nom: 'Rapport préliminaire.pdf', date: '15/02/2026' },
-    ],
-    conclusions: '',
-    appreciation: '',
-    dateRapport: '2026-03-31',
-    signataire: 'K. ABALO',
-  },
-  {
-    ref: 'CTRL-2026-002', contribuable: 'LOMÉ TEXTILE ZF SAS', periode: 'Avr 2026',
-    dateDebut: '2026-04-01', dateFin: '2026-04-30', statut: 'planifiee', statutLabel: 'Planifiée',
-    agents: ['M. KOFFI'], objectifs: 'Contrôle des engagements ZFI (emploi, investissement).',
-    typeMission: 'Sur place', constats: 0,
-    dossiers: [{ ref: 'OASE-2026-0035', type: 'Zone Franche', montant: '89M FCFA', anomalie: false }],
-    documents: [{ nom: 'Ordre de mission.pdf', date: '28/03/2026' }],
-    conclusions: '', appreciation: '', dateRapport: '', signataire: '',
-  },
-  {
-    ref: 'CTRL-2025-018', contribuable: 'AGRO-TOGO INVEST SA', periode: 'Oct–Déc 2025',
-    dateDebut: '2025-10-01', dateFin: '2025-12-31', statut: 'cloturee', statutLabel: 'Clôturée',
-    agents: ['A. MENSAH', 'P. TCHALLA'],
-    objectifs: 'Contrôle d\'ensemble de l\'exonération TVA accordée sous LFI 2024.',
-    typeMission: 'Sur pièces', constats: 1,
-    dossiers: [{ ref: 'OASE-2024-0156', type: 'TVA', montant: '12,2M FCFA', anomalie: true }],
-    documents: [
-      { nom: 'Rapport final CTRL-2025-018.pdf', date: '15/01/2026' },
-      { nom: 'Procès-verbal de contrôle.pdf', date: '10/01/2026' },
-    ],
-    conclusions: 'La mission a relevé un dépassement de la durée légale d\'exonération de 117 jours sur le dossier OASE-2024-0156.',
-    appreciation: 'mineures', dateRapport: '2026-01-15', signataire: 'A. MENSAH',
-  },
-])
+// Missions réelles chargées depuis GET /missions (voir onMounted).
+const missions = ref<Mission[]>([])
+const missionsLoading = ref(false)
+const missionsError = ref<string | null>(null)
 
-const constats = ref<Constat[]>([
-  {
-    id: 'c1', dossierRef: 'OASE-2025-0082', typeIrregularite: 'Dépassement de quota',
-    gravite: 'critique', montant: '89 400 000 FCFA', periode: 'Jan 2025 – Déc 2025',
-    baseLegale: 'CGI Art. 215 — Quota annuel exonération douanière',
-    description: 'Le montant d\'exonération douanière consommé dépasse de 340% le quota autorisé. Le contribuable a utilisé 89,4M FCFA contre une autorisation de 26,2M FCFA.',
-    observations: 'Documents douaniers SYDONIA confirment les montants.',
-  },
-  {
-    id: 'c2', dossierRef: 'OASE-2024-0156', typeIrregularite: 'Durée d\'exonération dépassée',
-    gravite: 'elevee', montant: '12 200 000 FCFA', periode: '2024–2026',
-    baseLegale: 'LFI 2024 Art. 45 — Durée maximale 24 mois',
-    description: 'L\'exonération TVA a été appliquée pendant 847 jours au lieu des 730 jours autorisés, soit un dépassement de 117 jours.',
-    observations: 'Calcul basé sur les déclarations SIGTAS.',
-  },
-])
+// Constats alimentés par GET /anomalies (voir onMounted) — saisie locale possible en attendant la vague B.
+const constats = ref<Constat[]>([])
 
-const recommandations = ref<Recommandation[]>([
-  { id: 'r1', texte: 'Émettre un avis de redressement pour le montant de 63,2M FCFA (excédent de quota)', responsable: 'OTR Douanes', priorite: 'haute', echeance: '2026-06-30', suivi: 'en_cours' },
-  { id: 'r2', texte: 'Régulariser la durée de l\'exonération et procéder au recouvrement des 12,2M FCFA', responsable: 'OTR Impôts', priorite: 'haute', echeance: '2026-05-15', suivi: 'non' },
-  { id: 'r3', texte: 'Mettre en place un contrôle automatique des quotas dans le module SYDONIA', responsable: 'OTR Douanes', priorite: 'moyenne', echeance: '2026-09-30', suivi: 'non' },
-])
+// TODO(endpoint): pas d'endpoint recommandations (vague B) — liste vide, pas de données fictives
+const recommandations = ref<Recommandation[]>([])
 
-const suitesDonnees = ref<Suite[]>([
-  { id: 's1', type: 'Recouvrement amiable', contribuable: 'LOMÉ LOGISTICS SA', detail: '15,2M FCFA · Délai 60j', statut: 'en_attente', icon: 'mdi-bank-transfer', color: 'warning' },
-  { id: 's2', type: 'Suspension temporaire', contribuable: 'TOGO PHARMA ZF', detail: 'Convention ZFI-2020-005 — 6 mois', statut: 'execute', icon: 'mdi-pause-circle', color: 'error' },
-  { id: 's3', type: 'Main-levée accordée', contribuable: 'AGRO-TOGO INVEST SA', detail: 'Suite régularisation SIGTAS', statut: 'execute', icon: 'mdi-check-circle', color: 'success' },
-])
+// TODO(endpoint): pas d'endpoint suites données (vague B) — liste vide, pas de données fictives
+const suitesDonnees = ref<Suite[]>([])
 
-const alertesRegles = [
-  { id: 1, icon: 'mdi-timer-alert', label: 'Exonérations durée dépassée', details: '3 dossiers concernés' },
-  { id: 2, icon: 'mdi-bank-off', label: 'Contribuables avec dettes fiscales', details: '2 signalements SIGTAS' },
-  { id: 3, icon: 'mdi-chart-bar', label: 'Écarts quota > 200%', details: '1 dossier douanier' },
-  { id: 4, icon: 'mdi-content-copy', label: 'Doublons SYDONIA/SIGTAS', details: '1 doublon détecté' },
-]
+/** Alertes moteur de règles : anomalies réelles regroupées par catégorie (GET /anomalies). */
+const alertesRegles = computed(() => {
+  const ICONS: Record<string, string> = {
+    temporelle: 'mdi-timer-alert',
+    juridique: 'mdi-gavel',
+    financiere: 'mdi-currency-usd',
+    quota: 'mdi-chart-bar',
+    procedurale: 'mdi-clipboard-alert',
+  }
+  const groupes = new Map<string, number>()
+  for (const c of constats.value) {
+    groupes.set(c.typeIrregularite, (groupes.get(c.typeIrregularite) || 0) + 1)
+  }
+  return [...groupes.entries()].map(([categorie, count], i) => ({
+    id: i + 1,
+    icon: ICONS[categorie] || 'mdi-alert-circle',
+    label: `Anomalies ${categorie}`,
+    details: `${count} dossier(s) concerné(s)`,
+  }))
+})
 
 // ── Form state ──
 const constatForm = ref<Constat>({ id: '', dossierRef: '', typeIrregularite: '', gravite: 'elevee', montant: '', periode: '', baseLegale: '', description: '', observations: '' })

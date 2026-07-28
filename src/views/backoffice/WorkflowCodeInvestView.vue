@@ -17,6 +17,13 @@
       </v-col>
     </v-row>
 
+    <!-- Encart documentation normative : parcours, matrice, grille de classement et zones
+         décrivent le référentiel du processus n° 4, pas des chiffres d'activité. -->
+    <v-alert type="info" variant="tonal" rounded="lg" density="compact" class="mb-4" prepend-icon="mdi-book-open-outline">
+      <strong>Documentation normative.</strong> Parcours, matrice, grille de classement A/B/C/D et zones d'implantation
+      ci-dessous sont le référentiel du processus n° 4. Seuls les indicateurs ci-dessus proviennent de données réelles.
+    </v-alert>
+
     <!-- Parcours normé -->
     <v-card rounded="lg" elevation="1" class="mb-4">
       <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Parcours normé — Processus n° 4 (API-ZF / OTR)</v-card-title>
@@ -178,16 +185,51 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
 import ExportButton from '../../components/ExportButton.vue'
+import { listerConventionsReelles, type ConventionApi } from '../../services/backoffice'
 
-const kpis = [
-  { label: 'Agréments CI actifs', value: '112', icon: 'mdi-handshake', color: 'primary', subtitle: 'Loi n°2019-005' },
-  { label: 'Arrêtés en instruction', value: '18', icon: 'mdi-file-clock', color: 'info', subtitle: 'API-ZF + Ministère' },
-  { label: 'Alertes J-90 actives', value: '7', icon: 'mdi-bell-ring', color: 'error', subtitle: 'Expirations < 90 jours' },
-  { label: 'Engagements tenus', value: '84%', icon: 'mdi-check-decagram', color: 'success', subtitle: 'Contrôles API-ZF + OTR' },
-]
+const conventions = ref<ConventionApi[] | null>(null)
+
+onMounted(async () => {
+  try {
+    // GET /conventions — accessible aux rôles agent_ci/agent_cddi (RBAC élargi, vague C backend)
+    // → repli '—' honnête conservé si jamais l'accès est refusé.
+    conventions.value = await listerConventionsReelles()
+  } catch {
+    conventions.value = null
+  }
+})
+
+const J90_MS = 90 * 24 * 3600 * 1000
+const alertesJ90 = computed(() =>
+  (conventions.value ?? []).filter((c) => {
+    if (!c.dateFin) return false
+    const t = new Date(c.dateFin).getTime() - Date.now()
+    return t > 0 && t <= J90_MS
+  }).length,
+)
+
+const kpis = computed(() => [
+  {
+    label: 'Agréments CI actifs',
+    value: conventions.value ? String(conventions.value.filter((c) => c.statutCode === 'active').length) : '—',
+    icon: 'mdi-handshake', color: 'primary',
+    subtitle: conventions.value ? 'Conventions actives (API)' : 'Accès conventions non autorisé',
+  },
+  // TODO(endpoint): les arrêtés en instruction ne sont pas exposés par l'API — masqué (vague B backend)
+  { label: 'Arrêtés en instruction', value: '—', icon: 'mdi-file-clock', color: 'info', subtitle: 'API-ZF + Ministère' },
+  {
+    label: 'Alertes J-90 actives',
+    value: conventions.value ? String(alertesJ90.value) : '—',
+    icon: 'mdi-bell-ring', color: 'error',
+    subtitle: 'Expirations < 90 jours',
+  },
+  // TODO(endpoint): taux d'engagements tenus non exposé par l'API — masqué (vague B backend)
+  { label: 'Engagements tenus', value: '—', icon: 'mdi-check-decagram', color: 'success', subtitle: 'Contrôles API-ZF + OTR' },
+])
 
 const processHeaders = [
   { title: 'Étape', key: 'etape' },

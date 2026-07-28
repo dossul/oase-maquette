@@ -317,6 +317,13 @@ async function chargerTout() {
 }
 
 // ── KPIs ───────────────────────────────────────────────────────────────────
+/** Délai moyen de traitement formaté (heures → jours si > 48 h). */
+function formatDelai(heures: number | null | undefined): string {
+  if (heures === null || heures === undefined) return '—'
+  if (heures >= 48) return `${(heures / 24).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} j`
+  return `${heures.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} h`
+}
+
 const kpis = computed(() => {
   const approuvees = p4.value?.repartitionParStatut.find((s) => s.statutCode === 'approuve')?._count.id ?? 0
   return [
@@ -324,6 +331,13 @@ const kpis = computed(() => {
     { label: 'Exonérations actives', value: p4.value ? approuvees : '—', icon: 'mdi-check-circle', color: 'success', to: '/decideur/analyse' },
     { label: 'Contribuables', value: p5.value ? p5.value.nombreContribuables : '—', icon: 'mdi-chart-line', color: 'info', to: '/decideur/rapport-annuel' },
     { label: 'Alertes non traitées', value: nbAlertes.value, icon: 'mdi-alert', color: 'warning', subtitle: 'Anomalies + quotas en alerte', to: '/decideur/simulation' },
+    {
+      label: 'Délai moyen de traitement',
+      value: p4.value ? formatDelai(p4.value.delaiMoyenTraitementHeures) : '—',
+      icon: 'mdi-timer-outline',
+      color: 'secondary',
+      subtitle: p4.value ? `${p4.value.nombreDemandesDecidees} demande(s) décidée(s)` : 'Dépôt → décision',
+    },
   ]
 })
 

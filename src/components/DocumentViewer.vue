@@ -6,7 +6,7 @@
       <v-icon icon="mdi-file-pdf-box" color="error" size="18" class="me-1"/>
       <span class="text-caption font-weight-semibold" style="color:#CBD5E1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px">{{ filename }}</span>
       <v-chip size="x-small" color="error" variant="tonal" class="ms-2">Confidentiel</v-chip>
-      <v-chip size="x-small" color="success" variant="outlined" prepend-icon="mdi-clock-check-outline" class="ms-1">TSA</v-chip>
+      <v-chip v-if="jetonTsa" size="x-small" color="success" variant="outlined" prepend-icon="mdi-clock-check-outline" class="ms-1">TSA</v-chip>
 
       <v-divider vertical class="mx-2" style="border-color:rgba(255,255,255,0.15)"/>
 
@@ -89,9 +89,10 @@
       >
         <div style="width:100%;max-width:760px">
           <div class="mb-3 d-flex flex-wrap ga-2">
-            <v-chip size="small" color="success" variant="tonal" prepend-icon="mdi-pen-lock">Signature qualifiee valide</v-chip>
-            <v-chip size="small" color="info" variant="tonal" prepend-icon="mdi-clock-check-outline">Horodatage TSA 2026-06-01 22:14:32</v-chip>
-            <v-chip size="small" color="warning" variant="tonal" prepend-icon="mdi-history">Consultation journalisee</v-chip>
+            <!-- Chips de preuve affichés uniquement si de vraies métadonnées sont fournies -->
+            <v-chip v-if="hashSha256" size="small" color="success" variant="tonal" prepend-icon="mdi-pen-lock">Signature qualifiée valide</v-chip>
+            <v-chip v-if="jetonTsa" size="small" color="info" variant="tonal" prepend-icon="mdi-clock-check-outline">Horodatage TSA {{ jetonTsa }}</v-chip>
+            <v-chip size="small" color="warning" variant="tonal" prepend-icon="mdi-history">Consultation journalisée</v-chip>
           </div>
 
           <div
@@ -124,9 +125,14 @@
                 <v-icon icon="mdi-bookmark" size="24" color="primary"/>
               </div>
 
-              <!-- Document content (mock OASE document) -->
+              <!-- Document content -->
               <slot :page="currentPage">
-                <div v-html="mockPageContent(currentPage)" />
+                <!-- TODO(endpoint): afficher le rendu PDF réel du document (ex. GET /attestations/:id/preview) -->
+                <div class="d-flex flex-column align-center justify-center text-center" style="min-height:600px;color:#64748B">
+                  <v-icon icon="mdi-file-document-outline" size="64" class="mb-4 opacity-40"/>
+                  <div class="text-body-1 font-weight-medium mb-1">Aucun document à afficher</div>
+                  <div class="text-body-2">Le contenu du document n'est pas disponible.</div>
+                </div>
               </slot>
             </div>
           </div>
@@ -157,9 +163,9 @@
 
           <div class="pa-3" style="border-bottom:1px solid #E2E8F0">
             <div class="text-caption font-weight-semibold mb-2">Preuve documentaire</div>
-            <div class="text-caption text-medium-emphasis mb-1">Empreinte: `8f1c...a7d9`</div>
-            <div class="text-caption text-medium-emphasis mb-1">Jeton TSA: TSA-2026-0039-14</div>
-            <div class="text-caption text-medium-emphasis">Diffusion: Restreinte et journalisee</div>
+            <div v-if="hashSha256" class="text-caption text-medium-emphasis mb-1">Empreinte : {{ hashSha256 }}</div>
+            <div v-if="jetonTsa" class="text-caption text-medium-emphasis mb-1">Jeton TSA : {{ jetonTsa }}</div>
+            <div class="text-caption text-medium-emphasis">Diffusion : restreinte et journalisée</div>
           </div>
 
           <div v-if="annotations.length===0" class="pa-4 text-center text-medium-emphasis">
@@ -206,10 +212,16 @@ const props = withDefaults(defineProps<{
   filename?: string
   totalPages?: number
   modelValue?: boolean
+  /** Empreinte SHA-256 réelle du document (affichée uniquement si fournie). */
+  hashSha256?: string
+  /** Jeton d'horodatage TSA réel (affiché uniquement si fourni). */
+  jetonTsa?: string
 }>(), {
   filename: 'Document.pdf',
   totalPages: 3,
   modelValue: true,
+  hashSha256: '',
+  jetonTsa: '',
 })
 defineEmits(['download', 'update:modelValue'])
 
@@ -239,10 +251,7 @@ interface Annotation {
   x?: number
   y?: number
 }
-const annotations = ref<Annotation[]>([
-  { id: 'a1', type: 'highlight', page: 1, color: '#FBBF24', selectedText: 'Article 215 du CGI', style: { position: 'absolute', top: '220px', left: '48px', width: '200px', height: '18px', background: 'rgba(251,191,36,0.4)', borderRadius: '2px', pointerEvents: 'none' } },
-  { id: 'a2', type: 'note', page: 1, text: 'Vérifier la conformité avec la LFI 2026', x: 80, y: 300 },
-])
+const annotations = ref<Annotation[]>([])
 
 const pageAnnotations = computed(() => annotations.value.filter(a => a.page === currentPage.value && a.type === 'highlight'))
 const pageNotes = computed(() => annotations.value.filter(a => a.page === currentPage.value && a.type === 'note'))
@@ -334,67 +343,6 @@ function hexToRgba(hex: string, alpha: number) {
   const g = parseInt(hex.slice(3, 5), 16)
   const b = parseInt(hex.slice(5, 7), 16)
   return `rgba(${r},${g},${b},${alpha})`
-}
-
-function mockPageContent(page: number): string {
-  const pages: Record<number, string> = {
-    1: `
-      <div style="text-align:center;margin-bottom:32px">
-        <img src="" style="display:none"/>
-        <div style="font-size:11px;color:#64748B;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px">REPUBLIQUE TOGOLAISE — MINISTÈRE DE L'ÉCONOMIE ET DES FINANCES</div>
-        <div style="font-size:13px;font-weight:700;color:#1A2332;border-bottom:2px solid #2774AE;padding-bottom:8px;margin-bottom:8px">ATTESTATION D'EXONÉRATION N° OASE-2026-0039</div>
-        <div style="font-size:11px;color:#64748B">Conformément à l'article 215 du CGI et à la LFI 2026</div>
-      </div>
-      <p style="font-size:12px;line-height:1.8;margin-bottom:16px">Le Directeur Général de l'Office Togolais des Recettes, soussigné, <strong>ATTESTE</strong> que la société <strong>AGRO-TOGO INVEST SA</strong>, immatriculée sous le numéro NIF <strong>TG-002-2020-A</strong> et RCCM <strong>TG-LOM-2020-A-5678</strong>, bénéficie d'une exonération fiscale accordée conformément aux dispositions ci-après :</p>
-      <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px">
-        <tr style="background:#F4F6F9"><td style="padding:8px;font-weight:600;border:1px solid #CBD5E1">Nature</td><td style="padding:8px;border:1px solid #CBD5E1">Exonération de TVA</td></tr>
-        <tr><td style="padding:8px;font-weight:600;border:1px solid #CBD5E1">Montant accordé</td><td style="padding:8px;border:1px solid #CBD5E1">120 000 000 FCFA</td></tr>
-        <tr style="background:#F4F6F9"><td style="padding:8px;font-weight:600;border:1px solid #CBD5E1">Période</td><td style="padding:8px;border:1px solid #CBD5E1">Du 10/02/2026 au 10/02/2027</td></tr>
-        <tr><td style="padding:8px;font-weight:600;border:1px solid #CBD5E1">Base juridique</td><td style="padding:8px;border:1px solid #CBD5E1">LFI 2026, Article 45</td></tr>
-        <tr style="background:#F4F6F9"><td style="padding:8px;font-weight:600;border:1px solid #CBD5E1">Secteur</td><td style="padding:8px;border:1px solid #CBD5E1">Agriculture</td></tr>
-      </table>
-      <p style="font-size:11px;line-height:1.8;color:#475569">Cette attestation est délivrée pour servir et valoir ce que de droit. Elle est valable exclusivement pour les opérations visées ci-dessus et doit être présentée à toute réquisition des services fiscaux ou douaniers compétents.</p>
-    `,
-    2: `
-      <div style="font-size:13px;font-weight:700;margin-bottom:16px;color:#1A2332">CONDITIONS ET OBLIGATIONS DU CONTRIBUABLE</div>
-      <p style="font-size:12px;line-height:1.8;margin-bottom:12px">Le bénéfice de cette exonération est subordonné au respect des obligations suivantes :</p>
-      <ol style="font-size:12px;line-height:2;padding-left:20px">
-        <li>Tenir à jour une comptabilité régulière et sincère permettant de distinguer les opérations exonérées des autres opérations ;</li>
-        <li>Déposer trimestriellement un état récapitulatif des opérations exonérées auprès de la Direction des Grandes Entreprises ;</li>
-        <li>Informer immédiatement l'OTR de tout changement dans la nature ou le volume des opérations exonérées ;</li>
-        <li>Conserver pendant 10 ans tous les documents justificatifs relatifs aux opérations exonérées ;</li>
-        <li>Ne pas céder, transférer ou sous-louer le bénéfice de cette exonération à un tiers.</li>
-      </ol>
-      <div style="margin-top:24px;padding:12px;background:#FEF3C7;border-left:4px solid #F59E0B;font-size:11px;color:#78350F">
-        <strong>⚠ Important :</strong> Toute utilisation de cette exonération à des fins autres que celles pour lesquelles elle a été accordée entraîne sa révocation immédiate et le remboursement des montants concernés, majorés des pénalités légales.
-      </div>
-    `,
-    3: `
-      <div style="font-size:13px;font-weight:700;margin-bottom:16px;color:#1A2332">SIGNATURE ET CERTIFICATION</div>
-      <p style="font-size:12px;line-height:1.8;margin-bottom:24px">Fait à Lomé, le <strong>10 février 2026</strong></p>
-      <div style="display:flex;justify-content:space-between;margin-top:40px">
-        <div style="text-align:center;width:45%">
-          <div style="height:60px;border-bottom:1px solid #CBD5E1;margin-bottom:8px"/>
-          <div style="font-size:11px;font-weight:600">Le Directeur Général de l'OTR</div>
-          <div style="font-size:10px;color:#64748B">Signature et cachet</div>
-        </div>
-        <div style="text-align:center;width:45%">
-          <div style="height:60px;border-bottom:1px solid #CBD5E1;margin-bottom:8px;display:flex;align-items:center;justify-content:center">
-            <div style="width:60px;height:60px;border:2px solid #2774AE;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#2774AE;text-align:center;font-weight:600">SIGNATURE<br>NUMÉRIQUE<br>VALIDE</div>
-          </div>
-          <div style="font-size:11px;font-weight:600">Visa DGBF — Ministère des Finances</div>
-          <div style="font-size:10px;color:#64748B">Signature électronique certifiée</div>
-        </div>
-      </div>
-      <div style="margin-top:40px;padding:12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:4px;font-size:10px;color:#1E40AF">
-        <strong>Vérification QR Code :</strong> Ce document peut être vérifié en scannant le code QR ci-joint ou en accédant à <em>oase.mef.tg/verifier</em> avec la référence OASE-2026-0039.
-      </div>
-      <div style="margin-top:12px;padding:12px;background:#F8FAFC;border:1px dashed #CBD5E1;border-radius:4px;font-size:10px;color:#334155">
-        <strong>Preuve d'horodatage :</strong> Jeton TSA-2026-0039-14, empreinte SHA-256 8f1c...a7d9, consultation reservee aux profils habilites.
-      </div>
-    `,
-  }
-  return pages[page] || `<div style="color:#64748B;text-align:center;padding:40px">Page ${page}</div>`
 }
 </script>
 

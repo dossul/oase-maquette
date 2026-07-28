@@ -40,13 +40,15 @@
     </v-card>
 
     <!-- Liste notifications -->
+    <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
+    <v-alert v-if="loadError" type="error" variant="tonal" density="compact" class="mb-4">{{ loadError }}</v-alert>
     <v-card rounded="lg" elevation="1">
       <v-list class="pa-2" lines="two">
         <template v-for="(notif, idx) in filteredNotifs" :key="notif.id">
           <v-list-item
             :class="['rounded-lg', 'mb-1', !notif.lu ? 'bg-primary-lighten-5' : '']"
             :style="!notif.lu ? { background: 'rgba(39,116,174,0.06)' } : {}"
-            @click="notif.lu = true"
+            @click="markRead(notif)"
           >
             <template #prepend>
               <v-avatar :color="typeColor(notif.type)" size="38" class="me-3">
@@ -66,18 +68,15 @@
                   <v-icon icon="mdi-clock-outline" size="12" class="me-1" />
                   {{ formatDate(notif.date) }}
                 </span>
-                <v-chip v-if="notif.dossier" size="x-small" variant="outlined" color="secondary" :to="`/portail/demandes/1`">{{ notif.dossier }}</v-chip>
+                <v-chip v-if="notif.demandeId" size="x-small" variant="outlined" color="secondary" :to="dossierLink(notif.demandeId)" @click.stop>Voir le dossier</v-chip>
                 <v-chip size="x-small" variant="tonal" :color="proofColor(notif.type)">{{ proofLabel(notif.type) }}</v-chip>
               </div>
-            </template>
-            <template #append>
-              <v-btn icon="mdi-close" size="x-small" variant="text" @click.stop="dismiss(notif.id)" />
             </template>
           </v-list-item>
           <v-divider v-if="idx < filteredNotifs.length - 1" class="mb-1" />
         </template>
 
-        <div v-if="filteredNotifs.length === 0" class="pa-8 text-center text-medium-emphasis">
+        <div v-if="!loading && filteredNotifs.length === 0" class="pa-8 text-center text-medium-emphasis">
           <v-icon icon="mdi-bell-off-outline" size="48" class="mb-3 opacity-30" />
           <div class="text-body-1">Aucune notification</div>
         </div>
@@ -87,13 +86,13 @@
     <v-row class="mt-4">
       <v-col cols="12" md="6">
         <v-card rounded="lg" elevation="1">
-          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Notifications sensibles visibles</v-card-title>
-          <v-list density="compact" class="pa-2">
-            <v-list-item title="Expiration accord de siège" subtitle="Relance MAE + OTR avec diffusion restreinte" prepend-icon="mdi-flag-outline" />
-            <v-list-item title="Écart ITIE / extractif" subtitle="Alerte conjointe DGMG / CONEDEF / audit" prepend-icon="mdi-pickaxe" />
-            <v-list-item title="Convention textile à réévaluer" subtitle="Suivi sectoriel sur loi 2022-021" prepend-icon="mdi-tshirt-crew-outline" />
-            <v-list-item title="Blocage export nominatif" subtitle="Tentative d accès hors habilitation" prepend-icon="mdi-download-lock-outline" />
-          </v-list>
+          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Notifications sensibles</v-card-title>
+          <v-card-text class="pa-4">
+            <!-- TODO(endpoint): classification "sensible" des notifications (niveau de diffusion) non exposée par GET /notifications -->
+            <div class="text-body-2 text-medium-emphasis">
+              Les notifications à diffusion restreinte sont signalées par la pastille « Alerte sensible » dans la liste ci-dessus.
+            </div>
+          </v-card-text>
         </v-card>
       </v-col>
       <v-col cols="12" md="6">
@@ -112,15 +111,55 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../components/PageHeader.vue'
-import { mockNotifications } from '../mock/data'
+import { useAuthStore } from '../stores/auth'
+import {
+  listerNotifications,
+  marquerNotificationLue,
+  marquerToutesLues,
+  mapTypeNotification,
+} from '../services/notifications'
 
+interface NotifVM {
+  id: string
+  type: 'action' | 'info' | 'alerte' | 'systeme'
+  titre: string
+  message: string
+  date: string
+  lu: boolean
+  demandeId: string | null
+}
+
+const auth = useAuthStore()
 const search = ref('')
 const filterType = ref('tous')
 const filterLu = ref('tous')
 
-const notifications = ref(mockNotifications.map(n => ({ ...n })))
+const notifications = ref<NotifVM[]>([])
+const loading = ref(false)
+const loadError = ref<string | null>(null)
+
+onMounted(async () => {
+  loading.value = true
+  loadError.value = null
+  try {
+    const data = await listerNotifications()
+    notifications.value = data.map((n) => ({
+      id: n.id,
+      type: mapTypeNotification(n.typeNotificationCode),
+      titre: n.titre,
+      message: n.corps,
+      date: n.createdAt,
+      lu: n.estLue,
+      demandeId: n.demandeId,
+    }))
+  } catch {
+    loadError.value = 'Impossible de charger les notifications'
+  } finally {
+    loading.value = false
+  }
+})
 
 const typeItems = ['tous', 'action', 'info', 'alerte', 'systeme']
 const luItems = ['tous', 'non lues', 'lues']
@@ -130,7 +169,7 @@ const kpis = computed(() => [
   { label: 'Non lues', value: String(nonLus.value), subtitle: 'Relances actives' },
   { label: 'Sensibles', value: String(notifications.value.filter(n => n.type === 'alerte').length), subtitle: 'Diffusion restreinte' },
   { label: 'Bloquantes', value: String(notifications.value.filter(n => !n.lu && n.type !== 'info').length), subtitle: 'Action requise' },
-  { label: 'Journalisées', value: '100%', subtitle: 'Traçabilité' },
+  { label: 'Total', value: String(notifications.value.length), subtitle: 'Toutes notifications' },
 ])
 
 const filteredNotifs = computed(() => {
@@ -154,12 +193,25 @@ function typeColor(type: string) {
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
-function markAllRead() {
-  notifications.value.forEach(n => (n.lu = true))
+async function markRead(notif: NotifVM) {
+  if (notif.lu) return
+  notif.lu = true
+  try {
+    await marquerNotificationLue(notif.id)
+  } catch { /* l'état local reste cohérent ; l'utilisateur peut réessayer */ }
 }
-function dismiss(id: string) {
-  const idx = notifications.value.findIndex(n => n.id === id)
-  if (idx !== -1) notifications.value.splice(idx, 1)
+async function markAllRead() {
+  const nonLuesList = notifications.value.filter(n => !n.lu)
+  nonLuesList.forEach(n => (n.lu = true))
+  try {
+    await marquerToutesLues(nonLuesList.map(n => n.id))
+  } catch { /* idem */ }
+}
+/** Lien vers le dossier rattaché, selon le rôle de l'utilisateur connecté. */
+function dossierLink(demandeId: string) {
+  return auth.user?.role === 'contribuable'
+    ? `/portail/demandes/${demandeId}`
+    : `/backoffice/dossiers/${demandeId}/instruction`
 }
 function proofLabel(type: string) {
   return ({ action: 'Action requise', info: 'Information', alerte: 'Alerte sensible', systeme: 'Système' } as Record<string, string>)[type] || 'Notification'

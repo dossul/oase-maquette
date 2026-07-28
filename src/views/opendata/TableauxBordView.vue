@@ -4,118 +4,127 @@
       <div class="d-flex align-center justify-space-between flex-wrap ga-3 mb-6">
         <div>
           <h1 style="font-size:1.6rem;font-weight:700;letter-spacing:-0.02em">Tableaux de bord publics</h1>
-          <p class="text-medium-emphasis text-body-2 mt-1">Données agrégées et anonymisées — Mise à jour trimestrielle</p>
-        </div>
-        <div class="d-flex align-center ga-2">
-          <v-select v-model="annee" :items="['2026','2025','2024','2023']" label="Année" hide-details density="compact" style="width:120px"/>
+          <p class="text-medium-emphasis text-body-2 mt-1">Données agrégées et anonymisées — Source : API publique OASE /rapports/opendata</p>
         </div>
       </div>
 
       <!-- KPIs publics -->
-      <v-row class="mb-8">
+      <v-row v-if="kpis.length" class="mb-8">
         <v-col v-for="k in kpis" :key="k.label" cols="6" md="3"><KpiCard v-bind="k"/></v-col>
       </v-row>
+      <v-alert v-else-if="!loading" type="info" variant="tonal" rounded="lg" density="compact" class="mb-6">
+        Les indicateurs agrégés ne sont pas encore publiés.
+      </v-alert>
 
-      <!-- Évolution annuelle -->
+      <!-- Évolution annuelle des montants accordés (réel) -->
       <v-card rounded="lg" elevation="1" class="mb-6">
-        <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Évolution annuelle du coût total des exonérations (Mds FCFA)</v-card-title>
+        <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Évolution annuelle des montants accordés</v-card-title>
         <v-card-text>
-          <div class="text-caption text-medium-emphasis mb-4">Données 2018–2025 — Source : MEF / OASE</div>
-          <div v-for="row in evolutionAnnuelle" :key="row.annee" class="mb-3 d-flex align-center ga-3">
-            <div style="width:44px;font-size:0.8rem;font-weight:700">{{ row.annee }}</div>
-            <v-progress-linear :model-value="(row.montant/900)*100" color="primary" rounded height="12" class="flex-grow-1"/>
-            <div style="width:80px;font-size:0.8rem;font-weight:700;text-align:right">{{ row.montant }} Mds</div>
+          <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
+          <div v-for="a in evolutionAnnuelle" :key="a.annee" class="mb-3">
+            <div class="d-flex justify-space-between text-caption mb-1">
+              <span class="font-weight-medium">{{ a.annee }}</span>
+              <span class="font-weight-bold">{{ formatMontantCompact(a.montant) }}</span>
+            </div>
+            <v-progress-linear :model-value="(a.montant / maxEvolution) * 100" color="primary" rounded height="10"/>
           </div>
+          <v-alert v-if="!loading && !evolutionAnnuelle.length" type="info" variant="tonal" rounded="lg" density="compact">
+            Aucun montant approuvé publié pour le moment.
+          </v-alert>
         </v-card-text>
       </v-card>
 
-      <v-row class="mb-6">
-        <!-- Répartition type impôt -->
-        <v-col cols="12" md="6">
-          <v-card rounded="lg" elevation="1" class="h-100">
-            <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Répartition par type d'impôt {{ annee }}</v-card-title>
-            <v-card-text>
-              <div v-for="t in repartitionType" :key="t.label" class="mb-3">
-                <div class="d-flex justify-space-between text-caption mb-1">
-                  <span class="font-weight-medium">{{ t.label }}</span>
-                  <span class="font-weight-bold">{{ t.pct }}% — {{ t.montant }} Mds</span>
-                </div>
-                <v-progress-linear :model-value="t.pct" :color="t.color" rounded height="10"/>
-              </div>
-              <div class="mt-4 pa-3 rounded-lg text-caption text-medium-emphasis" style="background:rgba(0,0,0,0.04)">
-                📝 Note méthodologique : Les exonérations douanières incluent les droits de douane et la TVA à l'importation. Les montants sont exprimés en milliards de FCFA courants.
-              </div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-        <!-- Top secteurs -->
-        <v-col cols="12" md="6">
-          <v-card rounded="lg" elevation="1" class="h-100">
-            <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Top secteurs contribuables {{ annee }}</v-card-title>
-            <v-card-text>
-              <div v-for="(s,i) in topSecteurs" :key="s.secteur" class="mb-3">
-                <div class="d-flex justify-space-between text-caption mb-1">
-                  <span>{{ i+1 }}. {{ s.secteur }}</span>
-                  <span class="font-weight-bold">{{ s.montant }} Mds</span>
-                </div>
-                <v-progress-linear :model-value="(s.montant/234)*100" color="success" rounded height="8"/>
-              </div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-      </v-row>
-
-      <!-- Map -->
+      <!-- Montants par type d'impôt (réel) -->
       <v-card rounded="lg" elevation="1" class="mb-6">
-        <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Répartition géographique par région</v-card-title>
+        <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Montants accordés par type d'impôt</v-card-title>
         <v-card-text>
-          <v-row>
-            <v-col cols="12" md="4" class="d-flex align-center justify-center">
-              <div class="text-center pa-8">
-                <v-icon icon="mdi-map" size="80" color="primary" class="mb-3"/>
-                <div class="text-body-2 text-medium-emphasis">Carte choroplèthe des dépenses fiscales par région du Togo</div>
-              </div>
-            </v-col>
-            <v-col cols="12" md="8">
-              <v-list density="compact" class="pa-2">
-                <v-list-item v-for="r in regions" :key="r.nom" :title="r.nom" :subtitle="`${r.count} dossiers actifs`" rounded="lg" class="mb-2">
-                  <template #append>
-                    <div class="text-end">
-                      <div class="font-weight-bold text-primary">{{ r.montant }} Mds</div>
-                      <v-progress-linear :model-value="(r.montant/412)*100" color="primary" rounded height="4" style="width:80px"/>
-                    </div>
-                  </template>
-                </v-list-item>
-              </v-list>
-            </v-col>
-          </v-row>
+          <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
+          <div v-for="t in montantsParImpot" :key="t.label" class="mb-3">
+            <div class="d-flex justify-space-between text-caption mb-1">
+              <span class="font-weight-medium">{{ t.label }}</span>
+              <span class="font-weight-bold">{{ formatMontantCompact(t.montant) }} — {{ t.count }} mesure(s)</span>
+            </div>
+            <v-progress-linear :model-value="(t.montant / maxImpot) * 100" color="primary" rounded height="10"/>
+          </div>
+          <v-alert v-if="!loading && !montantsParImpot.length" type="info" variant="tonal" rounded="lg" density="compact">
+            Aucune mesure publiée pour le moment.
+          </v-alert>
+          <div class="mt-4 pa-3 rounded-lg text-caption text-medium-emphasis" style="background:rgba(0,0,0,0.04)">
+            📝 Source : API OASE /rapports/opendata — montants des demandes approuvées, agrégés et anonymisés.
+          </div>
         </v-card-text>
       </v-card>
     </v-container>
   </div>
 </template>
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import KpiCard from '../../components/KpiCard.vue'
-import { mockTopSecteurs, mockRegions } from '../../mock/data'
-const annee = ref('2025')
-const kpis = [
-  { label: 'Coût total dépenses fiscales', value: '724 Mds FCFA', icon: 'mdi-currency-usd', color: 'primary' },
-  { label: '% du PIB', value: '3,8%', icon: 'mdi-chart-line', color: 'info' },
-  { label: 'Nombre de contribuables', value: '1 102', icon: 'mdi-domain', color: 'success' },
-  { label: 'Types d\'exonérations', value: 6, icon: 'mdi-label-multiple', color: 'secondary' },
-]
-const evolutionAnnuelle = [
-  { annee: '2018', montant: 320 }, { annee: '2019', montant: 380 }, { annee: '2020', montant: 410 },
-  { annee: '2021', montant: 490 }, { annee: '2022', montant: 560 }, { annee: '2023', montant: 640 },
-  { annee: '2024', montant: 680 }, { annee: '2025', montant: 724 },
-]
-const repartitionType = [
-  { label: 'Droits de douane', pct: 42, montant: 304, color: 'primary' },
-  { label: 'TVA (interne + import)', pct: 28, montant: 203, color: 'info' },
-  { label: 'Impôt sur les sociétés', pct: 22, montant: 159, color: 'success' },
-  { label: 'IRCM & Autres', pct: 8, montant: 58, color: 'secondary' },
-]
-const topSecteurs = mockTopSecteurs.slice(0, 6)
-const regions = mockRegions
+import { listerMesuresOpenData, formatMontantCompact, type MesureOpenData } from '../../services/rapports'
+
+// Données réelles : mesures publiées + agrégats financiers
+// (GET /rapports/opendata — endpoint PUBLIC, accessible sans authentification).
+const loading = ref(false)
+const mesures = ref<MesureOpenData[]>([])
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    mesures.value = await listerMesuresOpenData()
+  } catch {
+    mesures.value = []
+  } finally {
+    loading.value = false
+  }
+})
+
+const impotsCouverts = computed(() =>
+  [...new Set(mesures.value.map((m) => m.version?.impotConcerne).filter((i): i is string => !!i))],
+)
+
+const montantTotalAccorde = computed(() =>
+  mesures.value.reduce((acc, m) => acc + Number(m.agregats?.montantTotalAccorde ?? 0), 0),
+)
+const totalApprouvees = computed(() =>
+  mesures.value.reduce((acc, m) => acc + (m.agregats?.nombreDemandesApprouvees ?? 0), 0),
+)
+
+// KPIs calculés sur données réelles (API publique).
+const kpis = computed(() =>
+  mesures.value.length
+    ? [
+        { label: 'Mesures publiées', value: String(mesures.value.length), icon: 'mdi-label-multiple', color: 'primary' },
+        { label: 'Impôts concernés', value: String(impotsCouverts.value.length), icon: 'mdi-bank-outline', color: 'info' },
+        { label: 'Montant total accordé', value: formatMontantCompact(montantTotalAccorde.value), icon: 'mdi-currency-usd', color: 'success' },
+        { label: 'Demandes approuvées', value: String(totalApprouvees.value), icon: 'mdi-check-decagram', color: 'warning' },
+      ]
+    : [],
+)
+
+// Évolution annuelle réelle (somme des montants approuvés par année, toutes mesures).
+const evolutionAnnuelle = computed(() => {
+  const parAnnee = new Map<number, number>()
+  for (const m of mesures.value) {
+    for (const a of m.agregats?.montantParAnnee ?? []) {
+      parAnnee.set(a.annee, (parAnnee.get(a.annee) ?? 0) + Number(a.montant))
+    }
+  }
+  return [...parAnnee.entries()].sort((a, b) => a[0] - b[0]).map(([annee, montant]) => ({ annee, montant }))
+})
+const maxEvolution = computed(() => Math.max(1, ...evolutionAnnuelle.value.map((a) => a.montant)))
+
+// Montants réels par type d'impôt.
+const montantsParImpot = computed(() =>
+  impotsCouverts.value
+    .map((impot) => {
+      const lignes = mesures.value.filter((m) => m.version?.impotConcerne === impot)
+      return {
+        label: impot,
+        count: lignes.length,
+        montant: lignes.reduce((acc, m) => acc + Number(m.agregats?.montantTotalAccorde ?? 0), 0),
+      }
+    })
+    .sort((a, b) => b.montant - a.montant),
+)
+const maxImpot = computed(() => Math.max(1, ...montantsParImpot.value.map((t) => t.montant)))
 </script>

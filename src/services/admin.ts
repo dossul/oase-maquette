@@ -131,3 +131,95 @@ export interface WorkflowTemplate {
 export function listerWorkflowTemplates(): Promise<WorkflowTemplate[]> {
   return api<WorkflowTemplate[]>('/workflow/templates')
 }
+
+export interface MfaConfig {
+  enabled: boolean
+  channels: string[]
+  defaultChannel: string
+  ttlSeconds: number
+  maxAttempts: number
+  emailEnabled: boolean
+  whatsappEnabled: boolean
+  whatsappTemplate?: string
+}
+
+/** GET /admin/mfa/config — configuration MFA réelle de la plateforme. */
+export function getMfaConfig(): Promise<MfaConfig> {
+  return api<MfaConfig>('/admin/mfa/config')
+}
+
+export interface JobsHeartbeat {
+  lastHeartbeat: string
+  healthy: boolean
+}
+
+/** GET /jobs/heartbeat — santé réelle des jobs planifiés (archivage, etc.). */
+export function getJobsHeartbeat(): Promise<JobsHeartbeat> {
+  return api<JobsHeartbeat>('/jobs/heartbeat')
+}
+
+/** GET /health — sonde de santé publique de l'API (pas d'auth requise). */
+export function getHealth(): Promise<{ status: string }> {
+  return api<{ status: string }>('/health')
+}
+
+// ── Paramétrage plateforme (vague B — « 0 mocked data ») ────────────────────
+
+/** Ensemble des clés system_config (sécurité, SMTP, SMS, WhatsApp, notifications). */
+export type ParametresPlateforme = Record<string, string>
+
+/** GET /admin/parametres — toutes les clés de paramétrage (admin_si). */
+export function getParametres(): Promise<ParametresPlateforme> {
+  return api<ParametresPlateforme>('/admin/parametres')
+}
+
+/** PUT /admin/parametres — upsert des clés fournies, renvoie l'ensemble à jour. */
+export function majParametres(updates: Record<string, string>): Promise<ParametresPlateforme> {
+  return api<ParametresPlateforme>('/admin/parametres', {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  })
+}
+
+export interface MonitoringPlateforme {
+  timestamp: string
+  version: string
+  uptimeSecondes: number
+  utilisateursActifs24h: number
+  erreurs500_24h: number
+  jobs: { actifs: number; echoues24h: number }
+}
+
+/** GET /admin/monitoring — agrégat santé plateforme (admin_si). */
+export function getMonitoring(): Promise<MonitoringPlateforme> {
+  return api<MonitoringPlateforme>('/admin/monitoring')
+}
+
+/** GET /referentiels/inseed — paramètres du référentiel INSEED (simulation fiscale). */
+export function getInseed(): Promise<Record<string, string>> {
+  return api<Record<string, string>>('/referentiels/inseed')
+}
+
+/** PUT /referentiels/inseed — mise à jour des clés inseed.* (admin_si). */
+export function majInseed(updates: Record<string, string>): Promise<Record<string, string>> {
+  return api<Record<string, string>>('/referentiels/inseed', {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  })
+}
+
+export interface NotificationTemplateApi {
+  id: string
+  code: string
+  typeNotificationCode: string
+  canalCode: string
+  sujet: string
+  corps: string
+  variables: string | null
+  estActive: boolean
+}
+
+/** GET /notifications/templates — bibliothèque des templates de notification (admin_si). */
+export function listerNotificationTemplates(): Promise<NotificationTemplateApi[]> {
+  return api<NotificationTemplateApi[]>('/notifications/templates')
+}

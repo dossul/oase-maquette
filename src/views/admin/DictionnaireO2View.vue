@@ -81,18 +81,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
 
 const tab = ref('attributs')
 
-const kpis = [
-  { label: 'Attributs O2 visibles', value: '17 / 17', icon: 'mdi-check-all', color: 'success', subtitle: 'Dictionnaire maquette' },
-  { label: 'Entites logiques', value: '9', icon: 'mdi-database-outline', color: 'primary', subtitle: 'Modele cible OASE' },
-  { label: 'Referentiels normes', value: '11', icon: 'mdi-shape-plus', color: 'info', subtitle: 'Nomenclatures officielles' },
-  { label: 'Regles bloquantes', value: '4', icon: 'mdi-lock-alert-outline', color: 'warning', subtitle: 'Qualite et completude' },
+// Contenu normatif MRD (documentation de référence) : les KPIs sont calculés
+// à partir des listes normatives affichées ci-dessous — aucun chiffre fictif.
+const reglesCompletude = [
+  'Blocage si liquidation incomplete',
+  'Controle des pieces premier rang par type de contribuable',
+  'Controle brut taxable / taux applique / montant exonere',
+  'Horodatage, utilisateur de saisie et piece probante avec hash',
 ]
+
+const kpis = computed(() => [
+  { label: 'Attributs O2 visibles', value: `${attributes.length} / ${attributes.length}`, icon: 'mdi-check-all', color: 'success', subtitle: 'Referentiel normatif MRD' },
+  { label: 'Entites logiques', value: entities.length, icon: 'mdi-database-outline', color: 'primary', subtitle: 'Modele cible OASE' },
+  { label: 'Referentiels normes', value: referentials.length, icon: 'mdi-shape-plus', color: 'info', subtitle: 'Nomenclatures officielles' },
+  { label: 'Regles de completude', value: reglesCompletude.length, icon: 'mdi-lock-alert-outline', color: 'warning', subtitle: 'Qualite et completude' },
+])
 
 const attributeHeaders = [
   { title: '#', key: 'id' },

@@ -1,10 +1,21 @@
 <template>
   <div>
     <PageHeader title="Suivi des engagements" subtitle="Vérification du respect des obligations contractuelles des contribuables" icon="mdi-chart-timeline"/>
-    <AlertBanner type="error" title="2 entreprises en défaut d'engagements" text="TOGO PHARMA ZF et LOMÉ TEXTILE ZF SAS n'ont pas atteint les seuils contractuels d'emplois et d'investissements." />
+    <AlertBanner
+      v-if="conventionsEnDefaut.length > 0"
+      type="error"
+      :title="`${conventionsEnDefaut.length} entreprise(s) en défaut d'engagements`"
+      :text="`${conventionsEnDefaut.map(c => c.contribuable).join(', ')} : emplois créés inférieurs aux emplois engagés.`"
+    />
+    <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
+    <v-alert v-if="loadError" type="error" variant="tonal" density="compact" class="mb-4">{{ loadError }}</v-alert>
     <v-card rounded="lg" elevation="1" class="mb-4">
       <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Tableau de bord des engagements par convention</v-card-title>
       <v-card-text class="pa-4">
+        <div v-if="!loading && engagements.length === 0 && !loadError" class="text-center pa-8 text-medium-emphasis">
+          <v-icon icon="mdi-file-certificate-outline" size="48" class="mb-3 opacity-30"/>
+          <div class="text-body-2">Aucune convention enregistrée pour le moment.</div>
+        </div>
         <div v-for="conv in engagements" :key="conv.id" class="mb-6">
           <div class="d-flex align-center justify-space-between mb-2">
             <div>
@@ -19,15 +30,13 @@
                 <span>Emplois créés</span>
                 <span><strong>{{ conv.emploisCrees }}</strong> / {{ conv.emploisEngages }} engagés</span>
               </div>
-              <v-progress-linear :model-value="(conv.emploisCrees/conv.emploisEngages)*100" :color="conv.emploisCrees<conv.emploisEngages*0.8?'error':'success'" rounded height="8"/>
+              <v-progress-linear
+                :model-value="conv.emploisEngages > 0 ? (conv.emploisCrees/conv.emploisEngages)*100 : 0"
+                :color="conv.emploisCrees<conv.emploisEngages*0.8?'error':'success'"
+                rounded height="8"
+              />
             </v-col>
-            <v-col cols="12" sm="6">
-              <div class="d-flex justify-space-between text-caption mb-1">
-                <span>Investissements</span>
-                <span><strong>{{ conv.investRealise }}Mds</strong> / {{ conv.investEngage }}Mds</span>
-              </div>
-              <v-progress-linear :model-value="(conv.investRealise/conv.investEngage)*100" :color="conv.investRealise<conv.investEngage*0.8?'warning':'success'" rounded height="8"/>
-            </v-col>
+            <!-- TODO(endpoint): le suivi des investissements (réalisé vs engagé) n'est pas exposé par GET /conventions — vague B backend -->
           </v-row>
           <div class="d-flex ga-2 mt-2">
             <v-btn size="x-small" variant="tonal" color="primary" prepend-icon="mdi-file-plus">Rapport annuel</v-btn>
@@ -42,11 +51,47 @@
   </div>
 </template>
 <script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import AlertBanner from '../../components/AlertBanner.vue'
-const engagements = [
-  { id: 'C001', reference: 'ZFI-2024-012', contribuable: 'LOMÉ TEXTILE ZF SAS', emploisCrees: 312, emploisEngages: 450, investRealise: 0.6, investEngage: 0.89, alerte: true },
-  { id: 'C002', reference: 'ZES-2023-008', contribuable: 'AGRO-PROCESSING ZES', emploisCrees: 620, emploisEngages: 800, investRealise: 0.95, investEngage: 1.2, alerte: false },
-  { id: 'C003', reference: 'CI-2025-003', contribuable: 'ENERGIE SOLAIRE TOGO', emploisCrees: 95, emploisEngages: 180, investRealise: 0.28, investEngage: 0.56, alerte: true },
-]
+import { listerConventionsReelles } from '../../services/backoffice'
+
+interface EngagementLigne {
+  id: string
+  reference: string
+  contribuable: string
+  emploisCrees: number
+  emploisEngages: number
+  alerte: boolean
+}
+
+const engagements = ref<EngagementLigne[]>([])
+const loading = ref(false)
+const loadError = ref<string | null>(null)
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    const data = await listerConventionsReelles()
+    engagements.value = data.map((c) => {
+      const emploisEngages = c.emploisEngages ?? 0
+      const emploisCrees = c.emploisCrees ?? 0
+      return {
+        id: c.id,
+        reference: c.reference,
+        contribuable: c.contribuables?.raisonSociale ?? '—',
+        emploisCrees,
+        emploisEngages,
+        // Défaut = emplois créés < emplois engagés (règle métier du lot).
+        alerte: emploisEngages > 0 && emploisCrees < emploisEngages,
+      }
+    })
+  } catch (e) {
+    loadError.value = e instanceof Error ? e.message : 'Impossible de charger les conventions'
+  } finally {
+    loading.value = false
+  }
+})
+
+const conventionsEnDefaut = computed(() => engagements.value.filter(c => c.alerte))
 </script>

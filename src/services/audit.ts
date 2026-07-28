@@ -104,3 +104,13 @@ export async function listerAuditLogs(filtres: FiltresAuditLogs = {}): Promise<A
 export function verifierChaineAudit(): Promise<VerificationChaine> {
   return api<VerificationChaine>('/audit-logs/verify-chain', { method: 'POST' })
 }
+
+export interface DetectionResult {
+  detectees: number
+  details: unknown[]
+}
+
+/** POST /anomalies/detecter — exécute réellement le moteur de règles sur les dossiers. */
+export function detecterAnomalies(): Promise<DetectionResult> {
+  return api<DetectionResult>('/anomalies/detecter', { method: 'POST', body: JSON.stringify({}) })
+}

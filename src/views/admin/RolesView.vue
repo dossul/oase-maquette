@@ -16,7 +16,12 @@
     </PageHeader>
 
     <v-alert type="warning" variant="tonal" rounded="lg" density="compact" class="mb-4">
-      Toute modification est journalisée dans l'audit trail et prend effet immédiatement.
+      <!-- TODO(endpoint): pas d'endpoint RBAC (rôles/permissions/profils) dans l'API v1.
+           La matrice, les modules et les profils sont une configuration de référence locale,
+           non persistée. Les utilisateurs et le journal proviennent de l'API réelle
+           (GET /utilisateurs, GET /audit-logs) ; suspension/réactivation via PATCH /utilisateurs/:id. -->
+      Matrice, modules et profils : configuration de référence (non persistée — pas d'endpoint RBAC dans l'API v1).
+      Utilisateurs, journal et changements de statut : données réelles de l'API.
     </v-alert>
 
     <!-- Legend -->
@@ -224,9 +229,11 @@
             </v-btn>
           </div>
           <v-divider/>
+          <v-alert v-if="usersError" type="error" variant="tonal" density="compact" rounded="lg" class="ma-3">{{ usersError }}</v-alert>
           <v-data-table
             :headers="userHeaders"
-            :items="mockUsers"
+            :items="users"
+            :loading="usersLoading"
             hover
           >
             <template #item.role="{ item }">
@@ -272,8 +279,13 @@
       <!-- ══ JOURNAL ══ -->
       <v-window-item value="journal">
         <v-card rounded="lg" elevation="1" class="mt-3">
-          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Journal des modifications</v-card-title>
-          <v-list density="compact" class="pa-2">
+          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Journal des modifications (audit réel)</v-card-title>
+          <v-progress-linear v-if="journalLoading" indeterminate color="primary"/>
+          <v-list v-else density="compact" class="pa-2">
+            <div v-if="journalRoles.length === 0" class="text-center pa-6 text-medium-emphasis">
+              <v-icon icon="mdi-history" size="36" class="mb-2 opacity-40"/>
+              <div class="text-body-2">Aucun événement d'habilitation journalisé.</div>
+            </div>
             <v-list-item
               v-for="j in journalRoles"
               :key="j.id"
@@ -348,7 +360,7 @@
       <v-card rounded="xl">
         <v-card-title class="pa-5 pb-3">Assigner un profil à un utilisateur</v-card-title>
         <v-card-text class="pa-5">
-          <v-select v-model="assignForm.userId" :items="mockUsers" item-title="name" item-value="id" label="Utilisateur" class="mb-3" hide-details/>
+          <v-select v-model="assignForm.userId" :items="users" item-title="name" item-value="id" label="Utilisateur" class="mb-3" hide-details/>
           <v-select v-model="assignForm.profileId" :items="profiles" item-title="name" item-value="id" label="Profil à assigner" class="mb-3" hide-details clearable/>
           <v-textarea v-model="assignForm.note" label="Note / Justification" rows="2" hide-details/>
         </v-card-text>
@@ -390,8 +402,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
+import { listerUtilisateurs } from '../../services/utilisateurs'
+import { listerAuditLogs } from '../../services/audit'
+import { modifierStatutUtilisateur } from '../../services/admin'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type CrudKey = 'c' | 'r' | 'u' | 'd' | 'e'
@@ -400,8 +415,8 @@ interface Profile {
   id: string; name: string; baseRole: string; description: string
   permissions: string[]; usersCount: number; icon: string; color: string
 }
-interface MockUser {
-  id: string; name: string; email: string; role: string
+interface UserRow {
+  id: string; name: string; email: string; role: string; roleCode: string
   profil: string | null; statut: string; lastLogin: string
 }
 
@@ -593,24 +608,60 @@ function toggleModule(role: string, path: string, val: boolean | null) {
   else moduleAccess[role].delete(path)
 }
 
-// ── Profiles ───────────────────────────────────────────────────────────────
+// ── Profils : configuration de référence locale (PAS d'endpoint profils dans l'API v1).
+// usersCount est calculé depuis les utilisateurs réels (par rôle de base).
 const profiles = ref<Profile[]>([
-  { id: 'p1', name: 'Inspecteur senior IGF', baseRole: 'Auditeur', description: 'Auditeur avec droits étendus sur les missions et accès aux constats.', permissions: ['audit_missions', 'audit_journal', 'audit_anomalies', 'audit_dossiers'], usersCount: 3, icon: 'mdi-magnify-scan', color: 'error' },
-  { id: 'p2', name: 'Agent OTR Douanes', baseRole: 'Agent OTR', description: "Agent spécialisé douanes avec droits d'instruction et validation.", permissions: ['dossier_instruct', 'dossier_validate', 'dossier_export'], usersCount: 12, icon: 'mdi-office-building', color: 'primary' },
-  { id: 'p3', name: 'Analyste DGBF', baseRole: 'Agent DGBF', description: 'Analyste budget avec accès read-only aux dossiers et exports budget.', permissions: ['budget_view', 'dossier_view_all', 'dossier_export'], usersCount: 5, icon: 'mdi-chart-bar', color: 'secondary' },
-  { id: 'p4', name: 'Décideur MEF', baseRole: 'Décideur', description: 'Dirigeant avec accès complet au tableau de bord et simulation.', permissions: ['dashboard_deciseur', 'rapport_generer', 'simulation', 'referentiel'], usersCount: 2, icon: 'mdi-briefcase', color: 'purple' },
+  { id: 'p1', name: 'Inspecteur senior IGF', baseRole: 'Auditeur', description: 'Auditeur avec droits étendus sur les missions et accès aux constats.', permissions: ['audit_missions', 'audit_journal', 'audit_anomalies', 'audit_dossiers'], usersCount: 0, icon: 'mdi-magnify-scan', color: 'error' },
+  { id: 'p2', name: 'Agent OTR Douanes', baseRole: 'Agent OTR', description: "Agent spécialisé douanes avec droits d'instruction et validation.", permissions: ['dossier_instruct', 'dossier_validate', 'dossier_export'], usersCount: 0, icon: 'mdi-office-building', color: 'primary' },
+  { id: 'p3', name: 'Analyste DGBF', baseRole: 'Agent DGBF', description: 'Analyste budget avec accès read-only aux dossiers et exports budget.', permissions: ['budget_view', 'dossier_view_all', 'dossier_export'], usersCount: 0, icon: 'mdi-chart-bar', color: 'secondary' },
+  { id: 'p4', name: 'Décideur MEF', baseRole: 'Décideur', description: 'Dirigeant avec accès complet au tableau de bord et simulation.', permissions: ['dashboard_deciseur', 'rapport_generer', 'simulation', 'referentiel'], usersCount: 0, icon: 'mdi-briefcase', color: 'purple' },
 ])
 
-// ── Mock users ─────────────────────────────────────────────────────────────
-const mockUsers = ref<MockUser[]>([
-  { id: 'u1', name: 'K. ABALO', email: 'k.abalo@igf.tg', role: 'Auditeur', profil: 'Inspecteur senior IGF', statut: 'Actif', lastLogin: '27/04/2026 09:14' },
-  { id: 'u2', name: 'A. KPODO', email: 'a.kpodo@igf.tg', role: 'Auditeur', profil: 'Inspecteur senior IGF', statut: 'Actif', lastLogin: '27/04/2026 08:52' },
-  { id: 'u3', name: 'S. AGBEKO', email: 's.agbeko@otr.tg', role: 'Agent OTR', profil: 'Agent OTR Douanes', statut: 'Actif', lastLogin: '26/04/2026 16:45' },
-  { id: 'u4', name: 'L. TOGBUI', email: 'l.togbui@dgbf.tg', role: 'Agent DGBF', profil: 'Analyste DGBF', statut: 'Actif', lastLogin: '26/04/2026 14:30' },
-  { id: 'u5', name: 'M. DOSSEH', email: 'm.dosseh@mef.tg', role: 'Décideur', profil: 'Décideur MEF', statut: 'Actif', lastLogin: '25/04/2026 11:00' },
-  { id: 'u6', name: 'Y. KODJO', email: 'y.kodjo@otr.tg', role: 'Agent OTR', profil: null, statut: 'Suspendu', lastLogin: '20/04/2026 10:15' },
-  { id: 'u7', name: 'B. ATTIOGBE', email: 'b.attiogbe@api-zf.tg', role: 'Agence', profil: null, statut: 'Actif', lastLogin: '27/04/2026 07:40' },
-])
+// ── Utilisateurs réels (GET /utilisateurs) ─────────────────────────────────
+const users = ref<UserRow[]>([])
+const usersLoading = ref(false)
+const usersError = ref<string | null>(null)
+
+/** Codes rôle API → libellés de la matrice. */
+const roleLabelMap: Record<string, string> = {
+  contribuable: 'Contribuable',
+  agent_ci: 'Agent OTR',
+  agent_cddi: 'Agent OTR',
+  agent_dgbf: 'Agent DGBF',
+  agent_dgtcp: 'Agent DGTCP',
+  agent_agence: 'Agence',
+  decideur: 'Décideur',
+  auditeur: 'Auditeur',
+  admin_si: 'Admin',
+}
+const roleLabel = (code: string) => roleLabelMap[code] ?? code
+
+async function chargerUtilisateurs() {
+  usersLoading.value = true
+  usersError.value = null
+  try {
+    const res = await listerUtilisateurs()
+    users.value = res.data.map(u => ({
+      id: u.id,
+      name: `${u.prenom ?? ''} ${u.nom ?? ''}`.trim() || u.email,
+      email: u.email,
+      role: roleLabel(u.role),
+      roleCode: u.role,
+      profil: null, // pas d'endpoint profils — aucune affectation réelle à afficher
+      statut: u.statutCode === 'actif' ? 'Actif' : 'Suspendu',
+      lastLogin: u.derniereConnexion ? new Date(u.derniereConnexion).toLocaleString('fr-FR') : '—',
+    }))
+    // Compteurs d'usage des profils calculés sur les utilisateurs réels.
+    for (const p of profiles.value) {
+      p.usersCount = users.value.filter(u => u.role === p.baseRole).length
+    }
+  } catch (e) {
+    users.value = []
+    usersError.value = e instanceof Error ? e.message : 'Erreur de chargement des utilisateurs'
+  } finally {
+    usersLoading.value = false
+  }
+}
 
 const userHeaders = [
   { title: 'Nom', key: 'name' },
@@ -637,7 +688,7 @@ const assignUserDialog = ref(false)
 const assignForm = reactive({ userId: '', profileId: '', note: '' })
 
 const revokeDialog = ref(false)
-const revokeTarget = ref<MockUser | null>(null)
+const revokeTarget = ref<UserRow | null>(null)
 
 const snackbar = ref(false)
 const snackMsg = ref('')
@@ -652,23 +703,47 @@ function snack(msg: string, color: 'success' | 'error' = 'success') {
   snackbar.value = true
 }
 
-// ── Journal ────────────────────────────────────────────────────────────────
-const journalRoles = ref([
-  { id: 1, action: 'L. TOGBUI — permission audit_journal accordée au rôle Décideur', date: '27/04/2026 15:22', type: 'grant' },
-  { id: 2, action: 'L. TOGBUI — dossier_validate retiré du rôle Agence', date: '26/04/2026 09:10', type: 'revoke' },
-  { id: 3, action: 'K. ABALO — profil "Inspecteur senior IGF" assigné à A. KPODO', date: '25/04/2026 14:05', type: 'grant' },
-  { id: 4, action: 'Admin — compte Y. KODJO suspendu', date: '20/04/2026 11:30', type: 'revoke' },
-])
-let journalId = 10
+// ── Journal : alimenté par le journal d'audit réel (GET /audit-logs) ────────
+interface JournalItem { id: string | number; action: string; date: string; type: 'grant' | 'revoke' }
+const journalRoles = ref<JournalItem[]>([])
+const journalLoading = ref(false)
+let journalId = 1
+
+/** Charge les événements d'habilitation réels depuis le journal d'audit. */
+async function chargerJournal() {
+  journalLoading.value = true
+  try {
+    const page = await listerAuditLogs({ limit: 50 })
+    journalRoles.value = page.items
+      .filter(e => /UTILISATEUR|MFA|PIN|ROLE/i.test(e.action))
+      .slice(0, 20)
+      .map(e => ({
+        id: e.id,
+        action: `${e.action} — ${e.entite}${e.institution ? ` (${e.institution})` : ''}`,
+        date: new Date(e.horodatage).toLocaleString('fr-FR'),
+        type: /CREE|RESET|ACTIF/i.test(e.action) ? 'grant' as const : 'revoke' as const,
+      }))
+  } catch {
+    journalRoles.value = []
+  } finally {
+    journalLoading.value = false
+  }
+}
+
 function addJournal(action: string, type: 'grant' | 'revoke') {
   const d = new Date()
   journalRoles.value.unshift({
-    id: journalId++,
+    id: `local-${journalId++}`,
     action: `Admin — ${action}`,
     date: `${d.toLocaleDateString('fr-FR')} ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`,
     type,
   })
 }
+
+onMounted(() => {
+  chargerUtilisateurs()
+  chargerJournal()
+})
 
 // ── Role actions ───────────────────────────────────────────────────────────
 function openNewRole() { editRoleMode.value = false; roleForm.name = ''; roleForm.baseRole = ''; roleForm.description = ''; newRoleDialog.value = true }
@@ -722,33 +797,46 @@ function openAssignProfile(p: Profile) {
 
 // ── User actions ───────────────────────────────────────────────────────────
 function saveAssignment() {
-  const user = mockUsers.value.find(u => u.id === assignForm.userId)
+  const user = users.value.find(u => u.id === assignForm.userId)
   const prof = profiles.value.find(p => p.id === assignForm.profileId)
   if (user && prof) {
     user.profil = prof.name
-    snack(`Profil "${prof.name}" assigné à ${user.name}`)
+    snack(`Profil "${prof.name}" assigné à ${user.name} (local — non persisté, pas d'endpoint profils)`)
     addJournal(`Profil "${prof.name}" assigné à ${user.name}`, 'grant')
   }
   assignUserDialog.value = false
 }
-function editUserProfile(item: MockUser) {
+function editUserProfile(item: UserRow) {
   assignForm.userId = item.id; assignForm.profileId = ''; assignForm.note = ''
   assignUserDialog.value = true
 }
-function revokeUserAccess(item: MockUser) { revokeTarget.value = item; revokeDialog.value = true }
-function confirmRevoke() {
+function revokeUserAccess(item: UserRow) { revokeTarget.value = item; revokeDialog.value = true }
+async function confirmRevoke() {
   if (revokeTarget.value) {
-    const u = mockUsers.value.find(x => x.id === revokeTarget.value!.id)
-    if (u) { u.statut = 'Suspendu'; u.profil = null }
-    addJournal(`Accès révoqué pour ${revokeTarget.value.name}`, 'revoke')
-    snack(`Accès de ${revokeTarget.value.name} révoqué`, 'error')
+    const target = revokeTarget.value
+    try {
+      // Désactivation réelle du compte via PATCH /utilisateurs/:id.
+      await modifierStatutUtilisateur(target.id, 'inactif')
+      const u = users.value.find(x => x.id === target.id)
+      if (u) { u.statut = 'Suspendu'; u.profil = null }
+      addJournal(`Accès révoqué pour ${target.name}`, 'revoke')
+      snack(`Accès de ${target.name} révoqué`, 'error')
+    } catch (e) {
+      snack(e instanceof Error ? e.message : 'Échec de la révocation', 'error')
+    }
   }
   revokeDialog.value = false
 }
-function toggleUserStatus(item: MockUser) {
-  item.statut = item.statut === 'Actif' ? 'Suspendu' : 'Actif'
-  snack(`${item.name} ${item.statut === 'Actif' ? 'réactivé' : 'suspendu'}`)
-  addJournal(`${item.name} ${item.statut === 'Actif' ? 'réactivé' : 'suspendu'}`, item.statut === 'Actif' ? 'grant' : 'revoke')
+async function toggleUserStatus(item: UserRow) {
+  const nouveau = item.statut === 'Actif' ? 'inactif' : 'actif'
+  try {
+    await modifierStatutUtilisateur(item.id, nouveau)
+    item.statut = nouveau === 'actif' ? 'Actif' : 'Suspendu'
+    snack(`${item.name} ${item.statut === 'Actif' ? 'réactivé' : 'suspendu'}`)
+    addJournal(`${item.name} ${item.statut === 'Actif' ? 'réactivé' : 'suspendu'}`, item.statut === 'Actif' ? 'grant' : 'revoke')
+  } catch (e) {
+    snack(e instanceof Error ? e.message : 'Échec du changement de statut', 'error')
+  }
 }
 
 // ── Export ─────────────────────────────────────────────────────────────────

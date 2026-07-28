@@ -22,7 +22,7 @@
               <v-btn variant="outlined" color="white" size="large" rounded="lg" to="/opendata/datasets" prepend-icon="mdi-download">Télécharger</v-btn>
             </div>
           </v-col>
-          <v-col cols="12" md="5" class="d-none d-md-flex justify-center">
+          <v-col v-if="heroKpis.length" cols="12" md="5" class="d-none d-md-flex justify-center">
             <v-row dense>
               <v-col v-for="k in heroKpis" :key="k.label" cols="6">
                 <v-card color="rgba(255,255,255,0.12)" rounded="lg" style="backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.2)" class="pa-4 mb-3">
@@ -62,25 +62,28 @@
 
       <!-- Key indicators -->
       <div class="mt-12 mb-4">
-        <div class="text-h6 font-weight-bold mb-1">Indicateurs clés {{ filterAnnee }}</div>
-        <div class="text-medium-emphasis text-body-2">Données agrégées et anonymisées — Mise à jour trimestrielle</div>
+        <div class="text-h6 font-weight-bold mb-1">Indicateurs clés</div>
+        <div class="text-medium-emphasis text-body-2">Données agrégées et anonymisées — Source : API OASE</div>
       </div>
-      <v-row>
+      <v-row v-if="publicKpis.length">
         <v-col v-for="k in publicKpis" :key="k.label" cols="6" md="3">
           <KpiCard v-bind="k"/>
         </v-col>
       </v-row>
+      <v-alert v-else-if="!loading" type="info" variant="tonal" rounded="lg" density="compact" class="mb-4">
+        Les indicateurs agrégés ne sont pas encore publiés.
+      </v-alert>
 
       <div class="mt-12 mb-4">
-        <div class="text-h6 font-weight-bold mb-1">Indicateurs obligatoires publies</div>
+        <div class="text-h6 font-weight-bold mb-1">Mesures d'exonération publiées</div>
         <div class="text-medium-emphasis text-body-2">Jeux publics issus du workflow de validation, anonymisation et versioning</div>
       </div>
       <v-row class="mb-8">
         <v-col cols="12" md="7">
           <v-card rounded="lg" elevation="1">
-            <v-data-table :headers="indicatorHeaders" :items="mandatoryIndicators" hover density="comfortable">
-              <template #item.statut="{ item }">
-                <v-chip :color="item.statut === 'Publié' ? 'success' : 'warning'" size="x-small" variant="tonal">{{ item.statut }}</v-chip>
+            <v-data-table :headers="indicatorHeaders" :items="mesuresPubliees" :loading="loading" hover density="comfortable" no-data-text="Aucune mesure publiée pour le moment.">
+              <template #item.impot="{ item }">
+                <v-chip color="info" size="x-small" variant="tonal">{{ item.impot }}</v-chip>
               </template>
             </v-data-table>
           </v-card>
@@ -89,10 +92,12 @@
           <v-card rounded="lg" elevation="1" class="mb-4">
             <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Preuve de publication</v-card-title>
             <v-card-text class="pa-4">
-              <div class="text-body-2 mb-2"><strong>Lot public :</strong> PUB-2026-T2-004</div>
-              <div class="text-body-2 mb-2"><strong>Date :</strong> 01/06/2026</div>
-              <div class="text-body-2 mb-2"><strong>Version :</strong> v4.2</div>
-              <div class="text-body-2"><strong>Validation :</strong> UPF / administration OASE</div>
+              <div class="text-body-2 mb-2"><strong>Mesures publiées :</strong> {{ mesures.length }}</div>
+              <div class="text-body-2 mb-2"><strong>Impôts couverts :</strong> {{ impotsCouverts.join(', ') || '—' }}</div>
+              <div class="text-body-2 mb-2"><strong>Montant total accordé :</strong> {{ formatMontantCompact(montantTotalAccorde) }}</div>
+              <div class="text-body-2 mb-2"><strong>Demandes approuvées :</strong> {{ totalApprouvees }}</div>
+              <div class="text-body-2"><strong>Source :</strong> API OASE /rapports/opendata (publique)</div>
+              <!-- TODO(endpoint): identifiant de lot de diffusion, version et horodatage de publication non exposés par l'API. -->
             </v-card-text>
           </v-card>
 
@@ -121,42 +126,91 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import KpiCard from '../../components/KpiCard.vue'
+import { listerMesuresOpenData, formatMontantCompact, type MesureOpenData } from '../../services/rapports'
+
 const search = ref('')
 const filterSecteur = ref(null)
 const filterAnnee = ref('2026')
 const secteurs = ['Mines','Zone Franche','Agriculture','Énergie','Numérique','Santé','Transport']
-const heroKpis = [
-  { label: 'Total exonérations 2025', value: '724 Mds FCFA' },
-  { label: 'Contribuables actifs', value: '1 102' },
-  { label: 'Types d\'exonération', value: '6' },
-  { label: 'Taux / PIB', value: '3,8%' },
-]
+
+// Données réelles : mesures d'exonération publiées + agrégats financiers
+// (GET /rapports/opendata — endpoint PUBLIC, accessible sans authentification).
+const loading = ref(false)
+const mesures = ref<MesureOpenData[]>([])
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    mesures.value = await listerMesuresOpenData()
+  } catch {
+    mesures.value = []
+  } finally {
+    loading.value = false
+  }
+})
+
+const impotsCouverts = computed(() =>
+  [...new Set(mesures.value.map((m) => m.version?.impotConcerne).filter((i): i is string => !!i))],
+)
+
+/** Agrégats financiers publics réels (demandes approuvées). */
+const montantTotalAccorde = computed(() =>
+  mesures.value.reduce((acc, m) => acc + Number(m.agregats?.montantTotalAccorde ?? 0), 0),
+)
+const totalApprouvees = computed(() =>
+  mesures.value.reduce((acc, m) => acc + (m.agregats?.nombreDemandesApprouvees ?? 0), 0),
+)
+
+// KPIs calculés sur données réelles (API publique /rapports/opendata).
+const heroKpis = computed(() =>
+  mesures.value.length
+    ? [
+        { label: 'Mesures publiées', value: String(mesures.value.length) },
+        { label: 'Impôts concernés', value: String(impotsCouverts.value.length) },
+        { label: 'Montant total accordé', value: formatMontantCompact(montantTotalAccorde.value) },
+        { label: 'Demandes approuvées', value: String(totalApprouvees.value) },
+      ]
+    : [],
+)
+
 const navCards = [
   { to: '/opendata/tableaux-de-bord', icon: 'mdi-chart-bar', title: 'Tableaux de bord', desc: 'Visualisations interactives' },
   { to: '/opendata/datasets', icon: 'mdi-database', title: 'Jeux de données', desc: 'CSV, JSON, XLSX' },
   { to: '/opendata/rapports', icon: 'mdi-file-chart', title: 'Rapports officiels', desc: 'Rapport annuel UEMOA' },
   { to: '/login', icon: 'mdi-lock', title: 'Espace sécurisé', desc: 'Connexion agents' },
 ]
-const publicKpis = [
-  { label: 'Dépenses fiscales 2025', value: '724 Mds FCFA', icon: 'mdi-currency-usd', color: 'primary' },
-  { label: 'Secteur principal', value: 'Mines', icon: 'mdi-diamond', color: 'secondary' },
-  { label: '% du PIB', value: '3,8%', icon: 'mdi-chart-line', color: 'info' },
-  { label: 'Rapports publiés', value: 4, icon: 'mdi-file-chart', color: 'success' },
-]
+
+const publicKpis = computed(() =>
+  mesures.value.length
+    ? [
+        { label: 'Mesures publiées', value: String(mesures.value.length), icon: 'mdi-label-multiple', color: 'primary' },
+        { label: 'Impôts concernés', value: String(impotsCouverts.value.length), icon: 'mdi-bank-outline', color: 'info' },
+        { label: 'Montant total accordé', value: formatMontantCompact(montantTotalAccorde.value), icon: 'mdi-currency-usd', color: 'success' },
+        { label: 'Demandes approuvées', value: String(totalApprouvees.value), icon: 'mdi-check-decagram', color: 'warning' },
+      ]
+    : [],
+)
+
 const indicatorHeaders = [
-  { title: 'Indicateur', key: 'label' },
-  { title: 'Frequence', key: 'frequence' },
-  { title: 'Statut', key: 'statut' },
+  { title: 'Code mesure', key: 'code' },
+  { title: 'Libelle', key: 'libelle' },
+  { title: 'Impôt', key: 'impot' },
+  { title: 'Approuvées', key: 'approuvees' },
+  { title: 'Montant accordé', key: 'montant' },
 ]
-const mandatoryIndicators = [
-  { label: 'Inventaire des bases juridiques', frequence: 'Trimestrielle', statut: 'Publié' },
-  { label: 'Mesures actives par impôt / secteur / contribuable agrégé', frequence: 'Trimestrielle', statut: 'Publié' },
-  { label: 'Montants annuels agrégés par impôt / fonction budgétaire', frequence: 'Annuelle', statut: 'Publié' },
-  { label: 'Rapports d évaluation des dépenses fiscales', frequence: 'Annuelle', statut: 'Publié' },
-  { label: 'Indicateurs de qualité des données', frequence: 'Trimestrielle', statut: 'Publié' },
-]
+
+const mesuresPubliees = computed(() =>
+  mesures.value.map((m) => ({
+    code: m.codeMesure,
+    libelle: m.version?.libelle ?? '—',
+    impot: m.version?.impotConcerne ?? '—',
+    approuvees: m.agregats?.nombreDemandesApprouvees ?? 0,
+    montant: formatMontantCompact(m.agregats?.montantTotalAccorde ?? 0),
+  })),
+)
+
 const faqs = [
   { q: 'Qu\'est-ce qu\'une dépense fiscale ?', r: 'Une dépense fiscale est un avantage fiscal accordé à certains contribuables sous forme d\'exonération, de réduction ou de déduction, représentant un manque à gagner pour l\'État.' },
   { q: 'Ces données identifient-elles les contribuables ?', r: 'Non. Toutes les données publiées sont agrégées et anonymisées. Aucune information nominative sur les contribuables n\'est visible.' },

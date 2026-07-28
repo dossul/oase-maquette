@@ -6,8 +6,7 @@
       icon="mdi-table-search"
     >
       <template #actions>
-        <v-btn color="secondary" variant="tonal" size="small" prepend-icon="mdi-content-save-outline">Sauvegarder</v-btn>
-        <v-btn color="primary" size="small" prepend-icon="mdi-download">Executer & exporter</v-btn>
+        <v-btn color="primary" size="small" prepend-icon="mdi-refresh" :loading="loading" @click="executer">Executer</v-btn>
       </template>
     </PageHeader>
 
@@ -19,7 +18,10 @@
             <v-select :items="['Registre central', 'Archives', 'Rapprochements', 'Rapports CONEDEF']" label="Source" density="compact" class="mb-2" />
             <v-select :items="['Mesure', 'Contribuable', 'Regime', 'Secteur', 'Montant exonere', 'Qualite donnee']" label="Colonnes visibles" multiple chips closable-chips density="compact" class="mb-2" />
             <v-select :items="['Public', 'Interne', 'Restreint', 'Confidentiel']" label="Niveau de confidentialite" density="compact" class="mb-2" />
-            <v-textarea label="Filtres logiques" rows="4" density="compact" model-value="regime = 'Zone franche' AND statut_rapprochement != 'Reconcile'" />
+            <v-textarea label="Filtres logiques" rows="4" density="compact" placeholder="ex: statut = 'approuve' AND secteur = 'Industrie textile'" />
+            <div class="text-caption text-medium-emphasis mt-2">
+              La previsualisation execute une requete reelle sur le registre (GET /demandes).
+            </div>
           </v-card-text>
         </v-card>
 
@@ -36,8 +38,22 @@
 
       <v-col cols="12" md="8">
         <v-card rounded="lg" elevation="1" class="mb-4">
-          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Resultat de previsualisation</v-card-title>
-          <v-data-table :headers="headers" :items="rows" hover />
+          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold d-flex align-center justify-space-between">
+            Resultat de previsualisation (donnees reelles)
+            <v-chip size="x-small" color="primary" variant="tonal">{{ rows.length }} ligne(s)</v-chip>
+          </v-card-title>
+          <v-alert v-if="loadError" type="error" variant="tonal" density="compact" rounded="lg" class="ma-3">{{ loadError }}</v-alert>
+          <v-data-table :headers="headers" :items="rows" :loading="loading" hover>
+            <template #item.montant="{ item }">
+              {{ item.montant }}
+            </template>
+            <template #no-data>
+              <div class="text-center pa-6 text-medium-emphasis">
+                <v-icon icon="mdi-table-off" size="36" class="mb-2 opacity-40"/>
+                <div class="text-body-2">Aucun dossier dans le registre.</div>
+              </div>
+            </template>
+          </v-data-table>
         </v-card>
 
         <v-card rounded="lg" elevation="1">
@@ -55,19 +71,52 @@
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
+import { listerDemandesApi } from '../../services/demandes'
 
 const headers = [
-  { title: 'Mesure', key: 'mesure' },
+  { title: 'Reference', key: 'reference' },
   { title: 'Contribuable', key: 'contribuable' },
-  { title: 'Regime', key: 'regime' },
+  { title: 'NIF', key: 'nif' },
+  { title: 'Secteur', key: 'secteur' },
+  { title: 'Statut', key: 'statut' },
   { title: 'Montant exonere', key: 'montant' },
-  { title: 'Qualite', key: 'qualite' },
 ]
 
-const rows = [
-  { mesure: 'MES-2026-00083', contribuable: 'Lome Textile ZF SAS', regime: 'Zone franche', montant: '780 000 000 FCFA', qualite: 'Certifie' },
-  { mesure: 'MES-2026-00124', contribuable: 'Mission diplomatique Canada', regime: 'Accord de siege', montant: '128 000 000 FCFA', qualite: 'Corrige' },
-  { mesure: 'MES-2025-00411', contribuable: 'Mines du Nord Togo', regime: 'Convention miniere', montant: '234 000 000 FCFA', qualite: 'Brut' },
-]
+interface Row {
+  reference: string
+  contribuable: string
+  nif: string
+  secteur: string
+  statut: string
+  montant: string
+}
+
+const rows = ref<Row[]>([])
+const loading = ref(false)
+const loadError = ref<string | null>(null)
+
+async function executer() {
+  loading.value = true
+  loadError.value = null
+  try {
+    const res = await listerDemandesApi()
+    rows.value = res.data.map(d => ({
+      reference: d.reference,
+      contribuable: d.contribuable?.raisonSociale ?? '—',
+      nif: d.contribuable?.nif ?? '—',
+      secteur: d.secteur ?? '—',
+      statut: d.statutCode,
+      montant: `${Number(d.montantFcfa).toLocaleString('fr-FR')} FCFA`,
+    }))
+  } catch (e) {
+    rows.value = []
+    loadError.value = e instanceof Error ? e.message : 'Erreur lors de l\'execution de la requete'
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(executer)
 </script>

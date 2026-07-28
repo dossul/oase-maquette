@@ -83,6 +83,12 @@ export const mockDemandes = [
   { id: '6', reference: 'OASE-2026-0044', statutCode: 'en_instruction', baseJuridiqueVersionId: 'bj-6', contribuableId: 'c-6', contribuable: { id: 'c-6', raisonSociale: 'NUMERIQUE AFRIQUE SA', nif: 'TG-006-2023-F' }, instructeurId: 'u-cddi', instructeur: { id: 'u-cddi', nom: 'MENSAH', prenom: 'Akossiwa' }, montantFcfa: '55000000', secteur: 'Numérique', dateDepot: '2026-04-01T00:00:00.000Z', dateEcheance: '2026-10-01T00:00:00.000Z', motifRejet: null, estUrgente: false, createdAt: '2026-04-01T00:00:00.000Z', updatedAt: '2026-04-01T00:00:00.000Z', type: 'sectorielle', etapeActuelle: 'Instruction OTR Impôts' },
 ]
 
+/** Notifications au format RÉEL (Notification Prisma — tableau brut, tri createdAt desc). */
+export const mockNotificationsApi = [
+  { id: 'n-1', utilisateurId: 'u-ben', demandeId: '3', typeNotificationCode: 'INSTRUCTION', canalCode: 'inapp', titre: 'Complément requis', corps: "Votre dossier OASE-2026-0035 nécessite des pièces complémentaires.", estLue: false, dateLecture: null, createdAt: '2026-04-27T09:23:00.000Z' },
+  { id: 'n-2', utilisateurId: 'u-ben', demandeId: '2', typeNotificationCode: 'INSTRUCTION', canalCode: 'inapp', titre: 'Dossier approuvé', corps: "Votre demande OASE-2026-0039 a été approuvée. Téléchargez votre attestation.", estLue: false, dateLecture: null, createdAt: '2026-04-27T10:45:00.000Z' },
+]
+
 /** Conventions au format RÉEL (ConventionsService.lister — tableau brut Prisma). */
 export const mockConventions = [
   { id: 'C001', reference: 'ZFI-2024-012', regimeCode: 'zone_franche', statutCode: 'active', dateDebut: '2024-01-15T00:00:00.000Z', dateFin: '2034-01-15T00:00:00.000Z', montantEstime: '890000000', emploisEngages: 450, emploisCrees: 312, contribuables: { id: 'c-3', raisonSociale: 'LOMÉ TEXTILE ZF SAS', nif: 'TG-003-2021-C' } },
@@ -199,6 +205,22 @@ export async function installApiMocks(page: Page, options: { slow?: number; logi
       return route.fulfill({ status: 200, json: { data: mockDemandes } })
     }
 
+    // GET /notifications : le backend renvoie un TABLEAU BRUT (Prisma, tri createdAt desc).
+    if (isApiCall(route, 'GET', '/notifications')) {
+      await new Promise((r) => setTimeout(r, options.slow ?? 0))
+      return route.fulfill({ status: 200, json: mockNotificationsApi })
+    }
+
+    // GET /notifications/unread-count : { count }.
+    if (isApiCall(route, 'GET', '/notifications/unread-count')) {
+      return route.fulfill({ status: 200, json: { count: mockNotificationsApi.filter((n) => !n.estLue).length } })
+    }
+
+    // PATCH /notifications/:id/lue : notification mise à jour.
+    if (url.pathname.includes('/notifications/') && url.pathname.endsWith('/lue') && req.method() === 'PATCH') {
+      return route.fulfill({ status: 200, json: { estLue: true, dateLecture: new Date().toISOString() } })
+    }
+
     // GET /conventions : le backend renvoie un TABLEAU BRUT.
     if (isApiCall(route, 'GET', '/conventions')) {
       await new Promise((r) => setTimeout(r, options.slow ?? 0))
@@ -255,6 +277,47 @@ export async function installApiMocks(page: Page, options: { slow?: number; logi
       // Le backend trie par createdAt desc → le nouveau compte en première ligne.
       utilisateurs.unshift(created as (typeof mockUtilisateurs)[number])
       return route.fulfill({ status: 201, json: created })
+    }
+
+    // GET /missions (vague B) : TABLEAU BRUT — la vue audit Dashboard/Missions l'appelle au mount.
+    if (isApiCall(route, 'GET', '/missions')) {
+      return route.fulfill({ status: 200, json: [] })
+    }
+
+    // GET /registre-central/mesures (vague B) : TABLEAU BRUT.
+    if (isApiCall(route, 'GET', '/registre-central/mesures')) {
+      return route.fulfill({ status: 200, json: [] })
+    }
+
+    // GET /referentiels/inseed (vague B) : objet brut (clés system_config).
+    if (isApiCall(route, 'GET', '/referentiels/inseed')) {
+      return route.fulfill({ status: 200, json: {} })
+    }
+
+    // GET /connecteurs(+status/logs), /admin/parametres, /admin/monitoring,
+    // /notifications/templates, /utilisateurs/annuaire, /rapports(+opendata) :
+    // réponses vides génériques pour éviter toute fuite vers le backend réel
+    // (un 401 purgerait la session mockée → redirection /login intempestive).
+    if (isApiCall(route, 'GET', '/connecteurs') || url.pathname.includes('/connecteurs')) {
+      return route.fulfill({ status: 200, json: [] })
+    }
+    if (isApiCall(route, 'GET', '/admin/parametres')) {
+      return route.fulfill({ status: 200, json: {} })
+    }
+    if (isApiCall(route, 'GET', '/admin/monitoring')) {
+      return route.fulfill({ status: 200, json: { version: 'test', uptimeSeconds: 0, utilisateursActifs24h: 0, erreurs500_24h: 0, jobs: [] } })
+    }
+    if (isApiCall(route, 'GET', '/notifications/templates')) {
+      return route.fulfill({ status: 200, json: [] })
+    }
+    if (isApiCall(route, 'GET', '/utilisateurs/annuaire')) {
+      return route.fulfill({ status: 200, json: [] })
+    }
+    if (isApiCall(route, 'GET', '/rapports/opendata')) {
+      return route.fulfill({ status: 200, json: [] })
+    }
+    if (isApiCall(route, 'GET', '/rapports')) {
+      return route.fulfill({ status: 200, json: [] })
     }
 
     // Fallback : laisse passer vers le vrai backend (permettra de tester localhost:3000 si actif)

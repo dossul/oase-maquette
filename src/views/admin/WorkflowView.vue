@@ -478,8 +478,8 @@
               <v-card-title class="pa-4 pb-2 d-flex align-center ga-2">
                 <v-icon icon="mdi-email-multiple" color="info" size="20"/>
                 <span class="text-body-1 font-weight-semibold">Configuration E-mail</span>
-                <v-chip color="success" size="x-small" variant="tonal" class="ms-auto">
-                  <v-icon icon="mdi-check-circle" size="12" class="me-1"/>Connecté
+                <v-chip :color="emailConfigured ? 'success' : 'secondary'" size="x-small" variant="tonal" class="ms-auto">
+                  <v-icon :icon="emailConfigured ? 'mdi-check-circle' : 'mdi-minus-circle-outline'" size="12" class="me-1"/>{{ emailConfigured ? 'Configuré (GET /admin/parametres)' : 'Non configuré' }}
                 </v-chip>
               </v-card-title>
               <v-card-text class="pa-4">
@@ -520,8 +520,8 @@
               <v-card-title class="pa-4 pb-2 d-flex align-center ga-2">
                 <v-icon icon="mdi-message-text-fast" color="success" size="20"/>
                 <span class="text-body-1 font-weight-semibold">Configuration SMS</span>
-                <v-chip color="success" size="x-small" variant="tonal" class="ms-auto">
-                  <v-icon icon="mdi-check-circle" size="12" class="me-1"/>Actif
+                <v-chip :color="smsConfigured ? 'success' : 'secondary'" size="x-small" variant="tonal" class="ms-auto">
+                  <v-icon :icon="smsConfigured ? 'mdi-check-circle' : 'mdi-minus-circle-outline'" size="12" class="me-1"/>{{ smsConfigured ? 'Configuré (GET /admin/parametres)' : 'Non configuré' }}
                 </v-chip>
               </v-card-title>
               <v-card-text class="pa-4">
@@ -555,8 +555,8 @@
               <v-card-title class="pa-4 pb-2 d-flex align-center ga-2">
                 <v-icon icon="mdi-whatsapp" color="success" size="20"/>
                 <span class="text-body-1 font-weight-semibold">WhatsApp Business API</span>
-                <v-chip color="warning" size="x-small" variant="tonal" class="ms-auto">
-                  <v-icon icon="mdi-alert" size="12" class="me-1"/>Vérification en cours
+                <v-chip :color="waConfigured ? 'success' : 'secondary'" size="x-small" variant="tonal" class="ms-auto">
+                  <v-icon :icon="waConfigured ? 'mdi-check-circle' : 'mdi-minus-circle-outline'" size="12" class="me-1"/>{{ waConfigured ? 'Activé (GET /admin/parametres)' : 'Non configuré' }}
                 </v-chip>
               </v-card-title>
               <v-card-text class="pa-4">
@@ -612,10 +612,10 @@
                 </v-row>
                 <!-- Preview -->
                 <div class="mt-3">
-                  <div class="text-caption text-medium-emphasis mb-2 font-weight-bold">Aperçu de l'alerte :</div>
+                  <div class="text-caption text-medium-emphasis mb-2 font-weight-bold">Aperçu de l'alerte (variables de template) :</div>
                   <v-alert type="warning" variant="tonal" rounded="lg" density="compact" closable>
                     <div class="text-caption font-weight-bold">Nouveau dossier à instruire</div>
-                    <div class="text-caption">OASE-2026-0042 — TOGO STEEL SARL · Exonération douanière · En attente depuis 2h</div>
+                    <div class="text-caption" v-pre>{{dossier_ref}} — {{contribuable}} · Type d'exonération · En attente d'instruction</div>
                   </v-alert>
                 </div>
               </v-card-text>
@@ -651,7 +651,13 @@
           <v-col cols="12" md="4">
             <v-card rounded="lg" elevation="1" style="position:sticky;top:80px">
               <v-card-title class="pa-4 pb-2 text-body-2 font-weight-semibold">Bibliothèque de templates</v-card-title>
-              <v-list density="compact" class="pa-2">
+              <!-- Bibliothèque réelle : GET /notifications/templates (admin_si) -->
+              <div v-if="allTemplates.length === 0" class="text-center pa-6 text-medium-emphasis">
+                <v-icon icon="mdi-email-off-outline" size="36" class="mb-2 opacity-40"/>
+                <div class="text-body-2">Aucun template enregistré.</div>
+                <div class="text-caption">L'API ne retourne aucun template de notification pour le moment.</div>
+              </div>
+              <v-list v-else density="compact" class="pa-2">
                 <v-list-item
                   v-for="tpl in allTemplates" :key="tpl.id"
                   :title="tpl.name"
@@ -789,7 +795,13 @@
 
             <v-card rounded="lg" elevation="1">
               <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Journal des alertes SLA</v-card-title>
-              <v-list density="compact" class="pa-2">
+              <!-- TODO(endpoint): pas de journal d'alertes SLA dans l'API v1 — état vide honnête. -->
+              <div v-if="slaJournal.length === 0" class="text-center pa-6 text-medium-emphasis">
+                <v-icon icon="mdi-timer-off-outline" size="36" class="mb-2 opacity-40"/>
+                <div class="text-body-2">Aucune alerte SLA journalisée.</div>
+                <div class="text-caption">Les alertes SLA seront affichées dès que le backend les exposera.</div>
+              </div>
+              <v-list v-else density="compact" class="pa-2">
                 <v-list-item
                   v-for="j in slaJournal" :key="j.id"
                   :title="j.action"
@@ -815,12 +827,21 @@
         </v-card-title>
         <v-divider/>
         <v-card-text class="pa-5">
-          <v-select :items="mockDossiers" item-title="ref" item-value="id" label="Dossier de test" class="mb-3" hide-details/>
+          <!-- Dossiers réels chargés via GET /demandes -->
+          <v-select
+            v-model="sandboxDossierId"
+            :items="sandboxDossiers"
+            item-title="ref"
+            item-value="id"
+            label="Dossier de test (réel — GET /demandes)"
+            class="mb-3"
+            hide-details
+            :no-data-text="'Aucun dossier retourné par l\'API'"
+          />
           <v-select :items="acteurs" label="Simuler l'acteur courant" class="mb-3" hide-details/>
           <v-select v-model="sandboxStep" :items="workflow.map(n=>n.label)" label="Étape de départ" class="mb-3" hide-details/>
           <v-divider class="mb-3"/>
-          <v-checkbox v-model="sandboxOpts.notifs" label="Envoyer les notifications test (canaux configurés)" hide-details density="compact" class="mb-1"/>
-          <v-checkbox v-model="sandboxOpts.mockData" label="Utiliser des données mockées réalistes" hide-details density="compact" class="mb-1"/>
+          <v-checkbox v-model="sandboxOpts.notifs" label="Simuler les notifications (aucun envoi réel)" hide-details density="compact" class="mb-1"/>
           <v-checkbox v-model="sandboxOpts.evalConditions" label="Évaluer les conditions métier" hide-details density="compact"/>
           <v-divider class="my-3"/>
           <div v-if="sandboxResult.length" class="sandbox-log pa-3 rounded-lg" style="background:#0F172A;max-height:200px;overflow-y:auto">
@@ -889,7 +910,13 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
-import { listerWorkflowTemplates, type WorkflowTemplate } from '../../services/admin'
+import {
+  listerWorkflowTemplates,
+  getParametres,
+  listerNotificationTemplates,
+  type WorkflowTemplate,
+} from '../../services/admin'
+import { listerDemandesApi } from '../../services/demandes'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 type NodeType = 'trigger' | 'action' | 'auto' | 'condition' | 'notification' | 'delay' | 'end'
@@ -928,9 +955,18 @@ const acteurs = ['Contribuable', 'Agent OTR Douanes', 'Agent OTR Impôts', 'Agen
 const notifDestinataires = ['Contribuable', 'Agent instructeur', 'Superviseur', 'Agent DGBF', "Responsable d'escalade"]
 const condFields = ['montant_fcfa', 'type_exoneration', 'statut_fiscal', 'statut_douanier', 'secteur', 'nb_emplois', 'zone_geographique', 'date_depot', 'nb_jours_traitement']
 const condOperators = ['==', '!=', '>', '<', '>=', '<=', 'contient', 'ne contient pas']
-const emailTemplates = ['Notification dépôt dossier', 'Dossier en cours d\'instruction', 'Demande de complément', 'Décision approuvée', 'Décision de rejet', 'Relance contribuable', 'Escalade SLA', 'Attestation disponible']
-const smsTemplates = ['SMS dépôt confirmé', 'SMS mise en instruction', 'SMS décision disponible', 'SMS relance', 'SMS escalade urgente']
-const waTemplates = ['oase_depot_confirme', 'oase_instruction_lancee', 'oase_decision_approuvee', 'oase_document_disponible']
+const EMAIL_TEMPLATES_FALLBACK = ['Notification dépôt dossier', 'Dossier en cours d\'instruction', 'Demande de complément', 'Décision approuvée', 'Décision de rejet', 'Relance contribuable', 'Escalade SLA', 'Attestation disponible']
+const SMS_TEMPLATES_FALLBACK = ['SMS dépôt confirmé', 'SMS mise en instruction', 'SMS décision disponible', 'SMS relance', 'SMS escalade urgente']
+const WA_TEMPLATES_FALLBACK = ['oase_depot_confirme', 'oase_instruction_lancee', 'oase_decision_approuvee', 'oase_document_disponible']
+// Listes dérivées des templates réels (GET /notifications/templates) quand disponibles,
+// sinon repli sur les libellés statiques ci-dessus.
+function tplNames(canal: string, fallback: string[]) {
+  const reels = allTemplates.value.filter(t => t.channel === canal).map(t => t.name)
+  return reels.length ? reels : fallback
+}
+const emailTemplates = computed(() => tplNames('email', EMAIL_TEMPLATES_FALLBACK))
+const smsTemplates = computed(() => tplNames('sms', SMS_TEMPLATES_FALLBACK))
+const waTemplates = computed(() => tplNames('whatsapp', WA_TEMPLATES_FALLBACK))
 const templateVars = ['{{dossier_ref}}', '{{contribuable}}', '{{montant}}', '{{etape}}', '{{acteur}}', '{{delai}}', '{{lien_dossier}}', '{{date}}', '{{decision}}', '{{agent_nom}}']
 
 const mkNotif = (): NotifConfig => ({
@@ -996,7 +1032,7 @@ const previewDialog = ref(false)
 const sandboxDialog = ref(false)
 const sandboxLoading = ref(false)
 const sandboxStep = ref('')
-const sandboxOpts = reactive({ notifs: true, mockData: true, evalConditions: true })
+const sandboxOpts = reactive({ notifs: true, evalConditions: true })
 const sandboxResult = ref<{ msg: string; type: string }[]>([])
 const testSuccess = ref<string | null>(null)
 const testSnack = ref(false)
@@ -1013,42 +1049,91 @@ const typesExo = [
   { value: 'code_investissement', label: "Convention d'investissement" },
 ]
 
-const versions = [
-  { version: '3.2', date: '15/04/2026 (actuelle)', active: true },
-  { version: '3.1', date: '01/02/2026', active: false },
-  { version: '3.0', date: '01/01/2026', active: false },
-]
+// Versions : seule la version locale courante est connue (non persistée côté API).
+// TODO(endpoint): historique des versions de workflow non exposé par l'API v1.
+const versions = computed(() => [
+  { version: version.value, date: 'Version locale (non persistée)', active: true },
+])
 
-const mockDossiers = [
-  { id: '1', ref: 'OASE-2026-0042 — TOGO STEEL SARL' },
-  { id: '2', ref: 'OASE-2026-0039 — AGRO-TOGO INVEST' },
-]
+// ── Dossiers sandbox réels (GET /demandes) ───────────────────────────────────
+interface DossierSandbox { id: string; ref: string; montantFcfa: number; statutCode: string }
+const sandboxDossiers = ref<DossierSandbox[]>([])
+const sandboxDossierId = ref<string | null>(null)
+
+async function chargerSandboxDossiers() {
+  try {
+    const res = await listerDemandesApi()
+    sandboxDossiers.value = res.data.map(d => ({
+      id: d.id,
+      ref: d.contribuable?.raisonSociale ? `${d.reference} — ${d.contribuable.raisonSociale}` : d.reference,
+      montantFcfa: Number(d.montantFcfa ?? 0),
+      statutCode: d.statutCode,
+    }))
+  } catch {
+    sandboxDossiers.value = []
+  }
+}
 
 // ── Channel configs ──────────────────────────────────────────────────────────
-const emailConfig = reactive({ smtp: 'smtp.mef.tg', port: '587', from: 'noreply@oase.mef.tg', fromName: 'Plateforme OASE', user: 'smtp-oase', password: '', tls: 'STARTTLS', replyTo: 'support@oase.mef.tg' })
-const smsConfig = reactive({ provider: 'Orange Togo SMS API', apiKey: '', senderId: 'OASE-MEF', endpoint: 'https://api.orange.tg/sms/v1/send', encoding: 'GSM-7 (160 car.)' })
-const waConfig = reactive({ phoneNumberId: '1234567890', accessToken: '', businessAccountId: '', webhookVerifyToken: '' })
+// Pré-remplies depuis GET /admin/parametres (clés smtp.*, sms.*, whatsapp.*).
+const emailConfig = reactive({ smtp: '', port: '', from: '', fromName: '', user: '', password: '', tls: 'STARTTLS', replyTo: '' })
+const smsConfig = reactive({ provider: '', apiKey: '', senderId: '', endpoint: '', encoding: 'GSM-7 (160 car.)' })
+const waConfig = reactive({ phoneNumberId: '', accessToken: '', businessAccountId: '', webhookVerifyToken: '', enabled: false, template: '' })
+const paramsCanauxLoading = ref(false)
 const inappConfig = reactive({ banner: true, badge: true, sound: false, persist: true, autoExpire: '24 heures' })
 const globalRules = reactive({ deduplication: true, quietHours: true, fallback: true, logAll: true })
 
+const emailConfigured = computed(() => Boolean(emailConfig.smtp))
+const smsConfigured = computed(() => Boolean(smsConfig.provider))
+const waConfigured = computed(() => waConfig.enabled)
+
+/** Pré-remplit les configurations de canaux depuis GET /admin/parametres. */
+async function chargerConfigCanaux() {
+  paramsCanauxLoading.value = true
+  try {
+    const p = await getParametres()
+    emailConfig.smtp = p['smtp.host'] ?? ''
+    emailConfig.port = p['smtp.port'] ?? ''
+    emailConfig.from = p['smtp.from'] ?? ''
+    emailConfig.user = p['smtp.user'] ?? ''
+    smsConfig.provider = p['sms.provider'] ?? ''
+    smsConfig.apiKey = p['sms.api_key'] ?? ''
+    waConfig.enabled = p['whatsapp.enabled'] === 'true'
+    waConfig.template = p['whatsapp.template'] ?? ''
+  } catch {
+    // paramètres indisponibles : champs laissés vides (« non configuré »)
+  } finally {
+    paramsCanauxLoading.value = false
+  }
+}
+
 // ── SLA ──────────────────────────────────────────────────────────────────────
-const sla = reactive({ escaladeResponsable: 'Directeur OTR', delaiEscalade: '48h', canaux: ['email', 'sms', 'inapp'], autoRelance: true, relanceDelai: '7j', relanceCanal: 'E-mail', relanceMax: 3, autoArchive: true, autoRejet: false })
-const slaJournal = ref([
-  { id: 1, action: 'SLA dépassé : OASE-2026-0031 — Instruction OTR (18j)', date: '26/04/2026 09:15', level: 'error' },
-  { id: 2, action: 'Relance auto envoyée : OASE-2026-0028 — inactif 7j', date: '25/04/2026 08:00', level: 'warning' },
-  { id: 3, action: 'Escalade déclenchée : OASE-2026-0025 — Directeur OTR notifié', date: '22/04/2026 14:30', level: 'error' },
-])
+const sla = reactive({ escaladeResponsable: '', delaiEscalade: '', canaux: ['email', 'inapp'], autoRelance: false, relanceDelai: '', relanceCanal: 'E-mail', relanceMax: 3, autoArchive: false, autoRejet: false })
+// TODO(endpoint): pas de journal d'alertes SLA dans l'API v1 — section masquée.
+const slaJournal = ref<{ id: number; action: string; date: string; level: string }[]>([])
 
 // ── Templates ────────────────────────────────────────────────────────────────
-const allTemplates = ref<Template[]>([
-  { id: 't1', name: 'Notification dépôt dossier', channel: 'email', type: 'Dépôt dossier', subject: '[OASE] Votre dossier {{dossier_ref}} a été reçu', body: `Bonjour {{contribuable}},\n\nNous accusons réception de votre demande d'exonération référencée **{{dossier_ref}}**.\n\nVotre dossier est désormais en cours de traitement. Vous pouvez suivre l'avancement de votre demande en vous connectant sur la plateforme OASE :\n\n{{lien_dossier}}\n\nCordialement,\nL'équipe OASE — Ministère de l'Économie et des Finances du Togo` },
-  { id: 't2', name: 'SMS dépôt confirmé', channel: 'sms', type: 'Dépôt dossier', subject: '', body: 'OASE-MEF: Dossier {{dossier_ref}} recu. Traitement sous 15j ouvres. Suivi: oase.mef.tg' },
-  { id: 't3', name: 'SMS décision disponible', channel: 'sms', type: 'Notification finale', subject: '', body: 'OASE-MEF: Decision dossier {{dossier_ref}} disponible. Connexion: oase.mef.tg' },
-  { id: 't4', name: 'oase_depot_confirme', channel: 'whatsapp', type: 'Dépôt dossier', subject: '', body: 'Votre dossier {{dossier_ref}} a bien été reçu par la plateforme OASE. Délai de traitement: 15 jours ouvrés. 🟢' },
-  { id: 't5', name: 'Escalade SLA', channel: 'email', type: 'Escalade', subject: '[OASE URGENT] SLA dépassé — {{dossier_ref}}', body: `Monsieur/Madame {{acteur}},\n\nLe dossier **{{dossier_ref}}** a dépassé le délai réglementaire de {{delai}} à l'étape "{{etape}}".\n\nMerci d'intervenir dans les meilleurs délais.\n\nPlateforme OASE — Alerte automatique` },
-])
+// Bibliothèque réelle chargée depuis GET /notifications/templates (admin_si).
+const allTemplates = ref<Template[]>([])
 
-selectedTemplate.value = allTemplates.value[0]
+selectedTemplate.value = null
+
+/** Charge les templates de notification réels et les mappe vers le modèle local. */
+async function chargerTemplatesNotification() {
+  try {
+    const tpls = await listerNotificationTemplates()
+    allTemplates.value = tpls.map(t => ({
+      id: t.id,
+      name: t.code,
+      channel: t.canalCode,
+      type: t.typeNotificationCode,
+      subject: t.sujet,
+      body: t.corps,
+    }))
+  } catch {
+    allTemplates.value = []
+  }
+}
 
 // ── Methods ──────────────────────────────────────────────────────────────────
 function snack(msg: string, color: 'success' | 'error' = 'success') {
@@ -1077,6 +1162,9 @@ onMounted(async () => {
   } finally {
     apiTemplatesLoading.value = false
   }
+  chargerSandboxDossiers()
+  chargerConfigCanaux()
+  chargerTemplatesNotification()
 })
 
 function addNodeFromPalette(type: NodeType) {
@@ -1122,12 +1210,13 @@ function testNotification(node: WorkflowNode) {
 }
 
 function testChannel(ch: string) {
+  // Aucun canal externe n'est configuré côté API v1 : pas d'envoi réel possible.
   const msgs: Record<string, string> = {
-    email: 'E-mail test envoyé à admin@oase.mef.tg',
-    sms: 'SMS test envoyé au +228 XX XX XX XX',
-    whatsapp: 'Message WhatsApp test envoyé',
+    email: 'Canal e-mail non configuré — aucun envoi réel possible.',
+    sms: 'Canal SMS non configuré — aucun envoi réel possible.',
+    whatsapp: 'Canal WhatsApp non configuré — aucun envoi réel possible.',
   }
-  snack(msgs[ch] || 'Test effectué')
+  snack(msgs[ch] || 'Canal non configuré', 'error')
 }
 
 function addTemplate() {
@@ -1149,28 +1238,46 @@ function insertVar(v: string) {
 function runSandbox() {
   sandboxLoading.value = true
   sandboxResult.value = []
-  const steps = [
+  const dossier = sandboxDossiers.value.find(d => d.id === sandboxDossierId.value)
+  if (!dossier) {
+    sandboxResult.value.push({ msg: '⚠ Sélectionnez un dossier réel (GET /demandes) pour lancer la simulation.', type: 'error' })
+    sandboxLoading.value = false
+    return
+  }
+  // Simulation sèche dérivée du circuit édité et d'un dossier RÉEL —
+  // aucune notification n'est réellement envoyée (canaux non configurés).
+  const steps: { msg: string; type: string }[] = [
     { msg: '▶ Initialisation sandbox...', type: 'info' },
-    { msg: '✓ Dossier mock OASE-2026-0042 chargé', type: 'success' },
-    { msg: '✓ Acteur simulé : Agent OTR Douanes', type: 'success' },
-    { msg: '→ Étape 1 — Dépôt du dossier... OK', type: 'success' },
-    { msg: '  📧 E-mail envoyé (simulation) à contribuable@test.tg', type: 'info' },
-    { msg: '  📱 SMS envoyé (simulation) au +228 90000001', type: 'info' },
-    { msg: '→ Étape 2 — Instruction OTR... OK', type: 'success' },
-    { msg: '  🔔 Alerte dashboard créée pour Agent OTR', type: 'info' },
-    { msg: '→ Condition : montant_fcfa > 50000000 → VRAI (150M FCFA)', type: 'info' },
-    { msg: '→ Étape 3 — Visa DGBF... OK', type: 'success' },
-    { msg: '  📧 E-mail envoyé à agent-dgbf@mef.tg + 📱 SMS', type: 'info' },
-    { msg: '→ Étape 4 — Signature Directeur OTR... OK', type: 'success' },
-    { msg: '→ Étape 5 — Notification finale... OK', type: 'success' },
-    { msg: '  📧 Email + 📱 SMS + 📲 WhatsApp envoyés', type: 'info' },
-    { msg: '✅ Simulation terminée — 6 étapes, 7 notifications envoyées', type: 'success' },
+    { msg: `✓ Dossier réel ${dossier.ref} chargé (statut: ${dossier.statutCode}, montant: ${dossier.montantFcfa.toLocaleString('fr-FR')} FCFA)`, type: 'success' },
   ]
+  workflow.value.forEach((node, i) => {
+    steps.push({ msg: `→ Étape ${i + 1} — ${node.label} (${node.acteur})… simulée OK`, type: 'success' })
+    if (sandboxOpts.evalConditions && node.condition.conditions.length) {
+      const cond = node.condition.conditions[0]
+      const isMontant = cond.field === 'montant_fcfa'
+      const seuil = Number(cond.value) || 0
+      const resultat = isMontant && seuil ? (dossier.montantFcfa > seuil) : null
+      steps.push({
+        msg: `  ⚡ Condition ${cond.field} ${cond.operator} ${cond.value} → ${resultat === null ? 'non évaluable localement' : resultat ? `VRAI (${node.condition.trueLabel})` : `FAUX (${node.condition.falseLabel})`}`,
+        type: 'info',
+      })
+    }
+    if (sandboxOpts.notifs) {
+      const canaux = [
+        node.notifs.email.enabled && 'e-mail',
+        node.notifs.sms.enabled && 'SMS',
+        node.notifs.whatsapp.enabled && 'WhatsApp',
+        node.notifs.inapp.enabled && 'in-app',
+      ].filter(Boolean).join(', ')
+      steps.push({ msg: `  � Notifications simulées (${canaux || 'aucun canal actif'}) — aucun envoi réel`, type: 'info' })
+    }
+  })
+  steps.push({ msg: `✅ Simulation terminée — ${workflow.value.length} étape(s) parcourue(s) sur données réelles`, type: 'success' })
   let i = 0
   const interval = setInterval(() => {
     if (i < steps.length) { sandboxResult.value.push(steps[i++]) }
     else { clearInterval(interval); sandboxLoading.value = false }
-  }, 180)
+  }, 150)
 }
 </script>
 

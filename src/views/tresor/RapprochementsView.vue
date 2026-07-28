@@ -33,8 +33,13 @@
       </v-card-text>
     </v-card>
 
+    <v-alert type="info" variant="tonal" rounded="lg" density="compact" class="mb-4">
+      Module de rapprochement inter-systèmes à venir : aucun écart réel n'est encore exposé par l'API (GUDEF, SIGFiP, Sydonia, E-TAX, DAS).
+    </v-alert>
+
     <v-card rounded="lg" elevation="1">
-      <v-data-table :headers="headers" :items="filteredRows" :search="search" hover>
+      <!-- TODO(endpoint): GET /rapprochements requis — la table reste vide plutôt que d'afficher des écarts fictifs. -->
+      <v-data-table :headers="headers" :items="filteredRows" :search="search" hover no-data-text="Aucun écart de rapprochement à afficher.">
         <template #item.systeme="{ item }">
           <v-chip :color="systemColor(item.systeme)" size="x-small" variant="tonal">{{ item.systeme }}</v-chip>
         </template>
@@ -83,16 +88,8 @@
               </v-card>
               <v-card variant="outlined" rounded="lg">
                 <v-card-title class="text-body-2 font-weight-semibold">Historique recent</v-card-title>
-                <v-timeline density="compact" side="end" class="pa-4">
-                  <v-timeline-item dot-color="primary" size="small">
-                    <div class="text-caption font-weight-semibold">Relance DGBF</div>
-                    <div class="text-caption text-medium-emphasis">Aujourd hui 10:20</div>
-                  </v-timeline-item>
-                  <v-timeline-item dot-color="warning" size="small">
-                    <div class="text-caption font-weight-semibold">Ecart detecte</div>
-                    <div class="text-caption text-medium-emphasis">Hier 18:42</div>
-                  </v-timeline-item>
-                </v-timeline>
+                <!-- TODO(endpoint): GET /rapprochements/{id}/historique requis. -->
+                <v-card-text class="text-body-2 text-medium-emphasis">Aucun historique disponible.</v-card-text>
               </v-card>
             </v-col>
           </v-row>
@@ -140,12 +137,8 @@ const headers = [
   { title: 'Actions', key: 'actions', sortable: false },
 ]
 
-const rows: RapprochementRow[] = [
-  { flux: 'Remboursement TVA diplomatique', mesure: 'MES-2026-00124', systeme: 'GUDEF', statut: 'A justifier', impact: 'Documentaire', justification: 'Reference de decision presente dans OASE mais piece GUDEF non rattachee.' },
-  { flux: 'Annexe budgetaire 2026', mesure: 'MES-2025-00411', systeme: 'SIGFiP', statut: 'En ecart', impact: 'Budgetaire', justification: 'Montant consolide different entre OASE et la ligne budgetaire SIGFiP.' },
-  { flux: 'Quota zone franche textile', mesure: 'MES-2026-00083', systeme: 'Sydonia', statut: 'Reconcile', impact: 'Pilotage', justification: 'Consommation et decision parfaitement alignees.' },
-  { flux: 'Personnel exonere non resident', mesure: 'MES-2026-00124', systeme: 'DAS', statut: 'A justifier', impact: 'Budgetaire', justification: 'Liste personnel 2026 recue mais non encore certifiee.' },
-]
+// TODO(endpoint): GET /rapprochements requis — aucune ligne réelle disponible.
+const rows: RapprochementRow[] = []
 
 const filteredRows = computed(() =>
   rows.filter((item) => {

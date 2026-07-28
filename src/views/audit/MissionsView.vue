@@ -15,6 +15,11 @@
       </template>
     </PageHeader>
 
+    <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4"/>
+    <v-alert v-if="loadError" type="error" variant="tonal" rounded="lg" density="compact" class="mb-4" prepend-icon="mdi-alert-circle">
+      {{ loadError }}
+    </v-alert>
+
     <!-- Calendar — full width above KPIs -->
     <v-row class="mb-4">
       <v-col cols="12">
@@ -89,10 +94,18 @@
             :headers="mHeaders"
             :items="filteredMissions"
             :search="search"
+            :loading="loading"
             hover
             :row-props="({ item }) => ({ class: selectedMission?.ref === item.ref ? 'mission-row--selected' : '' })"
             @click:row="(_, {item}) => selectMission(item)"
           >
+            <template #item.titre="{ item }">
+              <span class="text-body-2">{{ item.titre }}</span>
+            </template>
+            <template #item.avancement="{ item }">
+              <span v-if="item.avancement === null" class="text-caption text-medium-emphasis">—</span>
+              <span v-else>{{ item.avancement }}%</span>
+            </template>
             <template #item.statut="{ item }">
               <v-chip :color="statutColor(item.statut)" size="x-small" variant="tonal">{{ item.statutLabel }}</v-chip>
             </template>
@@ -136,6 +149,7 @@
         <div class="d-flex align-center justify-space-between px-5 py-3" style="border-bottom:1px solid rgba(0,0,0,0.08)">
           <div>
             <div class="font-weight-bold text-body-1">{{ selectedMission.ref }}</div>
+            <div class="text-body-2">{{ selectedMission.titre }}</div>
             <div class="text-caption text-medium-emphasis">{{ selectedMission.institution }} &middot; {{ selectedMission.periode }}</div>
           </div>
           <div class="d-flex align-center ga-2">
@@ -193,10 +207,17 @@
                   <div class="text-caption text-medium-emphasis font-weight-bold text-uppercase mb-1">Perimetre et Objectifs</div>
                   <div class="text-body-2" style="white-space:pre-line">{{ selectedMission.perimetre }}</div>
                 </v-col>
+                <v-col cols="12" class="mt-2" v-if="selectedMission.demandeRef">
+                  <div class="text-caption text-medium-emphasis font-weight-bold text-uppercase mb-1">Demande liee</div>
+                  <v-chip size="small" variant="outlined" color="primary" prepend-icon="mdi-file-document">{{ selectedMission.demandeRef }}</v-chip>
+                </v-col>
                 <v-col cols="12" class="mt-3">
                   <div class="text-caption text-medium-emphasis font-weight-bold text-uppercase mb-2">Avancement</div>
-                  <v-progress-linear :model-value="selectedMission.avancement" :color="selectedMission.avancement===100?'success':'primary'" rounded height="8" bg-color="surface-variant"/>
-                  <div class="text-caption text-end mt-1">{{ selectedMission.avancement }}%</div>
+                  <template v-if="selectedMission.avancement !== null">
+                    <v-progress-linear :model-value="selectedMission.avancement" :color="selectedMission.avancement===100?'success':'primary'" rounded height="8" bg-color="surface-variant"/>
+                    <div class="text-caption text-end mt-1">{{ selectedMission.avancement }}%</div>
+                  </template>
+                  <div v-else class="text-caption text-medium-emphasis">Avancement non renseigne pour cette mission.</div>
                 </v-col>
               </v-row>
               <v-divider class="my-3"/>
@@ -391,7 +412,7 @@
             <v-col cols="6" class="mt-3">
               <v-select
                 v-model="form.statut"
-                :items="[{title:'Planifiee',value:'planifiee'},{title:'En cours',value:'en_cours'},{title:'Cloturee',value:'cloturee'}]"
+                :items="[{title:'Planifiée',value:'planifiee'},{title:'En cours',value:'en_cours'},{title:'Terminée',value:'cloturee'}]"
                 item-title="title"
                 item-value="value"
                 label="Statut"
@@ -505,38 +526,6 @@
       </v-card>
     </v-dialog>
 
-    <!-- Full-screen DocumentViewer Dialog -->
-    <v-dialog v-model="viewerDialog" fullscreen transition="dialog-bottom-transition">
-      <v-card style="display:flex;flex-direction:column;height:100vh">
-        <v-toolbar color="secondary" density="compact" style="flex-shrink:0">
-          <v-btn icon="mdi-arrow-left" variant="text" @click="viewerDialog=false"/>
-          <v-toolbar-title class="text-body-2">
-            <span class="text-medium-emphasis me-2">{{ selectedMission ? selectedMission.ref : '' }}</span>
-            <v-icon icon="mdi-chevron-right" size="14" class="me-2"/>
-            <span>{{ viewerDoc ? viewerDoc.nom : '' }}</span>
-          </v-toolbar-title>
-          <v-spacer/>
-          <v-btn variant="tonal" size="small" prepend-icon="mdi-export" color="warning" class="me-2" @click="triggerViewerExport">
-            Exporter annotations
-          </v-btn>
-          <v-btn icon="mdi-close" variant="text" @click="viewerDialog=false"/>
-        </v-toolbar>
-        <div style="flex:1;min-height:0;overflow:hidden">
-          <DocumentViewer
-            v-if="viewerDialog && viewerDoc"
-            ref="viewerRef"
-            :filename="viewerDoc.nom"
-            :total-pages="viewerDoc.pages"
-            style="height:100%;border-radius:0;border:none"
-          >
-            <template #default="{ page }">
-              <div v-html="renderMissionDocPage(viewerDoc, page)"/>
-            </template>
-          </DocumentViewer>
-        </div>
-      </v-card>
-    </v-dialog>
-
     <!-- Snackbar -->
     <v-snackbar v-model="snackbar" color="success" timeout="3000" location="bottom right">
       <v-icon icon="mdi-check-circle" class="me-2"/>{{ snackMsg }}
@@ -545,9 +534,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
-import DocumentViewer from '../../components/DocumentViewer.vue'
+import { listerUtilisateurs, listerAnnuaire } from '../../services/utilisateurs'
+import { listerMissions, missionStatutLabel, type MissionApi } from '../../services/missions'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface MissionDoc {
@@ -568,6 +558,7 @@ interface Recommandation {
 
 interface Mission {
   ref: string
+  titre: string
   institution: string
   institutions: string[]
   periode: string
@@ -578,86 +569,49 @@ interface Mission {
   chefMission: string
   equipe: string[]
   perimetre: string
-  avancement: number
+  avancement: number | null
   constats: string
   anomalies: string[]
   recommandations: Recommandation[]
   documents: MissionDoc[]
+  demandeRef: string | null
 }
 
-// ── Mock data ──────────────────────────────────────────────────────────────
+// ── Données ─────────────────────────────────────────────────────────────────
+// Missions réelles chargées depuis GET /missions (backend vague B).
 const missions = ref([] as Mission[])
-missions.value = [
-  {
-    ref: 'AUDIT-IGF-2026-001',
-    institution: 'OTR Douanes',
-    institutions: ['OTR Douanes'],
-    periode: 'Jan-Mar 2026',
-    dateDebut: '2026-01-10',
-    dateFin: '2026-03-31',
-    statut: 'en_cours',
-    statutLabel: 'En cours',
-    chefMission: 'S. AGBEKO',
-    equipe: ['S. AGBEKO', 'A. KPODO'],
-    perimetre: 'Controle a posteriori des exonerations douanieres accordees en 2025.\nVerification de la conformite avec le CGI Art. 215 et la LFI 2025.',
-    avancement: 65,
-    constats: 'Depassement de quota constate sur 3 dossiers (LOME LOGISTICS SA, PORT DE LOME SARL, TOGO STEEL SARL).\nBase juridique invalide relevee sur le dossier OASE-2025-0075.',
-    anomalies: ['A001', 'A002', 'A006'],
-    recommandations: [
-      { texte: "Mise en place d'un controle automatise des quotas dans SYDONIA", responsable: 'OTR', echeance: '2026-06-30', statut: 'en_cours' },
-      { texte: 'Regularisation des bases juridiques sur 5 dossiers identifies', responsable: 'UPF', echeance: '2026-03-31', statut: 'ok' },
-    ],
-    documents: [
-      { id: 'd1', nom: 'Ordre_mission_AUDIT-IGF-2026-001.pdf', type: 'PDF', categorie: 'Ordre de mission', pages: 2, taille: '98 Ko' },
-      { id: 'd2', nom: 'Rapport_preliminaire_Jan2026.pdf', type: 'PDF', categorie: 'Rapport preliminaire', pages: 12, taille: '1,2 Mo' },
-    ],
-  },
-  {
-    ref: 'AUDIT-CC-2026-002',
-    institution: 'DGBF',
-    institutions: ['DGBF', 'UPF'],
-    periode: 'Avr 2026',
-    dateDebut: '2026-04-15',
-    dateFin: '2026-04-30',
-    statut: 'planifiee',
-    statutLabel: 'Planifiee',
-    chefMission: 'A. KPODO',
-    equipe: ['A. KPODO'],
-    perimetre: 'Audit des depenses fiscales inscrites en annexe LFI 2026.\nConformite avec la Directive UEMOA 06/2009.',
-    avancement: 0,
-    constats: '',
+const loading = ref(false)
+const loadError = ref<string | null>(null)
+
+/** Mappe une mission API vers le modèle d'affichage local. */
+function mapMission(m: MissionApi): Mission {
+  const dateDebut = m.dateDebut?.slice(0, 10) || undefined
+  const dateFin = m.dateFin?.slice(0, 10) || undefined
+  const chef = m.auditeur ? `${m.auditeur.prenom} ${m.auditeur.nom}`.trim() : '—'
+  return {
+    ref: m.reference,
+    titre: m.titre,
+    institution: m.organe ?? '—',
+    institutions: m.organe ? [m.organe] : [],
+    periode: dateDebut ? `${dateDebut} > ${dateFin ?? '…'}` : '—',
+    dateDebut,
+    dateFin,
+    statut: m.statut === 'terminee' ? 'cloturee' : m.statut,
+    statutLabel: missionStatutLabel(m.statut),
+    chefMission: chef,
+    equipe: m.auditeur ? [chef] : [],
+    perimetre: m.titre,
+    // Avancement dérivé uniquement du statut réel (pas de valeur inventée pour « en_cours »).
+    avancement: m.statut === 'terminee' ? 100 : m.statut === 'planifiee' ? 0 : null,
+    constats: m.constats ?? '',
     anomalies: [],
-    recommandations: [],
-    documents: [
-      { id: 'd3', nom: 'Ordre_mission_AUDIT-CC-2026-002.pdf', type: 'PDF', categorie: 'Ordre de mission', pages: 2, taille: '94 Ko' },
-    ],
-  },
-  {
-    ref: 'AUDIT-IGF-2025-018',
-    institution: 'API-ZF',
-    institutions: ['API-ZF', 'SAZOF'],
-    periode: 'Nov-Dec 2025',
-    dateDebut: '2025-11-03',
-    dateFin: '2025-12-19',
-    statut: 'cloturee',
-    statutLabel: 'Cloturee',
-    chefMission: 'S. AGBEKO',
-    equipe: ['S. AGBEKO', 'A. KPODO', 'M. KOFFI'],
-    perimetre: 'Controle des conventions Zone Franche Industrielle et respect des engagements emplois/investissements.',
-    avancement: 100,
-    constats: 'Les 6 entreprises ZFI controlees respectent globalement leurs engagements contractuels.\nDeux entreprises presentent un retard dans la creation d\'emplois (moins de 80% de l\'objectif).',
-    anomalies: ['A003'],
-    recommandations: [
-      { texte: 'Mettre a jour le registre des emplois dans GUDEF trimestriellement', responsable: 'API-ZF', echeance: '2026-01-31', statut: 'ok' },
-      { texte: 'Notifier par courrier les 2 entreprises en retard sur les emplois', responsable: 'API-ZF', echeance: '2025-12-31', statut: 'ok' },
-    ],
-    documents: [
-      { id: 'd4', nom: 'Rapport_definitif_AUDIT-IGF-2025-018.pdf', type: 'PDF', categorie: 'Rapport definitif', pages: 24, taille: '2,4 Mo' },
-      { id: 'd5', nom: 'PV_cloture_Nov2025.pdf', type: 'PDF', categorie: 'Proces-verbal', pages: 4, taille: '210 Ko' },
-      { id: 'd6', nom: 'Annexes_preuves_ZFI.pdf', type: 'PDF', categorie: 'Pieces a conviction', pages: 18, taille: '3,1 Mo' },
-    ],
-  },
-]
+    recommandations: m.recommandations
+      ? [{ texte: m.recommandations, responsable: m.organe ?? '—', echeance: '', statut: 'nok' }]
+      : [],
+    documents: [],
+    demandeRef: m.demande?.reference ?? null,
+  }
+}
 
 // ── State ──────────────────────────────────────────────────────────────────
 const search = ref('')
@@ -676,9 +630,6 @@ const exportDialog = ref(false)
 const exportTarget = ref(null as Mission | null)
 const exportListDialog = ref(false)
 const addDocDialog = ref(false)
-const viewerDialog = ref(false)
-const viewerDoc = ref(null as MissionDoc | null)
-const viewerRef = ref(null as any)
 
 // Snackbar
 const snackbar = ref(false)
@@ -687,9 +638,41 @@ const snackMsg = ref('')
 function snack(msg: string) { snackMsg.value = msg; snackbar.value = true }
 
 // ── Filters & computed ─────────────────────────────────────────────────────
-const statutOptions = ['Tous', 'Planifiee', 'En cours', 'Cloturee']
-const instOptions = ['Toutes', 'OTR Douanes', 'OTR Impots', 'DGBF', 'API-ZF', 'UPF']
-const auditeurs = ['S. AGBEKO', 'A. KPODO', 'M. KOFFI', 'K. ABALO', 'Y. DOSSOU']
+const statutOptions = ['Tous', 'Planifiée', 'En cours', 'Terminée']
+// Institutions dérivées des organes réels des missions chargées.
+const instOptions = computed(() => ['Toutes', ...new Set(missions.value.flatMap(m => m.institutions))])
+// Auditeurs chargés depuis GET /utilisateurs/annuaire (rôles internes) —
+// repli sur GET /utilisateurs (ADMIN_SI) si l'annuaire est indisponible.
+const auditeurs = ref<string[]>([])
+
+onMounted(async () => {
+  loading.value = true
+  loadError.value = null
+  try {
+    const data = await listerMissions()
+    missions.value = data.map(mapMission)
+  } catch (e) {
+    loadError.value = e instanceof Error ? e.message : 'Impossible de charger les missions (GET /missions)'
+    missions.value = []
+  } finally {
+    loading.value = false
+  }
+  try {
+    const annuaire = await listerAnnuaire()
+    auditeurs.value = annuaire
+      .filter(u => u.role === 'auditeur')
+      .map(u => `${u.prenom} ${u.nom}`.trim())
+  } catch {
+    try {
+      const res = await listerUtilisateurs()
+      auditeurs.value = res.data
+        .filter(u => u.role === 'auditeur')
+        .map(u => `${u.prenom} ${u.nom}`.trim())
+    } catch {
+      auditeurs.value = []
+    }
+  }
+})
 const recoStatuts = [
   { label: 'Non mise en oeuvre', val: 'nok' },
   { label: 'En cours', val: 'en_cours' },
@@ -758,6 +741,7 @@ function calEventFg(color: string) {
 // ── Table headers ──────────────────────────────────────────────────────────
 const mHeaders = [
   { title: 'Reference', key: 'ref' },
+  { title: 'Mission', key: 'titre' },
   { title: 'Institution', key: 'institution' },
   { title: 'Periode', key: 'periode' },
   { title: 'Chef', key: 'chefMission' },
@@ -811,6 +795,10 @@ function openEdit(m: Mission) {
   missionDialog.value = true
 }
 
+function statutLabelOf(s: string) {
+  return s === 'planifiee' ? 'Planifiée' : s === 'en_cours' ? 'En cours' : 'Terminée'
+}
+
 function saveMission() {
   if (editMode.value) {
     const m = missions.value.find(x => x.ref === form.value.ref)
@@ -819,7 +807,7 @@ function saveMission() {
       m.equipe = form.value.equipe
       m.perimetre = form.value.perimetre
       m.statut = form.value.statut
-      m.statutLabel = form.value.statut === 'planifiee' ? 'Planifiee' : form.value.statut === 'en_cours' ? 'En cours' : 'Cloturee'
+      m.statutLabel = statutLabelOf(form.value.statut)
       m.avancement = form.value.avancement
       if (selectedMission.value && selectedMission.value.ref === m.ref) selectedMission.value = m
     }
@@ -827,11 +815,14 @@ function saveMission() {
   } else {
     const nm: Mission = {
       ref: form.value.ref,
+      titre: form.value.perimetre || form.value.ref,
       institution: form.value.institutions[0] || 'N/A',
       institutions: form.value.institutions,
       periode: `${form.value.dateDebut} > ${form.value.dateFin}`,
+      dateDebut: form.value.dateDebut || undefined,
+      dateFin: form.value.dateFin || undefined,
       statut: form.value.statut,
-      statutLabel: form.value.statut === 'planifiee' ? 'Planifiee' : form.value.statut === 'en_cours' ? 'En cours' : 'Cloturee',
+      statutLabel: statutLabelOf(form.value.statut),
       chefMission: form.value.chefMission,
       equipe: form.value.equipe,
       perimetre: form.value.perimetre,
@@ -840,6 +831,7 @@ function saveMission() {
       anomalies: [],
       recommandations: [],
       documents: [],
+      demandeRef: null,
     }
     missions.value.push(nm)
     snack('Mission creee avec succes')
@@ -928,64 +920,9 @@ function removeDoc(id: string) {
   snack('Document supprime')
 }
 
-function viewDoc(doc: MissionDoc) {
-  viewerDoc.value = doc
-  viewerDialog.value = true
-}
-
-function triggerViewerExport() {
-  if (viewerRef.value) viewerRef.value.exportAnnotations?.()
-}
-
-// ── Mock page renderer ─────────────────────────────────────────────────────
-function renderMissionDocPage(doc: MissionDoc | null, page: number): string {
-  if (!doc) return ''
-  const m = selectedMission.value
-  if (!m) return ''
-
-  if (doc.categorie === 'Ordre de mission') {
-    return `<div style="text-align:center;margin-bottom:28px">
-      <div style="font-size:11px;color:#64748B;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px">REPUBLIQUE TOGOLAISE — MINISTERE DE L ECONOMIE ET DES FINANCES</div>
-      <div style="font-size:11px;color:#64748B;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">INSPECTION GENERALE DES FINANCES</div>
-      <div style="font-size:14px;font-weight:700;color:#1A2332;border-bottom:2px solid #2774AE;padding-bottom:8px;margin-bottom:8px">ORDRE DE MISSION N ${m.ref}</div>
-    </div>
-    <p style="font-size:12px;line-height:1.8;margin-bottom:16px">Le Ministre de l Economie et des Finances <strong>ORDONNE</strong> une mission de controle a posteriori aupres de <strong>${m.institution}</strong>.</p>
-    <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px">
-      <tr style="background:#F4F6F9"><td style="padding:8px;font-weight:600;border:1px solid #CBD5E1;width:40%">Reference</td><td style="padding:8px;border:1px solid #CBD5E1">${m.ref}</td></tr>
-      <tr><td style="padding:8px;font-weight:600;border:1px solid #CBD5E1">Institution</td><td style="padding:8px;border:1px solid #CBD5E1">${m.institutions.join(', ')}</td></tr>
-      <tr style="background:#F4F6F9"><td style="padding:8px;font-weight:600;border:1px solid #CBD5E1">Periode</td><td style="padding:8px;border:1px solid #CBD5E1">${m.periode}</td></tr>
-      <tr><td style="padding:8px;font-weight:600;border:1px solid #CBD5E1">Chef de mission</td><td style="padding:8px;border:1px solid #CBD5E1">${m.chefMission}</td></tr>
-      <tr style="background:#F4F6F9"><td style="padding:8px;font-weight:600;border:1px solid #CBD5E1">Equipe</td><td style="padding:8px;border:1px solid #CBD5E1">${m.equipe.join(', ')}</td></tr>
-    </table>
-    <div style="font-size:12px;font-weight:600;margin-bottom:8px">PERIMETRE ET OBJECTIFS</div>
-    <p style="font-size:12px;line-height:1.8;white-space:pre-line">${m.perimetre}</p>`
-  }
-
-  if (doc.categorie === 'Rapport preliminaire' || doc.categorie === 'Rapport definitif') {
-    const pages: Record<number, string> = {
-      1: `<div style="text-align:center;margin-bottom:28px">
-        <div style="font-size:11px;color:#64748B;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px">INSPECTION GENERALE DES FINANCES — TOGO</div>
-        <div style="font-size:14px;font-weight:700;color:#1A2332;border-bottom:2px solid #2774AE;padding-bottom:8px;margin-bottom:8px">${doc.categorie.toUpperCase()} — ${m.ref}</div>
-      </div>
-      <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:#2774AE">1. RESUME EXECUTIF</div>
-      <p style="font-size:12px;line-height:1.8;margin-bottom:16px">La mission de controle aupres de <strong>${m.institution}</strong> a permis d identifier ${m.anomalies.length} anomalie(s) et de formuler ${m.recommandations.length} recommandation(s).</p>
-      <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:#2774AE">2. CONSTATS PRINCIPAUX</div>
-      <p style="font-size:12px;line-height:1.8;white-space:pre-line">${m.constats || '(Aucun constat saisi)'}</p>`,
-      2: `<div style="font-size:12px;font-weight:700;margin-bottom:12px;color:#2774AE">3. RECOMMANDATIONS</div>
-      ${m.recommandations.map((r, i) => `<div style="margin-bottom:16px;padding:12px;background:#F8FAFC;border-left:4px solid #2774AE;border-radius:4px">
-        <div style="font-size:12px;font-weight:600;margin-bottom:4px">Recommandation ${i + 1}</div>
-        <div style="font-size:12px;line-height:1.8">${r.texte || '(non renseigne)'}</div>
-        <div style="font-size:11px;color:#64748B;margin-top:4px">Responsable : ${r.responsable} - Echeance : ${r.echeance || 'N/A'}</div>
-      </div>`).join('') || '<p style="font-size:12px;color:#64748B">(Aucune recommandation)</p>'}`,
-    }
-    return pages[page] || `<div style="color:#64748B;text-align:center;padding:40px">Page ${page}</div>`
-  }
-
-  return `<div style="text-align:center;margin-bottom:28px">
-    <div style="font-size:14px;font-weight:700;color:#1A2332;border-bottom:2px solid #2774AE;padding-bottom:8px">${doc.nom}</div>
-    <div style="font-size:11px;color:#64748B;margin-top:8px">Mission : ${m.ref} — ${m.institution}</div>
-  </div>
-  <p style="font-size:12px;line-height:1.8;color:#475569">Categorie : <strong>${doc.categorie}</strong><br>Page ${page} sur ${doc.pages}.</p>`
+// TODO(endpoint): les pieces ne sont pas stockees cote serveur — visualisation indisponible (vague B)
+function viewDoc(_doc: MissionDoc) {
+  snack('Visualisation indisponible — piece non stockee cote serveur')
 }
 </script>
 

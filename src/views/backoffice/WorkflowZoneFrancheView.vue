@@ -17,6 +17,13 @@
       </v-col>
     </v-row>
 
+    <!-- Encart documentation normative : le parcours, la matrice et les critères ci-dessous
+         décrivent le processus institutionnel MRD, pas des chiffres d'activité. -->
+    <v-alert type="info" variant="tonal" rounded="lg" density="compact" class="mb-4" prepend-icon="mdi-book-open-outline">
+      <strong>Documentation normative.</strong> Parcours, matrices, critères d'éligibilité et délais ci-dessous sont le référentiel
+      du processus n° 3 (loi n° 2019-005). Seuls les indicateurs ci-dessus proviennent de données réelles.
+    </v-alert>
+
     <!-- Parcours normé -->
     <v-card rounded="lg" elevation="1" class="mb-4">
       <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Parcours normé — Processus n° 3 (API-ZF)</v-card-title>
@@ -87,7 +94,7 @@
                     <span class="font-weight-semibold">Agrément provisoire</span>
                   </div>
                   <div class="text-h6 font-weight-bold text-info">11 – 33 jours</div>
-                  <div class="text-caption text-medium-emphasis mt-1">Frais : 300 000 FCFA</div>
+                  <!-- TODO(endpoint): frais d'agrément masqués — pas de source API fiable (vague B backend) -->
                   <v-divider class="my-2" />
                   <div class="text-caption">Permet de bénéficier des avantages en attente du démarrage de production.</div>
                 </v-card>
@@ -99,7 +106,6 @@
                     <span class="font-weight-semibold">Agrément définitif</span>
                   </div>
                   <div class="text-h6 font-weight-bold text-success">52 – 107 jours</div>
-                  <div class="text-caption text-medium-emphasis mt-1">Coût : ~2 500 000 FCFA</div>
                   <v-divider class="my-2" />
                   <div class="text-caption">Certificat d'Entreprise Exportatrice. Acte définitif du comité d'agrément API-ZF.</div>
                 </v-card>
@@ -198,16 +204,51 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
 import ExportButton from '../../components/ExportButton.vue'
+import { listerConventionsReelles, type ConventionApi } from '../../services/backoffice'
 
-const kpis = [
-  { label: 'Agréments ZF actifs', value: '47', icon: 'mdi-factory', color: 'primary', subtitle: 'ZFI + ZES combinés' },
-  { label: 'Provisoires en cours', value: '8', icon: 'mdi-clock-fast', color: 'info', subtitle: 'Délai 11–33 jours' },
-  { label: 'Alertes J-90 actives', value: '5', icon: 'mdi-bell-ring', color: 'error', subtitle: 'Expirations < 90 jours' },
-  { label: 'Contrôles annuels OK', value: '79%', icon: 'mdi-check-circle', color: 'success', subtitle: 'Engagements respectés' },
-]
+const conventions = ref<ConventionApi[] | null>(null)
+
+onMounted(async () => {
+  try {
+    // GET /conventions — accessible aux rôles agent_ci/agent_cddi (RBAC élargi, vague C backend)
+    // → repli '—' honnête conservé si jamais l'accès est refusé.
+    conventions.value = await listerConventionsReelles()
+  } catch {
+    conventions.value = null
+  }
+})
+
+const J90_MS = 90 * 24 * 3600 * 1000
+const alertesJ90 = computed(() =>
+  (conventions.value ?? []).filter((c) => {
+    if (!c.dateFin) return false
+    const t = new Date(c.dateFin).getTime() - Date.now()
+    return t > 0 && t <= J90_MS
+  }).length,
+)
+
+const kpis = computed(() => [
+  {
+    label: 'Agréments ZF actifs',
+    value: conventions.value ? String(conventions.value.filter((c) => c.statutCode === 'active').length) : '—',
+    icon: 'mdi-factory', color: 'primary',
+    subtitle: conventions.value ? 'Conventions actives (API)' : 'Accès conventions non autorisé',
+  },
+  // TODO(endpoint): le statut provisoire/définitif n'est pas exposé par GET /conventions — masqué (vague B backend)
+  { label: 'Provisoires en cours', value: '—', icon: 'mdi-clock-fast', color: 'info', subtitle: 'Délai 11–33 jours' },
+  {
+    label: 'Alertes J-90 actives',
+    value: conventions.value ? String(alertesJ90.value) : '—',
+    icon: 'mdi-bell-ring', color: 'error',
+    subtitle: 'Expirations < 90 jours',
+  },
+  // TODO(endpoint): taux de contrôles annuels non exposé par l'API — masqué (vague B backend)
+  { label: 'Contrôles annuels OK', value: '—', icon: 'mdi-check-circle', color: 'success', subtitle: 'Engagements respectés' },
+])
 
 const processHeaders = [
   { title: 'Étape', key: 'etape' },

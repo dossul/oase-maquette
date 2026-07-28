@@ -44,7 +44,7 @@
 
       <div class="mt-3 d-flex ga-2">
         <v-btn size="x-small" variant="tonal" color="primary" prepend-icon="mdi-connection">Tester</v-btn>
-        <v-btn size="x-small" variant="tonal" prepend-icon="mdi-history">Logs</v-btn>
+        <v-btn size="x-small" variant="tonal" prepend-icon="mdi-history" @click="emit('show-logs', connector)">Logs</v-btn>
         <v-btn size="x-small" variant="tonal" prepend-icon="mdi-cog">Config</v-btn>
       </div>
     </v-card-text>
@@ -56,14 +56,15 @@ import { computed } from 'vue'
 import type { Connecteur } from '../types'
 
 const props = defineProps<{ connector: Connecteur }>()
+const emit = defineEmits<{ 'show-logs': [connector: Connecteur] }>()
 
 const statusColor = computed(() => {
-  const map = { actif: 'success', erreur: 'error', maintenance: 'warning' }
-  return map[props.connector.statut]
+  const map: Record<string, string> = { actif: 'success', inactif: 'secondary', erreur: 'error', maintenance: 'warning' }
+  return map[props.connector.statut] ?? 'secondary'
 })
 const statusLabel = computed(() => {
-  const map = { actif: 'Actif', erreur: 'Erreur', maintenance: 'Maintenance' }
-  return map[props.connector.statut]
+  const map: Record<string, string> = { actif: 'Actif', inactif: 'Inactif', erreur: 'Erreur', maintenance: 'Maintenance' }
+  return map[props.connector.statut] ?? props.connector.statut
 })
-const formatDate = (d: string) => new Date(d).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })
+const formatDate = (d: string | null) => d ? new Date(d).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—'
 </script>

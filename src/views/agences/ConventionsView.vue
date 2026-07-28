@@ -37,7 +37,6 @@
             <div class="mb-3"><div class="label-micro text-medium-emphasis">Régime</div><div>{{ selectedConvention.regime }}</div></div>
             <div class="mb-3"><div class="label-micro text-medium-emphasis">Durée</div><div>{{ formatDate(selectedConvention.dateDebut) }} → {{ formatDate(selectedConvention.dateFin) }}</div></div>
             <div class="mb-3"><div class="label-micro text-medium-emphasis">Montant estimé</div><div class="font-weight-bold text-primary">{{ (selectedConvention.montantEstime/1e9).toFixed(2) }} Mds FCFA</div></div>
-            <div class="mb-3"><div class="label-micro text-medium-emphasis">Confidentialité</div><div>{{ conventionMeta(selectedConvention).confidentialite }}</div></div>
             <div class="mb-4">
               <div class="label-micro text-medium-emphasis mb-2">Engagements emploi</div>
               <div class="d-flex justify-space-between text-caption mb-1">
@@ -91,23 +90,23 @@
         </v-card>
       </v-col>
     </v-row>
-    <!-- Convention type preview with DocumentViewer -->
+    <!-- Prévisualisation de la convention -->
     <v-dialog v-model="previewDialog" fullscreen transition="dialog-bottom-transition">
       <v-card>
         <v-toolbar color="secondary" density="compact">
           <v-btn icon="mdi-close" @click="previewDialog=false"/>
           <v-toolbar-title class="text-body-2">
-            Convention type — {{ selectedConvention?.reference }} · {{ selectedConvention?.contribuable }}
+            Convention — {{ selectedConvention?.reference }} · {{ selectedConvention?.contribuable }}
           </v-toolbar-title>
           <v-spacer/>
-          <v-btn prepend-icon="mdi-download" size="small" variant="tonal" color="white" class="me-2">Télécharger</v-btn>
         </v-toolbar>
-        <div style="height:calc(100vh - 48px)">
-          <DocumentViewer
-            :filename="`Convention_${selectedConvention?.reference}.pdf`"
-            :total-pages="3"
-            @download="previewDialog=false"
-          />
+        <div style="height:calc(100vh - 48px)" class="d-flex align-center justify-center">
+          <!-- TODO(endpoint): la pièce PDF de la convention n'est pas exposée par l'API — état vide honnête en attendant la vague B (module documents) -->
+          <div class="text-center pa-8 text-medium-emphasis">
+            <v-icon icon="mdi-file-hidden" size="64" class="mb-4 opacity-30"/>
+            <div class="text-body-1 font-weight-semibold mb-2">Pièce non disponible</div>
+            <div class="text-body-2">Le document de cette convention n'est pas encore raccordé à la plateforme.</div>
+          </div>
         </div>
       </v-card>
     </v-dialog>
@@ -129,7 +128,6 @@
 import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import ExportButton from '../../components/ExportButton.vue'
-import DocumentViewer from '../../components/DocumentViewer.vue'
 import type { Convention } from '../../types'
 import { listerConventionsReelles } from '../../services/backoffice'
 const search = ref('')
@@ -178,18 +176,11 @@ const filteredConventions = computed(() => conventions.value.filter(c => {
   return true
 }))
 const formatDate = (d: string) => new Date(d).toLocaleDateString('fr-FR')
-const conventionMeta = (item: Convention) => ({
-  codeAdditionnel: item.regime.includes('Zone') ? 'DOU-ZF-2026-14' : 'FISC-CI-2026-05',
-  confidentialite: item.regime.includes('investissements') ? 'Interne' : 'Restreint',
-  piece: item.regime.includes('Zone') ? 'convention_zf.pdf / 5de4...cc21' : 'convention_ci.pdf / 3bf1...aa02',
-})
+// TODO(endpoint): codes additionnels, confidentialité et pièces probantes (hash) non exposés par GET /conventions — lignes masquées (vague B backend)
 const o2Rows = (item: Convention) => [
-  { label: 'id_mesure / id_decision', value: `${item.reference} / DEC-${item.reference}` },
+  { label: 'reference convention', value: item.reference },
   { label: 'contribuable / regime', value: `${item.contribuable} / ${item.regime}` },
-  { label: 'code additionnel / SI', value: `${conventionMeta(item).codeAdditionnel} / Sydonia + E-TAX + GUDEF` },
   { label: 'montant estime / emplois', value: `${(item.montantEstime/1e9).toFixed(2)} Mds FCFA / ${item.emploisEngages}` },
-  { label: 'piece probante / hash', value: conventionMeta(item).piece },
-  { label: 'confidentialite / diffusion', value: `${conventionMeta(item).confidentialite} / partage restreint journalisé` },
 ]
 const specialCases = [
   {

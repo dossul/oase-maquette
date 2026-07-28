@@ -97,7 +97,7 @@
                       <!-- Static sections -->
                       <div v-for="s in sections.filter(s=>s.selected)" :key="s.key" class="mb-4">
                         <div class="text-subtitle-2 font-weight-bold mb-2" style="color:#2774AE;border-bottom:1px solid #E2E8F0;padding-bottom:4px">{{ s.label.toUpperCase() }}</div>
-                        <div class="text-body-2 text-medium-emphasis" style="line-height:1.8">{{ s.mockContent }}</div>
+                        <div class="text-body-2 text-medium-emphasis" style="line-height:1.8">{{ sectionContent(s.key) }}</div>
                       </div>
 
                       <div v-if="commentaire" class="mb-4">
@@ -150,8 +150,9 @@
       <v-col cols="12" md="5">
         <v-card rounded="lg" elevation="1" class="mb-4">
           <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Rapports publiés</v-card-title>
+          <v-progress-linear v-if="dataLoading" indeterminate color="primary" class="mx-4" />
           <v-list density="compact" class="pa-2">
-            <v-list-item v-for="r in historique" :key="r.annee" :subtitle="`Publié le ${r.date} · ${r.taille}`" rounded="lg" class="mb-1">
+            <v-list-item v-for="r in historique" :key="r.id" :subtitle="`Publié le ${r.date} · ${r.taille}`" rounded="lg" class="mb-1">
               <template #prepend>
                 <v-avatar color="error" size="36" rounded="lg">
                   <v-icon icon="mdi-file-pdf-box" color="white" size="18"/>
@@ -165,6 +166,7 @@
                 </div>
               </template>
             </v-list-item>
+            <v-list-item v-if="!dataLoading && !historique.length" title="Aucun rapport généré pour le moment" subtitle="Les rapports générés via l'API apparaîtront ici" />
           </v-list>
         </v-card>
 
@@ -220,10 +222,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import DocumentViewer from '../../components/DocumentViewer.vue'
 import { generateText, setApiKey, hasApiKey, MODELS, buildRapportSystemPrompt, buildRecommandationsPrompt, buildSynthesePrompt, buildAnalyseSectoriellePrompt } from '../../services/openrouter'
+import {
+  getDashboardP5,
+  listerMesuresRegistre,
+  listerAnomaliesNouvelles,
+  type DashboardP5,
+  type MesureRegistre,
+} from '../../services/decideur'
+import {
+  listerRapports,
+  listerMesuresOpenData,
+  tailleDataUri,
+  labelTypeRapport,
+  formatMontantCompact,
+  type RapportApi,
+} from '../../services/rapports'
+import { getReferentielInseed } from '../../services/referentiels'
 
 const step = ref(1)
 const annee = ref('2025')
@@ -248,12 +266,95 @@ const modelItems = MODELS
 
 const secteurs = ['Mines & Hydrocarbures', 'Zone Franche', 'Agriculture', 'Énergie', 'Numérique', 'Santé', 'Transport']
 
+// ── Données réelles (API) injectées dans les contenus et prompts IA ────────
+const dataLoading = ref(false)
+const p5 = ref<DashboardP5 | null>(null)
+const mesuresRegistre = ref<MesureRegistre[]>([])
+const nbAnomalies = ref(0)
+const pibMds = ref<number | null>(null)
+const evolutionParAnnee = ref<{ annee: number; montant: number }[]>([])
+const rapports = ref<RapportApi[]>([])
+
+onMounted(async () => {
+  dataLoading.value = true
+  const [resP5, resMesures, resAnomalies, resInseed, resOpenData, resRapports] = await Promise.allSettled([
+    getDashboardP5(),
+    listerMesuresRegistre(),
+    listerAnomaliesNouvelles(),
+    getReferentielInseed(),
+    listerMesuresOpenData(),
+    listerRapports(),
+  ])
+  if (resP5.status === 'fulfilled') p5.value = resP5.value
+  if (resMesures.status === 'fulfilled') mesuresRegistre.value = resMesures.value
+  if (resAnomalies.status === 'fulfilled') nbAnomalies.value = resAnomalies.value.length
+  if (resInseed.status === 'fulfilled') pibMds.value = resInseed.value.pibMilliardsFcfa
+  if (resOpenData.status === 'fulfilled') {
+    const parAnnee = new Map<number, number>()
+    for (const m of resOpenData.value) {
+      for (const a of m.agregats?.montantParAnnee ?? []) {
+        parAnnee.set(a.annee, (parAnnee.get(a.annee) ?? 0) + Number(a.montant))
+      }
+    }
+    evolutionParAnnee.value = [...parAnnee.entries()].sort((a, b) => a[0] - b[0]).map(([annee, montant]) => ({ annee, montant }))
+  }
+  if (resRapports.status === 'fulfilled') rapports.value = resRapports.value
+  dataLoading.value = false
+})
+
+/** Montant total accordé (FCFA, réel — demandes approuvées). */
+const totalAccorde = computed(() => Number(p5.value?.montantTotalAccorde ?? 0))
+const totalAccordeLabel = computed(() => formatMontantCompact(totalAccorde.value))
+const totalAccordeMds = computed(() => (totalAccorde.value / 1e9).toLocaleString('fr-FR', { maximumFractionDigits: 2 }))
+const nbMesuresActives = computed(() => mesuresRegistre.value.filter((m) => m.estActive).length)
+const topMesure = computed(() =>
+  [...mesuresRegistre.value].sort((a, b) => Number(b.montantTotalAccorde) - Number(a.montantTotalAccorde))[0] ?? null,
+)
+const ratioPib = computed(() =>
+  pibMds.value && totalAccorde.value
+    ? `${((totalAccorde.value / 1e9 / pibMds.value) * 100).toLocaleString('fr-FR', { maximumFractionDigits: 2 })}%`
+    : 'non calculable (PIB de référence indisponible)',
+)
+
+/** Contexte macro réel injecté dans le prompt système IA. */
+const donneesMacro = computed(() => {
+  const parts: string[] = []
+  if (p5.value) parts.push(`montant total accordé ${totalAccordeLabel.value}`)
+  if (pibMds.value && totalAccorde.value) parts.push(`ratio dépenses fiscales/PIB ${ratioPib.value} (PIB ${pibMds.value.toLocaleString('fr-FR')} Mds FCFA)`)
+  if (topMesure.value) parts.push(`mesure principale « ${topMesure.value.libelle ?? topMesure.value.codeMesure} » (${formatMontantCompact(topMesure.value.montantTotalAccorde)})`)
+  if (mesuresRegistre.value.length) parts.push(`${nbMesuresActives.value} mesure(s) active(s) sur ${mesuresRegistre.value.length} au registre central`)
+  return parts.join(', ')
+})
+
 const sections = ref([
-  { key: 'inventaire', label: 'Inventaire des exonérations', selected: true, mockContent: 'Tableau exhaustif des 1 248 exonérations actives au 31/12/2025, réparties selon leur nature juridique (CGI, code sectoriel, LFI)…' },
-  { key: 'cout', label: 'Coût budgétaire (FCFA)', selected: true, mockContent: 'Le coût total des dépenses fiscales s\'élève à 847,3 Mds FCFA pour l\'exercice 2025, en hausse de 12,4% par rapport à 2024…' },
-  { key: 'evolution', label: 'Évolution pluriannuelle', selected: true, mockContent: 'Sur la période 2021–2025, les dépenses fiscales ont progressé en moyenne de 8,7% par an, passant de 571 Mds à 847 Mds FCFA…' },
-  { key: 'annexes', label: 'Annexes statistiques', selected: true, mockContent: 'Tableaux A1 à A12 : détail par secteur, région, nature juridique et catégorie de contribuable…' },
+  { key: 'inventaire', label: 'Inventaire des exonérations', selected: true },
+  { key: 'cout', label: 'Coût budgétaire (FCFA)', selected: true },
+  { key: 'evolution', label: 'Évolution pluriannuelle', selected: true },
+  { key: 'annexes', label: 'Annexes statistiques', selected: true },
 ])
+
+/** Contenu réel (API) de chaque section statique du rapport. */
+function sectionContent(key: string): string {
+  if (dataLoading.value) return 'Chargement des données réelles…'
+  switch (key) {
+    case 'inventaire':
+      return mesuresRegistre.value.length
+        ? `Inventaire des ${mesuresRegistre.value.length} mesures du registre central (${nbMesuresActives.value} active(s)), réparties par base juridique et impôt concerné…`
+        : 'Aucune mesure au registre central pour le moment.'
+    case 'cout':
+      return p5.value
+        ? `Le montant total des exonérations accordées s'élève à ${totalAccordeLabel.value} (demandes approuvées, tous régimes confondus).`
+        : 'Montant total indisponible (API /dashboards/p5).'
+    case 'evolution':
+      return evolutionParAnnee.value.length
+        ? `Montants accordés par année : ${evolutionParAnnee.value.map((e) => `${e.annee} : ${formatMontantCompact(e.montant)}`).join(' · ')}.`
+        : 'Aucun historique annuel de montants approuvés disponible.'
+    case 'annexes':
+      return 'Tableaux de détail par mesure, impôt et organe de gestion, issus du registre central OASE.'
+    default:
+      return ''
+  }
+}
 
 const aiSections = ref([
   { key: 'resume', label: 'Résumé exécutif (IA)', loading: false, content: '' },
@@ -264,12 +365,18 @@ async function generateSection(sec: { key: string; label: string; loading: boole
   if (!aiEnabled.value) { aiConfigDialog.value = true; return }
   sec.loading = true
   try {
-    const systemMsg = buildRapportSystemPrompt(annee.value)
+    const systemMsg = buildRapportSystemPrompt(annee.value, donneesMacro.value || undefined)
     let userContent = ''
     if (sec.key === 'resume') {
-      userContent = buildSynthesePrompt({ total: '847,3 Mds FCFA', ratio: '4,2%', topSecteur: 'Mines & Hydrocarbures', anomalies: 6, annee: annee.value })
+      userContent = buildSynthesePrompt({
+        total: totalAccordeLabel.value,
+        ratio: ratioPib.value,
+        topSecteur: topMesure.value?.libelle ?? topMesure.value?.codeMesure ?? 'non déterminé',
+        anomalies: nbAnomalies.value,
+        annee: annee.value,
+      })
     } else if (sec.key === 'recommandations') {
-      userContent = buildRecommandationsPrompt('ensemble des secteurs', '847,3')
+      userContent = buildRecommandationsPrompt('ensemble des secteurs', totalAccordeMds.value)
     }
     sec.content = await generateText([systemMsg, { role: 'user', content: userContent }], { model: selectedModel.value })
   } catch (e: any) {
@@ -283,7 +390,7 @@ async function quickSynth() {
   quickLoading.value = true
   quickResult.value = ''
   try {
-    const sysMsg = buildRapportSystemPrompt(annee.value)
+    const sysMsg = buildRapportSystemPrompt(annee.value, donneesMacro.value || undefined)
     const userContent = buildAnalyseSectoriellePrompt(quickSynthSecteur.value)
     quickResult.value = await generateText([sysMsg, { role: 'user', content: userContent }], { model: selectedModel.value })
   } catch (e: any) {
@@ -300,9 +407,13 @@ function saveAiConfig() {
 const generate = () => { generating.value = true; setTimeout(() => { generating.value = false; generated.value = true }, 1200) }
 const sign = () => { signing.value = true; setTimeout(() => { signing.value = false; signed.value = true }, 1000) }
 
-const historique = [
-  { annee: '2024', date: '28/02/2025', taille: '4,2 Mo' },
-  { annee: '2023', date: '15/03/2024', taille: '3,8 Mo' },
-  { annee: '2022', date: '10/04/2023', taille: '3,1 Mo' },
-]
+/** Historique réel des rapports générés (GET /rapports). */
+const historique = computed(() =>
+  rapports.value.map((r) => ({
+    id: r.id,
+    annee: r.periodeAnnee ? String(r.periodeAnnee) : '—',
+    date: new Date(r.createdAt).toLocaleDateString('fr-FR'),
+    taille: tailleDataUri(r.fichierUrl) ?? labelTypeRapport(r.typeRapportCode),
+  })),
+)
 </script>

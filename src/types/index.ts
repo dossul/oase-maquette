@@ -42,7 +42,7 @@ export type Role =
   | 'admin'
   | 'ministere_sectoriel'
   | 'agent_dsi_mef'
-export type ConnecteurStatut = 'actif' | 'erreur' | 'maintenance'
+export type ConnecteurStatut = 'actif' | 'inactif' | 'erreur' | 'maintenance'
 export type AnomalieCategorie = 'juridique' | 'financiere' | 'procedurale' | 'temporelle'
 export type AnomalieGravite = 'faible' | 'moyenne' | 'elevee' | 'critique'
 
@@ -116,7 +116,7 @@ export interface Connecteur {
   statut: ConnecteurStatut
   latenceMs: number
   tauxErreur: number
-  dernierSync: string
+  dernierSync: string | null
   volume24h: number
   endpoint: string
 }

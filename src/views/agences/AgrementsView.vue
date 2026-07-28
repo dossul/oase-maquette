@@ -11,12 +11,18 @@
       <v-col cols="12" md="7">
         <v-card rounded="lg" elevation="1" class="mb-4">
           <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Demandes d'agrément reçues</v-card-title>
+          <v-progress-linear v-if="loading" indeterminate color="primary"/>
+          <v-alert v-if="loadError" type="error" variant="tonal" density="compact" class="ma-3">{{ loadError }}</v-alert>
           <v-data-table :headers="headers" :items="agrement" hover @click:row="(_, {item}) => openDemande(item)">
             <template #item.statut="{ item }">
               <v-chip :color="statutColor(item.statut)" size="x-small" variant="tonal">{{ item.statutLabel }}</v-chip>
             </template>
             <template #item.emplois="{ item }">
-              <span class="font-weight-medium">{{ item.emplois.toLocaleString('fr-FR') }}</span>
+              <!-- TODO(endpoint): les emplois projetés ne sont pas exposés par GET /demandes — vague B backend -->
+              <span class="font-weight-medium">{{ item.emplois != null ? item.emplois.toLocaleString('fr-FR') : '—' }}</span>
+            </template>
+            <template #no-data>
+              <div class="text-center pa-6 text-medium-emphasis text-body-2">Aucune demande d'agrément enregistrée.</div>
             </template>
           </v-data-table>
         </v-card>
@@ -47,11 +53,12 @@
                 />
               </v-col>
               <v-col cols="6">
-                <v-text-field :model-value="selected.emplois.toLocaleString('fr-FR')" label="Emplois projetés" readonly class="mb-3"/>
+                <v-text-field :model-value="selected.emplois != null ? selected.emplois.toLocaleString('fr-FR') : '—'" label="Emplois projetés" readonly class="mb-3"/>
               </v-col>
             </v-row>
 
-            <!-- ✅ Sélecteur Localisation ZF/ZES -->
+            <!-- Sélecteur Localisation ZF/ZES -->
+            <!-- TODO(endpoint): aucun endpoint ne fournit le référentiel des zones ZF/ZES — sélecteur désactivé en attendant la vague B backend -->
             <v-select
               v-model="selected.localisation"
               :items="zonesDisponibles"
@@ -60,7 +67,8 @@
               label="Localisation ZF / ZES"
               prepend-inner-icon="mdi-map-marker"
               class="mb-3"
-              :hint="selected.localisation ? zoneHint(selected.localisation) : ''"
+              :disabled="zonesDisponibles.length === 0"
+              :hint="zonesDisponibles.length === 0 ? 'Référentiel des zones non disponible (endpoint à venir)' : (selected.localisation ? zoneHint(selected.localisation) : '')"
               persistent-hint
             >
               <template #item="{ item, props }">
@@ -103,6 +111,9 @@
 
             <div class="mb-4">
               <div class="label-micro text-medium-emphasis mb-2">Variante de regime specialisee</div>
+              <v-alert type="info" variant="tonal" density="compact" rounded="lg" class="mb-2 text-caption">
+                Documentation normative des régimes (processus MRD) — ne reflète pas l'activité du dossier.
+              </v-alert>
               <v-tabs v-model="regimeDetailTab" color="primary" density="compact" class="mb-2">
                 <v-tab value="zf">Zone franche</v-tab>
                 <v-tab value="ci">Code investissements</v-tab>
@@ -147,7 +158,7 @@
             <v-divider class="mb-4"/>
             <div class="d-flex ga-2 mb-3">
               <v-btn color="success" variant="tonal" size="small" prepend-icon="mdi-check" @click="selected.statut='approuve';selected.statutLabel='Approuvé'">Valider</v-btn>
-              <v-btn color="warning" variant="tonal" size="small" prepend-icon="mdi-comment-alert" @click="selected.statut='en_attente';selected.statutLabel='Complément requis'">Demander complément</v-btn>
+              <v-btn color="warning" variant="tonal" size="small" prepend-icon="mdi-comment-alert" @click="selected.statut='action_requise';selected.statutLabel='Action requise'">Demander complément</v-btn>
               <v-btn color="error" variant="tonal" size="small" prepend-icon="mdi-close">Rejeter</v-btn>
             </div>
 
@@ -191,127 +202,14 @@
           </v-btn>
         </v-toolbar>
 
-        <div style="height:calc(100vh - 48px)">
-          <DocumentViewer
-            v-if="selected"
-            :filename="`Convention_${selected.entreprise}_${selected.localisation || 'ZF'}.pdf`"
-            :total-pages="4"
-            @download="conventionDialog=false"
-          >
-            <!-- Override page 1 with convention pre-filled data -->
-            <template #default="{ page }">
-              <div v-if="page===1" style="font-family:Georgia,serif">
-                <div style="text-align:center;margin-bottom:24px">
-                  <div style="font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:4px">REPUBLIQUE TOGOLAISE — MINISTÈRE DE L'ÉCONOMIE ET DES FINANCES</div>
-                  <div style="font-size:11px;font-weight:700;color:#1A2332;border-bottom:2px solid #2774AE;padding-bottom:6px;margin-bottom:6px">
-                    {{ regimeLabel(selected?.regime) }} — CONVENTION D'INVESTISSEMENT
-                  </div>
-                  <div style="font-size:10px;color:#64748B">{{ zoneFullLabel(selected?.localisation) }}</div>
-                </div>
-                <p style="font-size:11px;line-height:1.9;margin-bottom:14px">
-                  Entre <strong>L'ÉTAT TOGOLAIS</strong>, représenté par le Ministre de l'Économie et des Finances, d'une part,
-                </p>
-                <p style="font-size:11px;line-height:1.9;margin-bottom:14px">
-                  Et la société <strong>{{ selected?.entreprise }}</strong>, constituée conformément aux lois et règlements en vigueur,
-                  d'autre part,
-                </p>
-                <div style="font-weight:700;font-size:11px;margin-bottom:10px;color:#2774AE">Article 1 — OBJET DE LA CONVENTION</div>
-                <p style="font-size:11px;line-height:1.9;margin-bottom:14px">
-                  La présente convention a pour objet de définir les modalités d'agrément de la société
-                  <strong>{{ selected?.entreprise }}</strong> au régime <strong>{{ regimeLabel(selected?.regime) }}</strong>
-                  au sein de <strong>{{ zoneFullLabel(selected?.localisation) }}</strong>, conformément aux textes législatifs en vigueur.
-                </p>
-                <table style="width:100%;border-collapse:collapse;font-size:10px;margin-bottom:14px">
-                  <tr style="background:#F4F6F9">
-                    <td style="padding:7px 10px;font-weight:600;border:1px solid #CBD5E1;width:40%">Entreprise</td>
-                    <td style="padding:7px 10px;border:1px solid #CBD5E1">{{ selected?.entreprise }}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:7px 10px;font-weight:600;border:1px solid #CBD5E1">Régime</td>
-                    <td style="padding:7px 10px;border:1px solid #CBD5E1">{{ regimeLabel(selected?.regime) }}</td>
-                  </tr>
-                  <tr style="background:#F4F6F9">
-                    <td style="padding:7px 10px;font-weight:600;border:1px solid #CBD5E1">Localisation</td>
-                    <td style="padding:7px 10px;border:1px solid #CBD5E1">{{ zoneFullLabel(selected?.localisation) }}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:7px 10px;font-weight:600;border:1px solid #CBD5E1">Emplois projetés</td>
-                    <td style="padding:7px 10px;border:1px solid #CBD5E1">{{ selected?.emplois?.toLocaleString('fr-FR') }} emplois directs</td>
-                  </tr>
-                  <tr style="background:#F4F6F9">
-                    <td style="padding:7px 10px;font-weight:600;border:1px solid #CBD5E1">Montant investissement</td>
-                    <td style="padding:7px 10px;border:1px solid #CBD5E1">{{ selected?.montantInvest ? Number(selected.montantInvest).toLocaleString('fr-FR') + ' FCFA' : 'À compléter' }}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:7px 10px;font-weight:600;border:1px solid #CBD5E1">Durée de la convention</td>
-                    <td style="padding:7px 10px;border:1px solid #CBD5E1">{{ selected?.dureeConvention || 10 }} ans à compter de la date de signature</td>
-                  </tr>
-                </table>
-              </div>
-              <div v-else-if="page===2" style="font-family:Georgia,serif">
-                <div style="font-weight:700;font-size:12px;margin-bottom:14px;color:#2774AE">Article 2 — AVANTAGES ACCORDÉS</div>
-                <p style="font-size:11px;line-height:1.9;margin-bottom:12px">En vertu du présent agrément, la société bénéficie des avantages suivants :</p>
-                <ol style="font-size:11px;line-height:2;padding-left:18px">
-                  <li>Exonération totale des droits et taxes d'importation sur les équipements, matières premières et intrants ;</li>
-                  <li>Exonération d'impôt sur les bénéfices industriels et commerciaux pendant la durée de la convention ;</li>
-                  <li>Exonération de la TVA sur les ventes à l'exportation ;</li>
-                  <li>Liberté de transfert des capitaux, dividendes et bénéfices ;</li>
-                  <li>Accès prioritaire aux infrastructures communes de la zone.</li>
-                </ol>
-                <div style="font-weight:700;font-size:12px;margin:20px 0 12px;color:#2774AE">Article 3 — ENGAGEMENTS DU CONTRIBUABLE</div>
-                <ol style="font-size:11px;line-height:2;padding-left:18px">
-                  <li>Réaliser un investissement d'au moins <strong>{{ selected?.montantInvest ? Number(selected.montantInvest).toLocaleString('fr-FR') + ' FCFA' : '[montant à préciser]' }}</strong> dans les 24 mois suivant la signature ;</li>
-                  <li>Créer au moins <strong>{{ selected?.emplois }} emplois directs</strong> dont 60% de ressortissants togolais ;</li>
-                  <li>Soumettre un rapport d'activité semestriel à l'{{ selected?.regime?.includes('ZF') ? 'API-ZF' : 'SAZOF' }} ;</li>
-                  <li>Se conformer à la réglementation sociale, environnementale et fiscale togolaise.</li>
-                </ol>
-              </div>
-              <div v-else-if="page===3" style="font-family:Georgia,serif">
-                <div style="font-weight:700;font-size:12px;margin-bottom:14px;color:#2774AE">Article 4 — CONTRÔLE ET SUIVI</div>
-                <p style="font-size:11px;line-height:1.9;margin-bottom:14px">
-                  L'{{ selected?.regime?.includes('ZF') ? 'API-ZF' : 'SAZOF' }} est chargée du suivi de la présente convention. 
-                  L'OTR conserve ses prérogatives de contrôle fiscal et douanier conformément aux lois en vigueur.
-                  Toute irrégularité sera signalée via la plateforme OASE.
-                </p>
-                <div style="font-weight:700;font-size:12px;margin:20px 0 12px;color:#2774AE">Article 5 — DURÉE ET RENOUVELLEMENT</div>
-                <p style="font-size:11px;line-height:1.9;margin-bottom:14px">
-                  La présente convention est conclue pour une durée de <strong>{{ selected?.dureeConvention || 10 }} ans</strong>.
-                  Elle peut être renouvelée par accord express des parties, sous réserve d'un rapport d'évaluation favorable
-                  et du respect intégral des engagements.
-                </p>
-                <div style="font-weight:700;font-size:12px;margin:20px 0 12px;color:#2774AE">Article 6 — RÉSILIATION</div>
-                <p style="font-size:11px;line-height:1.9">
-                  La convention peut être résiliée de plein droit en cas de non-respect des engagements, de fraude 
-                  avérée ou de cessation d'activité. La résiliation entraîne le remboursement des avantages perçus 
-                  majorés des pénalités légales.
-                </p>
-              </div>
-              <div v-else style="font-family:Georgia,serif">
-                <div style="font-weight:700;font-size:12px;margin-bottom:14px;color:#2774AE">SIGNATURES ET ENTRÉE EN VIGUEUR</div>
-                <p style="font-size:11px;line-height:1.9;margin-bottom:24px">
-                  Fait à Lomé, le <strong>[date de signature]</strong>, en quatre exemplaires originaux.
-                </p>
-                <div style="display:flex;justify-content:space-between;margin-top:40px;gap:20px">
-                  <div style="text-align:center;width:45%">
-                    <div style="height:70px;border-bottom:1px solid #CBD5E1;margin-bottom:8px"/>
-                    <div style="font-size:10px;font-weight:600">Pour le Ministre de l'Économie<br>et des Finances</div>
-                    <div style="font-size:9px;color:#64748B">Direction de la Politique Fiscale / UPF</div>
-                  </div>
-                  <div style="text-align:center;width:45%">
-                    <div style="height:70px;border-bottom:1px solid #CBD5E1;margin-bottom:8px;display:flex;align-items:center;justify-content:center">
-                      <div style="width:50px;height:50px;border:2px solid #2774AE;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7px;color:#2774AE;text-align:center;font-weight:600">EN ATTENTE<br>SIGNATURE</div>
-                    </div>
-                    <div style="font-size:10px;font-weight:600">Pour {{ selected?.entreprise }}</div>
-                    <div style="font-size:9px;color:#64748B">Représentant légal</div>
-                  </div>
-                </div>
-                <div style="margin-top:32px;padding:10px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:4px;font-size:9px;color:#1E40AF">
-                  <strong>Référence OASE :</strong> Ce document sera enregistré et tracé dans la plateforme OASE après signature. 
-                  Un QR Code de vérification sera généré automatiquement.
-                </div>
-              </div>
-            </template>
-          </DocumentViewer>
+        <div style="height:calc(100vh - 48px)" class="d-flex align-center justify-center">
+          <!-- TODO(endpoint): la generation du PDF de convention type n'est pas raccordee au backend — etat vide honnete en attendant la vague B -->
+          <div class="text-center pa-8 text-medium-emphasis">
+            <v-icon icon="mdi-file-pdf-box" size="64" class="mb-4 opacity-30"/>
+            <div class="text-body-1 font-weight-semibold mb-2">Convention type non disponible</div>
+            <div class="text-body-2">La generation du document de convention sera branchee sur le backend (module documents) dans une prochaine version.</div>
+          </div>
+        </div>
         </div>
       </v-card>
     </v-dialog>
@@ -345,19 +243,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
-import DocumentViewer from '../../components/DocumentViewer.vue'
+import { listerDemandes } from '../../services/backoffice'
+import { STATUT_LABELS, type StatutDemande } from '../../types'
 
 interface Demande {
   entreprise: string
   regime: string
-  emplois: number
+  emplois: number | null
   statut: string
   statutLabel: string
   localisation: string
   montantInvest: string
-  dureeConvention: number
+  dureeConvention: number | null
   evalPlan: string
   notes: string
   etape: number
@@ -367,19 +266,13 @@ const selected = ref<Demande | null>(null)
 const conventionDialog = ref(false)
 const newDemandeDialog = ref(false)
 const regimeDetailTab = ref('zf')
+const loading = ref(false)
+const loadError = ref<string | null>(null)
 
 const newDemande = ref({ entreprise: '', regime: '', localisation: '', emplois: '', montantInvest: '', evalPlan: '' })
 
-// ── Zones ZF/ZES disponibles au Togo ──
-const zonesDisponibles = [
-  { value: 'ZFI-LOME', label: 'ZFI Lomé — Plateforme Industrielle', region: 'Maritime', type: 'Zone Franche Industrielle' },
-  { value: 'ZFI-LOME-NORD', label: 'ZFI Lomé Nord — Agbalépédogan', region: 'Maritime', type: 'Zone Franche Industrielle' },
-  { value: 'ZES-KARA', label: 'ZES Kara — Plateaux Industriels', region: 'Kara', type: 'Zone Économique Spéciale' },
-  { value: 'ZES-SOKODE', label: 'ZES Sokodé — Centrale', region: 'Centrale', type: 'Zone Économique Spéciale' },
-  { value: 'ZFI-ATAKPAME', label: 'ZFI Atakpamé — Plateaux', region: 'Plateaux', type: 'Zone Franche Industrielle' },
-  { value: 'ZF-MARITIME', label: 'Zone Franche Maritime Lomé', region: 'Maritime', type: 'Zone Franche Portuaire' },
-  { value: 'ZES-DAPAONG', label: 'ZES Dapaong — Savanes', region: 'Savanes', type: 'Zone Économique Spéciale' },
-]
+// TODO(endpoint): aucun endpoint ne fournit le référentiel des zones ZF/ZES — liste vide (vague B backend)
+const zonesDisponibles: { value: string; label: string; region: string; type: string }[] = []
 
 const regimes = [
   { value: 'ZFI', label: 'Zone Franche Industrielle (ZFI)' },
@@ -390,16 +283,40 @@ const regimes = [
 
 const workflowItems = ['Agent instructeur', 'Directeur Agence', 'Notification MEF']
 
-const agrement = ref<Demande[]>([
-  { entreprise: 'BATI-TOGO SA', regime: 'ZFI', emplois: 320, statut: 'en_cours', statutLabel: 'En instruction', localisation: 'ZFI-LOME', montantInvest: '2500000000', dureeConvention: 10, evalPlan: '', notes: '', etape: 2 },
-  { entreprise: 'PHARMA WEST AFRICA', regime: 'ZES', emplois: 150, statut: 'approuve', statutLabel: 'Approuvé', localisation: 'ZES-KARA', montantInvest: '780000000', dureeConvention: 10, evalPlan: '', notes: '', etape: 3 },
-  { entreprise: 'AGRI-PLUS TOGO', regime: 'ZFI', emplois: 480, statut: 'en_attente', statutLabel: 'Complément requis', localisation: '', montantInvest: '', dureeConvention: 10, evalPlan: '', notes: '', etape: 1 },
-  { entreprise: 'NUMERIQUE AFRIQUE SA', regime: 'CI', emplois: 95, statut: 'en_cours', statutLabel: 'En instruction', localisation: 'ZFI-LOME-NORD', montantInvest: '550000000', dureeConvention: 7, evalPlan: '', notes: '', etape: 1 },
-])
+const agrement = ref<Demande[]>([])
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    // NB : le type zone franche / code investissements n'est pas identifiable
+    // de façon fiable via baseJuridiqueVersion — on affiche toutes les demandes.
+    const data = await listerDemandes()
+    agrement.value = data.map((d) => {
+      const statutCode = (d.statutCode || 'soumis') as StatutDemande
+      return {
+        entreprise: d.contribuable?.raisonSociale ?? '—',
+        regime: '',
+        emplois: null, // TODO(endpoint): emplois projetés non exposés par GET /demandes
+        statut: statutCode,
+        statutLabel: STATUT_LABELS[statutCode] ?? statutCode,
+        localisation: '',
+        montantInvest: d.montantFcfa ?? '',
+        dureeConvention: null, // TODO(endpoint): durée de convention non exposée
+        evalPlan: '',
+        notes: '',
+        etape: 1,
+      }
+    })
+  } catch (e) {
+    loadError.value = e instanceof Error ? e.message : 'Impossible de charger les demandes'
+  } finally {
+    loading.value = false
+  }
+})
 
 const criteres = computed(() => [
   { label: 'Investissement ≥ seuil', ok: selected.value ? Number(selected.value.montantInvest) >= 500000000 : false },
-  { label: 'Emplois locaux ≥ 60%', ok: selected.value ? selected.value.emplois >= 50 : false },
+  { label: 'Emplois locaux ≥ 60%', ok: selected.value ? (selected.value.emplois ?? 0) >= 50 : false },
   { label: 'Secteur prioritaire', ok: true },
   { label: 'Plan financier validé', ok: selected.value ? !!selected.value.evalPlan || !!selected.value.montantInvest : false },
   { label: 'Zone sélectionnée', ok: selected.value ? !!selected.value.localisation : false },
@@ -425,13 +342,12 @@ const regimeDetails = [
 
 const o2Rows = computed(() => {
   if (!selected.value) return []
+  // Seules les données réelles du dossier sont affichées.
+  // TODO(endpoint): references de mesure/decision, code additionnel et piece probante (hash) non exposes par l'API — vague B backend
   return [
-    { label: 'id_mesure / id_decision', value: `AGR-${selected.value.entreprise.replace(/\s+/g, '-')} / ATT-AG-2026-01` },
-    { label: 'contribuable / regime', value: `${selected.value.entreprise} / ${regimeLabel(selected.value.regime)}` },
-    { label: 'code additionnel / zone', value: `${selected.value.regime}-2026-01 / ${zoneFullLabel(selected.value.localisation)}` },
+    { label: 'contribuable / regime', value: `${selected.value.entreprise} / ${regimeLabel(selected.value.regime) || '—'}` },
     { label: 'montant brut / investissement', value: `${Number(selected.value.montantInvest || 0).toLocaleString('fr-FR')} FCFA` },
-    { label: 'emplois / duree', value: `${selected.value.emplois.toLocaleString('fr-FR')} / ${selected.value.dureeConvention} ans` },
-    { label: 'piece probante / hash', value: 'projet_investissement.pdf / 5de4...cc21' },
+    { label: 'emplois / duree', value: `${selected.value.emplois != null ? selected.value.emplois.toLocaleString('fr-FR') : '—'} / ${selected.value.dureeConvention != null ? selected.value.dureeConvention + ' ans' : '—'}` },
   ]
 })
 
@@ -451,7 +367,7 @@ function openConventionViewer() {
 }
 
 function statutColor(s: string) {
-  return { en_cours: 'info', approuve: 'success', en_attente: 'warning', rejete: 'error' }[s] || 'default'
+  return { en_instruction: 'info', soumis: 'info', brouillon: 'default', approuve: 'success', action_requise: 'warning', rejete: 'error', expire: 'default', archive: 'default' }[s] || 'default'
 }
 
 function regimeLabel(v?: string) {
@@ -471,12 +387,12 @@ function addDemande() {
   agrement.value.push({
     entreprise: newDemande.value.entreprise,
     regime: newDemande.value.regime,
-    emplois: Number(newDemande.value.emplois),
-    statut: 'en_cours',
-    statutLabel: 'En instruction',
+    emplois: newDemande.value.emplois ? Number(newDemande.value.emplois) : null,
+    statut: 'soumis',
+    statutLabel: 'Soumis',
     localisation: newDemande.value.localisation,
     montantInvest: newDemande.value.montantInvest,
-    dureeConvention: 10,
+    dureeConvention: null,
     evalPlan: newDemande.value.evalPlan,
     notes: '',
     etape: 1,

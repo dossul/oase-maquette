@@ -99,14 +99,14 @@ export async function generateText(
 
 // --- Preset prompt builders for OASE ---
 
-export function buildRapportSystemPrompt(annee: string): AIMessage {
+export function buildRapportSystemPrompt(annee: string, donneesMacro?: string): AIMessage {
   return {
     role: 'system',
     content: `Tu es un expert en finances publiques et en politique fiscale pour le Ministère de l'Économie et des Finances de la République du Togo. 
 Tu aides à rédiger le rapport annuel des dépenses fiscales (exonérations) conformément à la Directive UEMOA 06/2009.
 Toutes tes réponses sont en français, professionnelles, structurées et prêtes à être insérées dans un rapport officiel.
 L'exercice fiscal concerné est l'année ${annee}.
-Les données macro disponibles : exonérations accordées : 847,3 Mds FCFA, ratio dépenses fiscales/PIB : 4,2%, secteur minier en tête (234 Mds FCFA), 1 248 exonérations actives.`,
+${donneesMacro ? `Données macro réelles (API OASE) : ${donneesMacro}.` : 'Aucune donnée macro disponible : n\'invente aucun chiffre, reste qualitatif.'}`,
   }
 }
 

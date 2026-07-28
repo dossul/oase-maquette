@@ -1130,9 +1130,10 @@ const naturesJuridiques = [
   { value: 'public',      title: 'Établissement public / Projet de développement' },
 ]
 const benefForm = ref({
-  rccm: 'TG-LOM-2019-B-1234', nif: 'TG-001-2019-B', raisonSociale: 'TOGO STEEL SARL',
-  formeJuridique: 'SARL', adresse: 'Zone Industrielle, Lomé',
-  secteur: 'Industrie manufacturière', natureJuridique: 'lucratif',
+  // Pré-rempli depuis GET /contribuables/me (voir onMounted) — pas de valeur fictive par défaut.
+  rccm: '', nif: '', raisonSociale: '',
+  formeJuridique: '', adresse: '',
+  secteur: '', natureJuridique: 'lucratif',
 })
 const natureLabel = computed(() => naturesJuridiques.find(n => n.value === benefForm.value.natureJuridique)?.title || 'Non défini')
 const natureDescription = computed(() => {
@@ -1161,7 +1162,7 @@ const details = ref({ description: '', montant: '', duree: '', dateDebut: '' })
 const evaluation = ref({ investissements: '', emploisNationaux: '', emploisExpatries: '', masseSalariale: '', caLocal: '', caExport: '', valeurAjoutee: '', consoEauElectricite: '', prelevementsOTR: '', contributionPIB: '', autresChargesObligatoires: '' })
 
 // Franchise douanière fields
-const douaFields = ref({ numDeclaration: 'SW-2026-00485', bureauDouane: '', modeTransport: 'Maritime (Bill of Lading)', typeOperation: 'Importation normale', descMarchandise: '', valeurFOB: '', droitsExoneres: '', refConnaissement: '', refEtatModeleA: '', transitaire: '' })
+const douaFields = ref({ numDeclaration: '', bureauDouane: '', modeTransport: 'Maritime (Bill of Lading)', typeOperation: 'Importation normale', descMarchandise: '', valeurFOB: '', droitsExoneres: '', refConnaissement: '', refEtatModeleA: '', transitaire: '' })
 
 // Zone Franche fields
 const zonesZF = [
@@ -1239,7 +1240,7 @@ const docsLucratif = ref<Doc[]>([
   { id: 'l2a', label: `Récépissé états financiers — exercice ${anneeN1} (N-1)`,     uploaded: false, fileName: '', groupe: 'États financiers' },
   { id: 'l2b', label: `Récépissé états financiers — exercice ${anneeN2} (N-2)`,     uploaded: false, fileName: '', groupe: 'États financiers' },
   { id: 'l2c', label: `Récépissé états financiers — exercice ${anneeN3} (N-3)`,     uploaded: false, fileName: '', groupe: 'États financiers' },
-  { id: 'l3',  label: 'Carte d\'immatriculation fiscale en cours de validité',      uploaded: true,  fileName: 'NIF_TogoSteel.pdf', groupe: 'Critères éliminatoires' },
+  { id: 'l3',  label: 'Carte d\'immatriculation fiscale en cours de validité',      uploaded: false, fileName: '', groupe: 'Critères éliminatoires' },
   { id: 'l4a', label: `Récépissé DAS — exercice ${anneeN1} (N-1)`,                 uploaded: false, fileName: '', groupe: 'DAS' },
   { id: 'l4b', label: `Récépissé DAS — exercice ${anneeN2} (N-2)`,                 uploaded: false, fileName: '', groupe: 'DAS' },
   { id: 'l4c', label: `Récépissé DAS — exercice ${anneeN3} (N-3)`,                 uploaded: false, fileName: '', groupe: 'DAS' },
@@ -1247,7 +1248,7 @@ const docsLucratif = ref<Doc[]>([
   { id: 'l6',  label: 'Quitus social',                                              uploaded: false, fileName: '', groupe: 'Critères éliminatoires' },
   { id: 'l7',  label: 'Fiche signalétique de suivi des agréments — dûment remplie et visée par le Ministère de tutelle', uploaded: false, fileName: '', groupe: 'Critères éliminatoires',
     condition: (ctx) => ctx.hasAgrement ? { status: 'obligatoire' } : { status: 'cache' } },
-  { id: 'l8',  label: 'RCCM (copie certifiée)',                                     uploaded: true,  fileName: 'RCCM_TogoSteel.pdf', groupe: 'Critères éliminatoires' },
+  { id: 'l8',  label: 'RCCM (copie certifiée)',                                     uploaded: false, fileName: '', groupe: 'Critères éliminatoires' },
   // Pièces transversales CI §1.1.2.3 MRD 2024
   { id: 'l_t1', label: 'Base légale invoquée (article CGI / texte habilitant)',                                          uploaded: false, fileName: '', groupe: 'Pièces transversales CI' },
   { id: 'l_t2', label: "Demande d'attestation d'exonération (courrier officiel)",                                        uploaded: false, fileName: '', groupe: 'Pièces transversales CI' },
@@ -1265,12 +1266,12 @@ const docsNonLucratif = ref<Doc[]>([
   { id: 'n1a', label: `Récépissé états financiers — exercice ${anneeN1} (N-1)`,     uploaded: false, fileName: '', groupe: 'États financiers' },
   { id: 'n1b', label: `Récépissé états financiers — exercice ${anneeN2} (N-2)`,     uploaded: false, fileName: '', groupe: 'États financiers' },
   { id: 'n1c', label: `Récépissé états financiers — exercice ${anneeN3} (N-3)`,     uploaded: false, fileName: '', groupe: 'États financiers' },
-  { id: 'n2',  label: 'Carte d\'immatriculation fiscale',                           uploaded: true,  fileName: 'NIF_TogoSteel.pdf', groupe: 'Critères éliminatoires' },
+  { id: 'n2',  label: 'Carte d\'immatriculation fiscale',                           uploaded: false, fileName: '', groupe: 'Critères éliminatoires' },
   { id: 'n3a', label: `Récépissé DAS — exercice ${anneeN1} (N-1)`,                 uploaded: false, fileName: '', groupe: 'DAS' },
   { id: 'n3b', label: `Récépissé DAS — exercice ${anneeN2} (N-2)`,                 uploaded: false, fileName: '', groupe: 'DAS' },
   { id: 'n3c', label: `Récépissé DAS — exercice ${anneeN3} (N-3)`,                 uploaded: false, fileName: '', groupe: 'DAS' },
   { id: 'n4',  label: 'Quitus social',                                              uploaded: false, fileName: '', groupe: 'Critères éliminatoires' },
-  { id: 'n5',  label: 'RCCM (copie certifiée)',                                     uploaded: true,  fileName: 'RCCM_TogoSteel.pdf', groupe: 'Critères éliminatoires' },
+  { id: 'n5',  label: 'RCCM (copie certifiée)',                                     uploaded: false, fileName: '', groupe: 'Critères éliminatoires' },
   { id: 'n7',  label: 'Fiche signalétique de suivi des agréments — dûment remplie et visée par le Ministère de tutelle', uploaded: false, fileName: '', groupe: 'Critères éliminatoires',
     condition: (ctx) => ctx.hasAgrement ? { status: 'obligatoire' } : { status: 'cache' } },
   // Pièces transversales CI §1.1.2.3 MRD 2024
@@ -1291,7 +1292,7 @@ const docsPublic = ref<Doc[]>([
   { id: 'p2a', label: `Récépissé DAS — exercice ${anneeN1} (N-1)`,                 uploaded: false, fileName: '', groupe: 'DAS' },
   { id: 'p2b', label: `Récépissé DAS — exercice ${anneeN2} (N-2)`,                 uploaded: false, fileName: '', groupe: 'DAS' },
   { id: 'p2c', label: `Récépissé DAS — exercice ${anneeN3} (N-3)`,                 uploaded: false, fileName: '', groupe: 'DAS' },
-  { id: 'p3',  label: 'RCCM / Référence administrative',                            uploaded: true,  fileName: 'RCCM_TogoSteel.pdf', groupe: 'Critères éliminatoires' },
+  { id: 'p3',  label: 'RCCM / Référence administrative',                            uploaded: false, fileName: '', groupe: 'Critères éliminatoires' },
   // Pièces transversales CI §1.1.2.3 MRD 2024
   { id: 'p_t1', label: 'Base légale invoquée (article CGI / texte habilitant)',                                          uploaded: false, fileName: '', groupe: 'Pièces transversales CI' },
   { id: 'p_t2', label: "Demande d'attestation d'exonération (courrier officiel)",                                        uploaded: false, fileName: '', groupe: 'Pièces transversales CI' },
@@ -1319,8 +1320,8 @@ const docsZoneFranche = ref<Doc[]>([
   { id: 'zf2', label: 'Plan d\'affaires / Étude de faisabilité',                    uploaded: false, fileName: '', groupe: 'Projet' },
   { id: 'zf3', label: 'Plan de financement détaillé',                               uploaded: false, fileName: '', groupe: 'Projet' },
   { id: 'zf4', label: 'Attestation de disponibilité des fonds / garantie bancaire', uploaded: false, fileName: '', groupe: 'Projet' },
-  { id: 'zf5', label: 'RCCM (copie certifiée)',                                     uploaded: true,  fileName: 'RCCM_TogoSteel.pdf', groupe: 'Identité juridique' },
-  { id: 'zf6', label: 'NIF (carte d\'immatriculation fiscale)',                     uploaded: true,  fileName: 'NIF_TogoSteel.pdf', groupe: 'Identité juridique' },
+  { id: 'zf5', label: 'RCCM (copie certifiée)',                                     uploaded: false, fileName: '', groupe: 'Identité juridique' },
+  { id: 'zf6', label: 'NIF (carte d\'immatriculation fiscale)',                     uploaded: false, fileName: '', groupe: 'Identité juridique' },
   { id: 'zf7', label: 'Statuts de la société (copie certifiée)',                    uploaded: false, fileName: '', groupe: 'Identité juridique' },
   { id: 'zf8',  label: 'Programme emplois et ressortissants nationaux',              uploaded: false, fileName: '', groupe: 'Engagements' },
   { id: 'zf9',  label: "Étude d'impact environnemental et social (EIES)",           uploaded: false, fileName: '', groupe: 'Conformité',
@@ -1335,8 +1336,8 @@ const docsCodeInvest = ref<Doc[]>([
   { id: 'ci2', label: 'Business plan avec projections financières (3 ans)',          uploaded: false, fileName: '', groupe: 'Programme CI' },
   { id: 'ci3', label: 'Plan d\'emplois et qualification des postes',                 uploaded: false, fileName: '', groupe: 'Programme CI' },
   { id: 'ci4', label: 'Attestation de capacité financière / garantie bancaire',     uploaded: false, fileName: '', groupe: 'Financement' },
-  { id: 'ci5', label: 'RCCM (copie certifiée)',                                     uploaded: true,  fileName: 'RCCM_TogoSteel.pdf', groupe: 'Identité juridique' },
-  { id: 'ci6', label: 'NIF (carte d\'immatriculation fiscale)',                     uploaded: true,  fileName: 'NIF_TogoSteel.pdf', groupe: 'Identité juridique' },
+  { id: 'ci5', label: 'RCCM (copie certifiée)',                                     uploaded: false, fileName: '', groupe: 'Identité juridique' },
+  { id: 'ci6', label: 'NIF (carte d\'immatriculation fiscale)',                     uploaded: false, fileName: '', groupe: 'Identité juridique' },
   { id: 'ci7', label: 'Quitus fiscal OTR',                                          uploaded: false, fileName: '', groupe: 'Critères éliminatoires' },
   { id: 'ci8',  label: `Récépissé DAS — exercice ${anneeN1} (N-1)`,                uploaded: false, fileName: '', groupe: 'DAS' },
   { id: 'ci9',  label: `Récépissé DAS — exercice ${anneeN2} (N-2)`,                uploaded: false, fileName: '', groupe: 'DAS' },

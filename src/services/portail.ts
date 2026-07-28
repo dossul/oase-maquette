@@ -75,6 +75,11 @@ export interface ApiBaseJuridiqueVersion {
   impotConcerne: string | null
   organeGestionCode: string | null
   estActive: boolean
+  typeTexte1?: string | null
+  natureMesureCode?: string | null
+  dateAdoption?: string | null
+  dateAbrogation?: string | null
+  basesJuridiques?: { id: string; codeMesure: string } | null
 }
 
 export interface CreerDemandePayload {
@@ -237,6 +242,6 @@ export function getUtilisateurMe(): Promise<ApiUtilisateurMe> {
 // ── Bases juridiques ─────────────────────────────────────────────────────────
 
 export async function listerBasesJuridiques(): Promise<ApiBaseJuridiqueVersion[]> {
-  const res = await api<{ items: ApiBaseJuridiqueVersion[] }>('/bases-juridiques')
+  const res = await api<{ items: ApiBaseJuridiqueVersion[] }>('/bases-juridiques?limit=200')
   return res.items ?? []
 }

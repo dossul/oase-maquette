@@ -6,17 +6,31 @@
       icon="mdi-cog-play"
     >
       <template #actions>
-        <v-btn color="secondary" variant="tonal" size="small" prepend-icon="mdi-play-speed" class="me-2" @click="runAllDialog=true">
-          Exécuter toutes
-        </v-btn>
-        <v-btn color="primary" size="small" prepend-icon="mdi-plus" @click="openCreate">
-          Nouvelle règle
+        <v-btn color="primary" size="small" prepend-icon="mdi-play-speed" :loading="runAllLoading" @click="runAllDialog=true">
+          Exécuter la détection
         </v-btn>
       </template>
     </PageHeader>
 
+    <v-alert type="info" variant="tonal" density="compact" rounded="lg" class="mb-4">
+      <!-- TODO(endpoint): pas de CRUD de règles dans l'API v1 (GET/POST/PATCH /regles-blocage absents).
+           Les règles affichées sont celles réellement évaluées par le backend via
+           GET /demandes/:id/blocages — lecture seule. -->
+      Règles réellement évaluées par le backend (blocages par dossier) — lecture seule.
+      L'édition des règles sera disponible quand l'API l'exposera.
+    </v-alert>
+
+    <v-alert v-if="loadError" type="error" variant="tonal" rounded="lg" density="compact" class="mb-4">
+      {{ loadError }}
+    </v-alert>
+
     <!-- KPIs -->
-    <v-row class="mb-4">
+    <v-row v-if="loading" class="mb-4">
+      <v-col v-for="n in 4" :key="n" cols="6" md="3">
+        <v-skeleton-loader type="card" rounded="lg"/>
+      </v-col>
+    </v-row>
+    <v-row v-else class="mb-4">
       <v-col v-for="k in kpis" :key="k.label" cols="6" md="3">
         <v-card rounded="lg" elevation="1" class="pa-3">
           <div class="d-flex align-center ga-3">
@@ -34,7 +48,7 @@
 
     <v-tabs v-model="mainTab" color="primary" density="compact" class="mb-3">
       <v-tab value="rules" prepend-icon="mdi-cog-play">Règles ({{ regles.length }})</v-tab>
-      <v-tab value="journal" prepend-icon="mdi-history">Journal <v-badge :content="journal.length" color="warning" inline class="ms-1"/></v-tab>
+      <v-tab value="journal" prepend-icon="mdi-history">Anomalies <v-badge :content="journal.length" color="warning" inline class="ms-1"/></v-tab>
       <v-tab value="stats" prepend-icon="mdi-chart-bar">Statistiques</v-tab>
     </v-tabs>
 
@@ -46,267 +60,68 @@
         <v-card rounded="lg" elevation="1" class="mb-3">
           <v-card-text class="pa-3">
             <v-row dense>
-              <v-col cols="12" md="5">
+              <v-col cols="12" md="6">
                 <v-text-field v-model="search" label="Rechercher une règle…" prepend-inner-icon="mdi-magnify" density="compact" hide-details clearable/>
               </v-col>
               <v-col cols="6" md="3">
                 <v-select v-model="filterSev" :items="['Toutes','bloquant','avertissement','info']" label="Sévérité" density="compact" hide-details/>
               </v-col>
-              <v-col cols="6" md="2">
-                <v-select v-model="filterCat" :items="['Toutes', ...categories]" label="Catégorie" density="compact" hide-details/>
-              </v-col>
-              <v-col cols="12" md="2">
-                <v-select v-model="filterActive" :items="[{title:'Toutes',value:'all'},{title:'Actives',value:'active'},{title:'Inactives',value:'inactive'}]" label="Statut" density="compact" hide-details/>
+              <v-col cols="6" md="3">
+                <v-select v-model="filterActive" :items="[{title:'Toutes',value:'all'},{title:'Avec blocage actif',value:'active'},{title:'Sans blocage',value:'inactive'}]" label="Déclenchement" density="compact" hide-details/>
               </v-col>
             </v-row>
           </v-card-text>
         </v-card>
 
-        <!-- Rule cards -->
-        <div class="d-flex justify-end mb-2 ga-2">
-          <v-btn size="x-small" variant="text" prepend-icon="mdi-expand-all" @click="expandAll">Tout ouvrir</v-btn>
-          <v-btn size="x-small" variant="text" prepend-icon="mdi-collapse-all" @click="collapseAll">Tout fermer</v-btn>
-        </div>
+        <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-3"/>
 
-        <div v-if="filteredRegles.length === 0" class="text-center pa-8 text-medium-emphasis">
+        <div v-if="!loading && filteredRegles.length === 0" class="text-center pa-8 text-medium-emphasis">
           <v-icon icon="mdi-filter-off" size="40" class="mb-2 opacity-40"/>
           <div>Aucune règle ne correspond aux filtres.</div>
         </div>
 
-        <div v-for="regle in filteredRegles" :key="regle.id" class="rule-node mb-2" :class="[`rule--${regle.severite}`, regle.expanded ? 'rule--open' : '']">
-          <!-- Header -->
-          <div class="rule-header" @click="regle.expanded = !regle.expanded">
+        <div v-for="regle in filteredRegles" :key="regle.code" class="rule-node mb-2" :class="`rule--${regle.severite}`">
+          <div class="rule-header">
             <div class="d-flex align-center ga-3 flex-grow-1 min-width-0">
               <v-avatar :color="sevColor(regle.severite)" size="34" rounded="lg">
                 <v-icon :icon="sevIcon(regle.severite)" size="16" color="white"/>
               </v-avatar>
               <div class="min-width-0 flex-grow-1">
                 <div class="d-flex align-center ga-2 flex-wrap">
-                  <span class="text-body-2 font-weight-semibold text-truncate" style="max-width:400px">{{ regle.description }}</span>
+                  <span class="text-body-2 font-weight-semibold">{{ regle.libelle }}</span>
                   <v-chip :color="sevColor(regle.severite)" size="x-small" variant="tonal">{{ regle.severite }}</v-chip>
-                  <v-chip color="secondary" size="x-small" variant="outlined" prepend-icon="mdi-tag-outline">{{ regle.categorie }}</v-chip>
+                  <v-chip color="secondary" size="x-small" variant="outlined" prepend-icon="mdi-tag-outline">{{ regle.code }}</v-chip>
                 </div>
                 <div class="text-caption text-medium-emphasis d-flex align-center ga-3 mt-1">
-                  <span><v-icon icon="mdi-play-circle" size="12" class="me-1"/>{{ regle.declenchements }} déclenchement(s) / 30j</span>
-                  <span><v-icon icon="mdi-code-braces" size="12" class="me-1"/>{{ condPreview(regle.conditions) }}</span>
+                  <span><v-icon icon="mdi-play-circle" size="12" class="me-1"/>{{ regle.declenchements }} dossier(s) bloqué(s) / {{ regle.evalues }} évalué(s)</span>
+                  <span v-if="regle.details"><v-icon icon="mdi-information-outline" size="12" class="me-1"/>{{ regle.details }}</span>
                 </div>
               </div>
             </div>
-            <div class="d-flex align-center ga-2 flex-shrink-0" @click.stop>
-              <v-switch v-model="regle.active" hide-details density="compact" :color="regle.active ? 'success' : 'secondary'" inset @update:model-value="onToggle(regle)"/>
-              <v-tooltip text="Modifier" location="top">
-                <template #activator="{ props }">
-                  <v-btn v-bind="props" size="x-small" icon="mdi-pencil" variant="text" color="primary" @click="openEdit(regle)"/>
-                </template>
-              </v-tooltip>
-              <v-tooltip text="Tester maintenant" location="top">
-                <template #activator="{ props }">
-                  <v-btn v-bind="props" size="x-small" icon="mdi-play" variant="text" color="secondary" @click="testRule(regle)"/>
-                </template>
-              </v-tooltip>
-              <v-tooltip text="Supprimer" location="top">
-                <template #activator="{ props }">
-                  <v-btn v-bind="props" size="x-small" icon="mdi-delete-outline" variant="text" color="error" @click="deleteRule(regle.id)"/>
-                </template>
-              </v-tooltip>
-              <v-btn size="x-small" :icon="regle.expanded ? 'mdi-chevron-up' : 'mdi-chevron-down'" variant="text"/>
-            </div>
+            <v-chip :color="regle.declenchements > 0 ? 'error' : 'success'" size="x-small" variant="tonal" class="flex-shrink-0">
+              {{ regle.declenchements > 0 ? 'Blocage actif' : 'Aucun blocage' }}
+            </v-chip>
           </div>
-
-          <!-- Expandable body -->
-          <v-expand-transition>
-            <div v-if="regle.expanded" class="rule-body">
-              <v-divider class="mb-3"/>
-              <v-tabs v-model="regle.activeTab" density="compact" color="primary" class="mb-3">
-                <v-tab value="condition" prepend-icon="mdi-code-braces" class="text-caption">Condition</v-tab>
-                <v-tab value="actions" prepend-icon="mdi-lightning-bolt" class="text-caption">Actions</v-tab>
-                <v-tab value="portee" prepend-icon="mdi-target" class="text-caption">Portée</v-tab>
-              </v-tabs>
-
-              <v-window v-model="regle.activeTab">
-
-                <!-- Condition tab -->
-                <v-window-item value="condition">
-                  <div class="d-flex align-center justify-space-between mb-2">
-                    <span class="text-caption font-weight-bold text-medium-emphasis">Conditions (SI…)</span>
-                    <div class="d-flex ga-2">
-                      <v-btn-toggle v-model="regle.andOr" density="compact" variant="outlined" color="primary" rounded="pill" mandatory>
-                        <v-btn value="ET" size="x-small">ET</v-btn>
-                        <v-btn value="OU" size="x-small">OU</v-btn>
-                      </v-btn-toggle>
-                      <v-btn size="x-small" color="primary" variant="tonal" prepend-icon="mdi-plus" @click="addCond(regle)">Ajouter</v-btn>
-                    </div>
-                  </div>
-
-                  <div v-for="(cond, ci) in regle.conditions" :key="ci" class="d-flex align-center ga-2 mb-2">
-                    <v-chip v-if="ci > 0" :color="regle.andOr === 'ET' ? 'primary' : 'warning'" size="x-small" variant="tonal" class="flex-shrink-0">
-                      {{ regle.andOr }}
-                    </v-chip>
-                    <v-select v-model="cond.field" :items="condFields" label="Champ" density="compact" hide-details style="max-width:200px"/>
-                    <v-select v-model="cond.operator" :items="condOperators" label="Opérateur" density="compact" hide-details style="max-width:130px"/>
-                    <v-text-field v-model="cond.value" label="Valeur" density="compact" hide-details class="flex-grow-1"/>
-                    <v-btn size="x-small" icon="mdi-close" variant="text" color="error" @click="regle.conditions.splice(ci,1)"/>
-                  </div>
-
-                  <div v-if="regle.conditions.length === 0" class="text-center pa-3 text-medium-emphasis">
-                    <v-icon icon="mdi-code-braces-box" size="24" class="mb-1 opacity-40"/>
-                    <div class="text-caption">Aucune condition définie — règle toujours déclenchée.</div>
-                  </div>
-
-                  <!-- Natural language preview -->
-                  <v-card v-if="regle.conditions.length" variant="tonal" color="primary" rounded="lg" class="mt-3 pa-3">
-                    <div class="text-caption text-medium-emphasis mb-1">Aperçu langage naturel :</div>
-                    <code class="text-caption" style="color:rgb(var(--v-theme-primary))">
-                      SI {{ regle.conditions.map(c => `${c.field} ${c.operator} ${c.value || '…'}`).join(` ${regle.andOr} `) }}
-                    </code>
-                  </v-card>
-                </v-window-item>
-
-                <!-- Actions tab -->
-                <v-window-item value="actions">
-                  <div class="text-caption font-weight-bold text-medium-emphasis mb-3">Actions déclenchées lors de la détection :</div>
-                  <v-row dense>
-                    <v-col cols="12" md="6">
-                      <v-card variant="outlined" rounded="lg" class="pa-3 mb-2">
-                        <div class="d-flex align-center justify-space-between">
-                          <div class="d-flex align-center ga-2">
-                            <v-icon icon="mdi-block-helper" color="error" size="16"/>
-                            <span class="text-caption font-weight-semibold">Bloquer le dossier</span>
-                          </div>
-                          <v-switch v-model="regle.actions.bloquer" hide-details density="compact" color="error" inset/>
-                        </div>
-                      </v-card>
-                    </v-col>
-                    <v-col cols="12" md="6">
-                      <v-card variant="outlined" rounded="lg" class="pa-3 mb-2">
-                        <div class="d-flex align-center justify-space-between">
-                          <div class="d-flex align-center ga-2">
-                            <v-icon icon="mdi-flag-variant" color="warning" size="16"/>
-                            <span class="text-caption font-weight-semibold">Créer une anomalie</span>
-                          </div>
-                          <v-switch v-model="regle.actions.anomalie" hide-details density="compact" color="warning" inset/>
-                        </div>
-                      </v-card>
-                    </v-col>
-                    <v-col cols="12" md="6">
-                      <v-card variant="outlined" rounded="lg" class="pa-3 mb-2">
-                        <div class="d-flex align-center justify-space-between">
-                          <div class="d-flex align-center ga-2">
-                            <v-icon icon="mdi-bell-ring" color="info" size="16"/>
-                            <span class="text-caption font-weight-semibold">Notifier l'agent</span>
-                          </div>
-                          <v-switch v-model="regle.actions.notifier" hide-details density="compact" color="info" inset/>
-                        </div>
-                      </v-card>
-                    </v-col>
-                    <v-col cols="12" md="6">
-                      <v-card variant="outlined" rounded="lg" class="pa-3 mb-2">
-                        <div class="d-flex align-center justify-space-between">
-                          <div class="d-flex align-center ga-2">
-                            <v-icon icon="mdi-email-alert" color="primary" size="16"/>
-                            <span class="text-caption font-weight-semibold">Notifier le superviseur</span>
-                          </div>
-                          <v-switch v-model="regle.actions.notifSuperviseur" hide-details density="compact" color="primary" inset/>
-                        </div>
-                      </v-card>
-                    </v-col>
-                    <v-col cols="12" md="6">
-                      <v-card variant="outlined" rounded="lg" class="pa-3 mb-2">
-                        <div class="d-flex align-center justify-space-between">
-                          <div class="d-flex align-center ga-2">
-                            <v-icon icon="mdi-journal-plus" color="secondary" size="16"/>
-                            <span class="text-caption font-weight-semibold">Journaliser dans l'audit</span>
-                          </div>
-                          <v-switch v-model="regle.actions.journaliser" hide-details density="compact" color="secondary" inset/>
-                        </div>
-                      </v-card>
-                    </v-col>
-                    <v-col cols="12" md="6">
-                      <v-card variant="outlined" rounded="lg" class="pa-3 mb-2">
-                        <div class="d-flex align-center justify-space-between">
-                          <div class="d-flex align-center ga-2">
-                            <v-icon icon="mdi-transfer" color="purple" size="16"/>
-                            <span class="text-caption font-weight-semibold">Réaffecter le dossier</span>
-                          </div>
-                          <v-switch v-model="regle.actions.reaffecter" hide-details density="compact" color="purple" inset/>
-                        </div>
-                      </v-card>
-                    </v-col>
-                  </v-row>
-                  <!-- Test button -->
-                  <div class="d-flex align-center ga-2 mt-2">
-                    <v-btn size="small" color="secondary" variant="tonal" prepend-icon="mdi-flask" @click="testRule(regle)">
-                      Tester sur données de démonstration
-                    </v-btn>
-                    <v-chip v-if="testSuccess === regle.id" color="success" size="x-small" variant="tonal" prepend-icon="mdi-check">Testé — 3 dossiers concernés</v-chip>
-                  </div>
-                </v-window-item>
-
-                <!-- Portée tab -->
-                <v-window-item value="portee">
-                  <v-row dense>
-                    <v-col cols="12" md="6">
-                      <v-select
-                        v-model="regle.portee.types"
-                        :items="typesExo"
-                        multiple chips closable-chips
-                        label="Types d'exonération"
-                        density="compact"
-                        hide-details
-                        class="mb-3"
-                      />
-                    </v-col>
-                    <v-col cols="12" md="6">
-                      <v-select
-                        v-model="regle.portee.etapes"
-                        :items="['Dépôt','Instruction','Visa DGBF','Signature','Notification','Toutes']"
-                        multiple chips closable-chips
-                        label="Étapes du workflow"
-                        density="compact"
-                        hide-details
-                        class="mb-3"
-                      />
-                    </v-col>
-                    <v-col cols="12" md="6">
-                      <v-select
-                        v-model="regle.portee.institutions"
-                        :items="['OTR Douanes','OTR Impôts','DGBF','API-ZF','Toutes']"
-                        multiple chips closable-chips
-                        label="Institutions concernées"
-                        density="compact"
-                        hide-details
-                      />
-                    </v-col>
-                    <v-col cols="12" md="6">
-                      <v-select
-                        v-model="regle.portee.frequence"
-                        :items="['En temps réel','Quotidien (nuit)','Hebdomadaire','Manuel uniquement']"
-                        label="Fréquence d'évaluation"
-                        density="compact"
-                        hide-details
-                      />
-                    </v-col>
-                  </v-row>
-                </v-window-item>
-              </v-window>
-            </div>
-          </v-expand-transition>
         </div>
       </v-window-item>
 
-      <!-- ══ JOURNAL ══ -->
+      <!-- ══ JOURNAL (anomalies réelles) ══ -->
       <v-window-item value="journal">
         <v-card rounded="lg" elevation="1" class="mt-1">
           <div class="pa-4 pb-2 d-flex align-center justify-space-between flex-wrap ga-2">
-            <span class="text-body-1 font-weight-semibold">Journal des déclenchements (30 derniers jours)</span>
+            <span class="text-body-1 font-weight-semibold">Anomalies détectées par le moteur (GET /anomalies)</span>
             <div class="d-flex ga-2">
               <v-text-field v-model="journalSearch" placeholder="Filtrer…" prepend-inner-icon="mdi-magnify" density="compact" hide-details clearable style="max-width:220px"/>
               <v-select v-model="journalSevFilter" :items="['Toutes','bloquant','avertissement','info']" density="compact" hide-details style="max-width:160px"/>
-              <v-btn size="small" variant="tonal" color="secondary" prepend-icon="mdi-file-export" @click="exportJournal">Exporter CSV</v-btn>
             </div>
           </div>
           <v-divider/>
-          <v-list density="compact" class="pa-2">
+          <v-progress-linear v-if="loading" indeterminate color="primary"/>
+          <v-list v-else density="compact" class="pa-2">
+            <div v-if="filteredJournal.length === 0" class="text-center pa-6 text-medium-emphasis">
+              <v-icon icon="mdi-check-decagram-outline" size="36" class="mb-2 opacity-40"/>
+              <div class="text-body-2">Aucune anomalie pour ces filtres.</div>
+            </div>
             <v-list-item
               v-for="j in filteredJournal" :key="j.id"
               rounded="lg" class="mb-1 pa-3"
@@ -322,7 +137,7 @@
               </template>
               <template #subtitle>
                 <span class="text-caption">
-                  Dossier: <strong>{{ j.dossier }}</strong> · {{ j.contribuable }} · {{ j.date }}
+                  Dossier: <strong>{{ j.dossier }}</strong> · {{ j.date }}
                 </span>
               </template>
               <template #append>
@@ -335,8 +150,8 @@
               </template>
             </v-list-item>
           </v-list>
-          <div class="pa-3 text-caption text-medium-emphasis text-center border-t" style="border-top:1px solid rgba(0,0,0,0.06)">
-            {{ filteredJournal.length }} événement(s) sur les 30 derniers jours
+          <div class="pa-3 text-caption text-medium-emphasis text-center" style="border-top:1px solid rgba(0,0,0,0.06)">
+            {{ filteredJournal.length }} anomalie(s) retournée(s) par l'API
           </div>
         </v-card>
       </v-window-item>
@@ -348,12 +163,13 @@
           <v-col cols="12" md="6">
             <v-card rounded="lg" elevation="1" class="mb-4">
               <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">
-                Top règles — Déclenchements
+                Règles — dossiers bloqués (réel)
               </v-card-title>
               <v-card-text class="pa-4">
-                <div v-for="r in topRules" :key="r.id" class="mb-3">
+                <div v-if="topRules.length === 0" class="text-center pa-4 text-medium-emphasis text-caption">Aucune donnée.</div>
+                <div v-for="r in topRules" :key="r.code" class="mb-3">
                   <div class="d-flex align-center justify-space-between mb-1">
-                    <span class="text-caption font-weight-semibold text-truncate" style="max-width:250px">{{ r.description }}</span>
+                    <span class="text-caption font-weight-semibold text-truncate" style="max-width:250px">{{ r.libelle }}</span>
                     <v-chip :color="sevColor(r.severite)" size="x-small" variant="tonal">{{ r.declenchements }}</v-chip>
                   </div>
                   <v-progress-linear
@@ -380,7 +196,7 @@
                   <div class="flex-grow-1">
                     <div class="d-flex justify-space-between mb-1">
                       <span class="text-caption font-weight-semibold">{{ sev.label }}</span>
-                      <span class="text-caption">{{ sev.count }} règle(s) · {{ sev.triggers }} déclenchements</span>
+                      <span class="text-caption">{{ sev.count }} règle(s) · {{ sev.triggers }} blocage(s)</span>
                     </div>
                     <v-progress-linear :model-value="sev.pct" :color="sev.color" rounded height="6" bg-color="surface-variant"/>
                   </div>
@@ -390,7 +206,7 @@
 
             <!-- Resolution rate -->
             <v-card rounded="lg" elevation="1">
-              <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Taux de résolution</v-card-title>
+              <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Taux de résolution des anomalies</v-card-title>
               <v-card-text class="pa-4">
                 <div class="d-flex align-center ga-4 mb-4">
                   <div class="text-center">
@@ -419,7 +235,8 @@
             <v-card rounded="lg" elevation="1">
               <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Activité récente</v-card-title>
               <v-card-text class="pa-4">
-                <v-timeline density="compact" align="start">
+                <div v-if="journal.length === 0" class="text-center pa-4 text-medium-emphasis text-caption">Aucune anomalie récente.</div>
+                <v-timeline v-else density="compact" align="start">
                   <v-timeline-item
                     v-for="j in journal.slice(0,6)" :key="j.id"
                     :dot-color="sevColor(j.severite)"
@@ -428,7 +245,7 @@
                     <div class="d-flex align-center justify-space-between flex-wrap ga-2">
                       <div>
                         <div class="text-body-2 font-weight-semibold">{{ j.regle }}</div>
-                        <div class="text-caption text-medium-emphasis">{{ j.dossier }} · {{ j.contribuable }}</div>
+                        <div class="text-caption text-medium-emphasis">{{ j.dossier }}</div>
                       </div>
                       <div class="d-flex ga-1 align-center">
                         <span class="text-caption text-medium-emphasis">{{ j.date }}</span>
@@ -445,104 +262,17 @@
 
     </v-window>
 
-    <!-- ── Create / Edit Rule Dialog ── -->
-    <v-dialog v-model="ruleDialog" max-width="640" scrollable>
-      <v-card rounded="xl">
-        <v-card-title class="pa-5 pb-3">
-          {{ editMode ? 'Modifier la règle' : 'Créer une règle' }}
-        </v-card-title>
-        <v-divider/>
-        <v-card-text class="pa-5">
-          <v-text-field v-model="form.description" label="Description de la règle" prepend-inner-icon="mdi-text" class="mb-3" hide-details/>
-          <v-row dense class="mb-3">
-            <v-col cols="6">
-              <v-select v-model="form.severite" :items="['bloquant','avertissement','info']" label="Sévérité" hide-details/>
-            </v-col>
-            <v-col cols="6">
-              <v-select v-model="form.categorie" :items="categories" label="Catégorie" hide-details/>
-            </v-col>
-          </v-row>
-
-          <!-- Condition builder -->
-          <div class="d-flex align-center justify-space-between mb-2">
-            <span class="text-body-2 font-weight-semibold">Conditions</span>
-            <div class="d-flex ga-2">
-              <v-btn-toggle v-model="form.andOr" density="compact" variant="outlined" color="primary" rounded="pill" mandatory>
-                <v-btn value="ET" size="x-small">ET</v-btn>
-                <v-btn value="OU" size="x-small">OU</v-btn>
-              </v-btn-toggle>
-              <v-btn size="x-small" color="primary" variant="tonal" prepend-icon="mdi-plus" @click="addFormCond">Ajouter</v-btn>
-            </div>
-          </div>
-
-          <div v-for="(cond, ci) in form.conditions" :key="ci" class="d-flex align-center ga-2 mb-2">
-            <v-chip v-if="ci > 0" :color="form.andOr === 'ET' ? 'primary' : 'warning'" size="x-small" variant="tonal" class="flex-shrink-0">{{ form.andOr }}</v-chip>
-            <v-select v-model="cond.field" :items="condFields" label="Champ" density="compact" hide-details style="max-width:180px"/>
-            <v-select v-model="cond.operator" :items="condOperators" label="Op." density="compact" hide-details style="max-width:110px"/>
-            <v-text-field v-model="cond.value" label="Valeur" density="compact" hide-details class="flex-grow-1"/>
-            <v-btn size="x-small" icon="mdi-close" variant="text" color="error" @click="form.conditions.splice(ci,1)"/>
-          </div>
-          <div v-if="form.conditions.length === 0" class="text-caption text-medium-emphasis pa-2 text-center">Aucune condition — cliquez sur Ajouter.</div>
-
-          <!-- Natural language preview -->
-          <v-card v-if="form.conditions.length" variant="tonal" color="primary" rounded="lg" class="pa-3 mt-2 mb-3">
-            <div class="text-caption text-medium-emphasis mb-1">Aperçu :</div>
-            <code class="text-caption">SI {{ form.conditions.map(c => `${c.field} ${c.operator} ${c.value || '…'}`).join(` ${form.andOr} `) }}</code>
-          </v-card>
-
-          <v-divider class="mb-3"/>
-          <div class="text-body-2 font-weight-semibold mb-2">Actions au déclenchement</div>
-          <div class="d-flex flex-wrap ga-2 mb-3">
-            <v-checkbox v-for="a in actionList" :key="a.key" v-model="form.actions[a.key]" :label="a.label" hide-details density="compact" :color="a.color"/>
-          </div>
-
-          <v-btn size="small" color="secondary" variant="tonal" prepend-icon="mdi-flask" @click="testDialog=true">
-            Tester sur données de démonstration
-          </v-btn>
-        </v-card-text>
-        <v-divider/>
-        <v-card-actions class="pa-4">
-          <v-spacer/>
-          <v-btn variant="text" @click="ruleDialog=false">Annuler</v-btn>
-          <v-btn color="primary" @click="saveRule">{{ editMode ? 'Enregistrer' : 'Créer la règle' }}</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <!-- ── Test Demo Dialog ── -->
-    <v-dialog v-model="testDialog" max-width="520">
-      <v-card rounded="xl">
-        <v-card-title class="pa-5 pb-3 d-flex align-center ga-2">
-          <v-icon icon="mdi-flask" color="secondary"/>
-          Test sur données de démonstration
-        </v-card-title>
-        <v-card-text class="pa-5">
-          <v-select :items="mockDossiers" item-title="ref" item-value="id" label="Dossier de test" class="mb-3" hide-details/>
-          <div v-if="testResult.length" class="test-log pa-3 rounded-lg mt-3" style="background:#0F172A;max-height:180px;overflow-y:auto">
-            <div v-for="(l,i) in testResult" :key="i" :class="['text-caption', l.ok ? 'text-success' : 'text-error']" style="font-family:monospace">
-              {{ l.msg }}
-            </div>
-          </div>
-        </v-card-text>
-        <v-card-actions class="pa-4">
-          <v-spacer/>
-          <v-btn variant="text" @click="testDialog=false; testResult=[]">Fermer</v-btn>
-          <v-btn color="secondary" :loading="testLoading" prepend-icon="mdi-play" @click="runTest">Lancer le test</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <!-- ── Run All Dialog ── -->
+    <!-- ── Run detection Dialog (POST /anomalies/detecter — réel) ── -->
     <v-dialog v-model="runAllDialog" max-width="400">
       <v-card rounded="xl">
         <v-card-title class="pa-5 pb-3 d-flex align-center ga-2">
           <v-icon icon="mdi-play-speed" color="primary"/>
-          Exécuter toutes les règles
+          Exécuter la détection
         </v-card-title>
         <v-card-text class="pa-5">
-          <p class="mb-3">Lance l'évaluation de toutes les règles actives sur l'ensemble des dossiers en cours.</p>
+          <p class="mb-3">Lance réellement le moteur de règles du backend (POST /anomalies/detecter) sur les dossiers en cours.</p>
           <v-alert type="warning" variant="tonal" density="compact" rounded="lg">
-            Cette opération peut prendre plusieurs minutes et générer des anomalies dans le journal d'audit.
+            Les anomalies détectées seront créées en base et journalisées dans l'audit.
           </v-alert>
         </v-card-text>
         <v-card-actions class="pa-4">
@@ -554,7 +284,7 @@
     </v-dialog>
 
     <!-- Snackbar -->
-    <v-snackbar v-model="snackbar" :color="snackColor" timeout="2500" location="bottom right">
+    <v-snackbar v-model="snackbar" :color="snackColor" timeout="3000" location="bottom right">
       <v-icon :icon="snackColor === 'success' ? 'mdi-check-circle' : 'mdi-alert'" class="me-2"/>
       {{ snackMsg }}
     </v-snackbar>
@@ -562,102 +292,49 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
+import { listerDemandesApi, listerBlocagesDemande } from '../../services/demandes'
+import { listerAnomalies, detecterAnomalies, type AnomalieAudit } from '../../services/audit'
 
 // ── Types ────────────────────────────────────────────────────────────────────
-interface CondItem { field: string; operator: string; value: string }
-interface RuleActions { bloquer: boolean; anomalie: boolean; notifier: boolean; notifSuperviseur: boolean; journaliser: boolean; reaffecter: boolean }
-interface RulePortee { types: string[]; etapes: string[]; institutions: string[]; frequence: string }
 interface Regle {
-  id: string; description: string; severite: string; categorie: string
-  declenchements: number; active: boolean; conditions: CondItem[]
-  andOr: 'ET' | 'OU'; actions: RuleActions; portee: RulePortee
-  expanded: boolean; activeTab: string
+  code: string
+  libelle: string
+  severite: string // 'bloquant' | 'avertissement' | 'info' (dérivé de la gravité API)
+  details?: string
+  declenchements: number // dossiers réellement bloqués
+  evalues: number // dossiers sur lesquels la règle a été évaluée
 }
-interface JournalEntry { id: number; regle: string; dossier: string; contribuable: string; date: string; severite: string; resolu: boolean }
-
-// ── Constants ────────────────────────────────────────────────────────────────
-const condFields = ['contribuable.dettes_sigtas', 'contribuable.dettes_sydonia', 'demande.montant_fcfa', 'demande.type', 'demande.duree_mois', 'demande.secteur', 'quota.utilise_pct', 'dossier.base_juridique_active', 'dossier.nb_doublons', 'dossier.date_expiration', 'agent.charge_dossiers']
-const condOperators = ['>', '<', '>=', '<=', '==', '!=', 'contient', 'est vide', 'est expiré']
-const categories = ['Fiscal', 'Douanier', 'Quota', 'Juridique', 'Doublon', 'Conformité', 'Temporel']
-const typesExo = ['Exonération douanière', 'Exonération IS', 'Exonération TVA', 'Zone Franche', "Convention d'investissement"]
-const actionList = [
-  { key: 'bloquer', label: 'Bloquer dossier', color: 'error' },
-  { key: 'anomalie', label: 'Créer anomalie', color: 'warning' },
-  { key: 'notifier', label: "Notifier l'agent", color: 'info' },
-  { key: 'notifSuperviseur', label: 'Notifier superviseur', color: 'primary' },
-  { key: 'journaliser', label: 'Journaliser', color: 'secondary' },
-  { key: 'reaffecter', label: 'Réaffecter', color: 'purple' },
-]
-
-const mkActions = (): RuleActions => ({ bloquer: false, anomalie: true, notifier: true, notifSuperviseur: false, journaliser: true, reaffecter: false })
-const mkPortee = (): RulePortee => ({ types: [], etapes: ['Toutes'], institutions: ['Toutes'], frequence: 'En temps réel' })
-
-function mkConds(arr: Partial<CondItem>[]): CondItem[] {
-  return arr.map(c => ({ field: c.field || '', operator: c.operator || '>', value: c.value || '' }))
-}
-
-// ── Data ─────────────────────────────────────────────────────────────────────
-const regles = ref<Regle[]>([
-  { id: 'r1', description: 'Contribuable avec dettes fiscales actives dans SIGTAS', severite: 'bloquant', categorie: 'Fiscal', declenchements: 8, active: true, andOr: 'ET', expanded: false, activeTab: 'condition', actions: { ...mkActions(), bloquer: true }, portee: { ...mkPortee(), types: [], etapes: ['Instruction','Validation'], institutions: ['OTR Impôts'] }, conditions: mkConds([{ field: 'contribuable.dettes_sigtas', operator: '>', value: '0' }, { field: 'demande.type', operator: '==', value: "'fiscale_is'" }]) },
-  { id: 'r2', description: 'Dépassement quota de plus de 200%', severite: 'bloquant', categorie: 'Quota', declenchements: 3, active: true, andOr: 'ET', expanded: false, activeTab: 'condition', actions: { ...mkActions(), bloquer: true }, portee: mkPortee(), conditions: mkConds([{ field: 'quota.utilise_pct', operator: '>=', value: '200' }]) },
-  { id: 'r3', description: 'Exonération dépassant la durée légale autorisée', severite: 'avertissement', categorie: 'Temporel', declenchements: 5, active: true, andOr: 'ET', expanded: false, activeTab: 'condition', actions: mkActions(), portee: mkPortee(), conditions: mkConds([{ field: 'demande.duree_mois', operator: '>', value: '36' }]) },
-  { id: 'r4', description: 'Doublon SYDONIA/SIGTAS même contribuable même base', severite: 'bloquant', categorie: 'Doublon', declenchements: 2, active: true, andOr: 'ET', expanded: false, activeTab: 'condition', actions: { ...mkActions(), bloquer: true }, portee: mkPortee(), conditions: mkConds([{ field: 'dossier.nb_doublons', operator: '>=', value: '1' }]) },
-  { id: 'r5', description: 'Exonération expirée dans 30 jours sans renouvellement', severite: 'info', categorie: 'Temporel', declenchements: 7, active: true, andOr: 'ET', expanded: false, activeTab: 'condition', actions: mkActions(), portee: mkPortee(), conditions: mkConds([{ field: 'dossier.date_expiration', operator: 'est expiré', value: '30j' }]) },
-  { id: 'r6', description: 'Base juridique marquée abrogée utilisée dans dossier actif', severite: 'avertissement', categorie: 'Juridique', declenchements: 1, active: false, andOr: 'ET', expanded: false, activeTab: 'condition', actions: mkActions(), portee: mkPortee(), conditions: mkConds([{ field: 'dossier.base_juridique_active', operator: '==', value: 'false' }]) },
-  { id: 'r7', description: 'Contribuable avec dettes douanières SYDONIA non soldées', severite: 'bloquant', categorie: 'Douanier', declenchements: 4, active: true, andOr: 'ET', expanded: false, activeTab: 'condition', actions: { ...mkActions(), bloquer: true }, portee: { ...mkPortee(), institutions: ['OTR Douanes'] }, conditions: mkConds([{ field: 'contribuable.dettes_sydonia', operator: '>', value: '0' }]) },
-])
-
-const journal = ref<JournalEntry[]>([
-  { id: 1, regle: 'Contribuable avec dettes fiscales (SIGTAS)', dossier: 'OASE-2026-0038', contribuable: 'TOGO STEEL SARL', date: '24/04/2026', severite: 'bloquant', resolu: false },
-  { id: 2, regle: 'Dépassement quota 340%', dossier: 'OASE-2025-0082', contribuable: 'AGRO-TOGO INVEST', date: '18/04/2026', severite: 'bloquant', resolu: true },
-  { id: 3, regle: 'Doublon SYDONIA/SIGTAS', dossier: 'OASE-2025-0099', contribuable: 'LOMÉ TRANSIT SA', date: '25/04/2026', severite: 'bloquant', resolu: false },
-  { id: 4, regle: 'Exonération expirée dans 30 jours', dossier: 'OASE-2024-0210', contribuable: 'API-ZF INVEST', date: '22/04/2026', severite: 'info', resolu: true },
-  { id: 5, regle: 'Durée légale dépassée', dossier: 'OASE-2023-0175', contribuable: 'TECHNOPOLE SA', date: '20/04/2026', severite: 'avertissement', resolu: false },
-  { id: 6, regle: 'Dettes douanières SYDONIA', dossier: 'OASE-2026-0041', contribuable: 'IMPORT EXPRESS', date: '19/04/2026', severite: 'bloquant', resolu: true },
-])
-
-const mockDossiers = [
-  { id: '1', ref: 'OASE-2026-0042 — TOGO STEEL SARL' },
-  { id: '2', ref: 'OASE-2026-0039 — AGRO-TOGO INVEST' },
-]
+interface JournalEntry { id: string; regle: string; dossier: string; date: string; severite: string; resolu: boolean }
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const mainTab = ref('rules')
 const search = ref('')
 const filterSev = ref('Toutes')
-const filterCat = ref('Toutes')
 const filterActive = ref('all')
 const journalSearch = ref('')
 const journalSevFilter = ref('Toutes')
-const ruleDialog = ref(false)
-const editMode = ref(false)
-const editingId = ref<string | null>(null)
-const testDialog = ref(false)
-const testLoading = ref(false)
-const testResult = ref<{ msg: string; ok: boolean }[]>([])
-const testSuccess = ref<string | null>(null)
 const runAllDialog = ref(false)
 const runAllLoading = ref(false)
 const snackbar = ref(false)
 const snackMsg = ref('')
 const snackColor = ref<'success' | 'error'>('success')
+const loading = ref(true)
+const loadError = ref<string | null>(null)
 
-const form = reactive({
-  description: '', severite: 'bloquant', categorie: 'Fiscal', andOr: 'ET' as 'ET' | 'OU',
-  conditions: [] as CondItem[],
-  actions: mkActions(),
-})
+const regles = ref<Regle[]>([])
+const journal = ref<JournalEntry[]>([])
+const nbDossiers = ref(0)
+const nbBlocagesActifs = ref(0)
 
 // ── Computed ──────────────────────────────────────────────────────────────────
 const filteredRegles = computed(() =>
   regles.value.filter(r => {
     if (filterSev.value !== 'Toutes' && r.severite !== filterSev.value) return false
-    if (filterCat.value !== 'Toutes' && r.categorie !== filterCat.value) return false
-    if (filterActive.value === 'active' && !r.active) return false
-    if (filterActive.value === 'inactive' && r.active) return false
-    if (search.value && !r.description.toLowerCase().includes(search.value.toLowerCase())) return false
+    if (filterActive.value === 'active' && r.declenchements === 0) return false
+    if (filterActive.value === 'inactive' && r.declenchements > 0) return false
+    if (search.value && !r.libelle.toLowerCase().includes(search.value.toLowerCase()) && !r.code.toLowerCase().includes(search.value.toLowerCase())) return false
     return true
   })
 )
@@ -671,10 +348,10 @@ const filteredJournal = computed(() =>
 )
 
 const kpis = computed(() => [
-  { label: 'Règles actives', value: regles.value.filter(r => r.active).length, icon: 'mdi-check-circle', color: 'success' },
-  { label: 'Règles bloquantes', value: regles.value.filter(r => r.severite === 'bloquant' && r.active).length, icon: 'mdi-alert-octagon', color: 'error' },
-  { label: 'Déclenchements (30j)', value: regles.value.reduce((a, r) => a + r.declenchements, 0), icon: 'mdi-play-circle', color: 'warning' },
-  { label: 'Règles désactivées', value: regles.value.filter(r => !r.active).length, icon: 'mdi-pause-circle', color: 'secondary' },
+  { label: 'Règles évaluées', value: regles.value.length, icon: 'mdi-cog-play', color: 'primary' },
+  { label: 'Dossiers évalués', value: nbDossiers.value, icon: 'mdi-folder-multiple-outline', color: 'info' },
+  { label: 'Blocages actifs', value: nbBlocagesActifs.value, icon: 'mdi-alert-octagon', color: 'error' },
+  { label: 'Anomalies ouvertes', value: pendingCount.value, icon: 'mdi-alert-circle-outline', color: 'warning' },
 ])
 
 const topRules = computed(() => [...regles.value].sort((a, b) => b.declenchements - a.declenchements).slice(0, 5))
@@ -683,101 +360,106 @@ const resolvedCount = computed(() => journal.value.filter(j => j.resolu).length)
 const pendingCount = computed(() => journal.value.filter(j => !j.resolu).length)
 const resolutionRate = computed(() => Math.round((resolvedCount.value / Math.max(journal.value.length, 1)) * 100))
 
-const sevStats = computed(() => [
-  { label: 'Bloquant', color: 'error', icon: 'mdi-alert-octagon', count: regles.value.filter(r => r.severite === 'bloquant').length, triggers: regles.value.filter(r => r.severite === 'bloquant').reduce((a, r) => a + r.declenchements, 0), pct: 65 },
-  { label: 'Avertissement', color: 'warning', icon: 'mdi-alert', count: regles.value.filter(r => r.severite === 'avertissement').length, triggers: regles.value.filter(r => r.severite === 'avertissement').reduce((a, r) => a + r.declenchements, 0), pct: 25 },
-  { label: 'Information', color: 'info', icon: 'mdi-information', count: regles.value.filter(r => r.severite === 'info').length, triggers: regles.value.filter(r => r.severite === 'info').reduce((a, r) => a + r.declenchements, 0), pct: 10 },
-])
+// % calculés réellement depuis les règles/blocages agrégés (plus de valeurs en dur).
+const sevStats = computed(() => {
+  const total = Math.max(regles.value.length, 1)
+  return (['bloquant', 'avertissement', 'info'] as const).map(sev => {
+    const rs = regles.value.filter(r => r.severite === sev)
+    return {
+      label: sev === 'bloquant' ? 'Bloquant' : sev === 'avertissement' ? 'Avertissement' : 'Information',
+      color: sevColor(sev),
+      icon: sevIcon(sev),
+      count: rs.length,
+      triggers: rs.reduce((a, r) => a + r.declenchements, 0),
+      pct: Math.round((rs.length / total) * 100),
+    }
+  })
+})
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function sevColor(s: string) { return s === 'bloquant' ? 'error' : s === 'avertissement' ? 'warning' : 'info' }
 function sevIcon(s: string) { return s === 'bloquant' ? 'mdi-alert-octagon' : s === 'avertissement' ? 'mdi-alert' : 'mdi-information' }
-function condPreview(conds: CondItem[]) {
-  if (!conds.length) return 'Toujours active'
-  return conds.map(c => `${c.field} ${c.operator} ${c.value}`).join(' ET ').slice(0, 50) + (conds.join('').length > 50 ? '…' : '')
+/** Gravité API → sévérité d'affichage. */
+function severiteFromGravite(gravite: string | undefined, bloque: boolean): string {
+  const g = (gravite ?? '').toLowerCase()
+  if (g === 'critique' || g === 'elevee' || (bloque && g !== 'faible')) return 'bloquant'
+  if (g === 'moyenne') return 'avertissement'
+  return 'info'
 }
 function snack(msg: string, color: 'success' | 'error' = 'success') {
   snackMsg.value = msg; snackColor.value = color; snackbar.value = true
 }
 
-// ── Actions ───────────────────────────────────────────────────────────────────
-function expandAll() { regles.value.forEach(r => r.expanded = true) }
-function collapseAll() { regles.value.forEach(r => r.expanded = false) }
+// ── Chargement réel ───────────────────────────────────────────────────────────
+async function charger() {
+  loading.value = true
+  loadError.value = null
+  try {
+    const [demandesRes, anomalies] = await Promise.all([
+      listerDemandesApi(),
+      listerAnomalies().catch(() => [] as AnomalieAudit[]),
+    ])
+    nbDossiers.value = demandesRes.data.length
 
-function addCond(regle: Regle) {
-  regle.conditions.push({ field: 'contribuable.dettes_sigtas', operator: '>', value: '' })
-}
-function addFormCond() {
-  form.conditions.push({ field: 'contribuable.dettes_sigtas', operator: '>', value: '' })
-}
+    // Évaluation réelle des règles de blocage sur chaque dossier (GET /demandes/:id/blocages).
+    const parCode = new Map<string, Regle>()
+    let blocagesActifs = 0
+    const resultats = await Promise.all(
+      demandesRes.data.map(d => listerBlocagesDemande(d.id).catch(() => [])),
+    )
+    for (const blocages of resultats) {
+      for (const b of blocages) {
+        const existing = parCode.get(b.code)
+        if (existing) {
+          existing.evalues++
+          if (b.bloque) { existing.declenchements++; blocagesActifs++ }
+          if (!existing.details && b.details) existing.details = b.details
+        } else {
+          if (b.bloque) blocagesActifs++
+          parCode.set(b.code, {
+            code: b.code,
+            libelle: b.libelle,
+            severite: severiteFromGravite(b.gravite, b.bloque),
+            details: b.details,
+            declenchements: b.bloque ? 1 : 0,
+            evalues: 1,
+          })
+        }
+      }
+    }
+    regles.value = [...parCode.values()].sort((a, b) => b.declenchements - a.declenchements)
+    nbBlocagesActifs.value = blocagesActifs
 
-function openCreate() {
-  editMode.value = false; editingId.value = null
-  form.description = ''; form.severite = 'bloquant'; form.categorie = 'Fiscal'
-  form.andOr = 'ET'; form.conditions = []; Object.assign(form.actions, mkActions())
-  ruleDialog.value = true
-}
-
-function openEdit(regle: Regle) {
-  editMode.value = true; editingId.value = regle.id
-  form.description = regle.description; form.severite = regle.severite; form.categorie = regle.categorie
-  form.andOr = regle.andOr; form.conditions = regle.conditions.map(c => ({ ...c }))
-  Object.assign(form.actions, regle.actions)
-  ruleDialog.value = true
-}
-
-function saveRule() {
-  if (!form.description) return
-  if (editMode.value && editingId.value) {
-    const r = regles.value.find(x => x.id === editingId.value)
-    if (r) { r.description = form.description; r.severite = form.severite; r.categorie = form.categorie; r.andOr = form.andOr; r.conditions = form.conditions.map(c => ({ ...c })); Object.assign(r.actions, form.actions) }
-    snack('Règle mise à jour')
-  } else {
-    regles.value.push({ id: `r${Date.now()}`, description: form.description, severite: form.severite, categorie: form.categorie, declenchements: 0, active: true, andOr: form.andOr, conditions: form.conditions.map(c => ({ ...c })), actions: { ...form.actions }, portee: mkPortee(), expanded: false, activeTab: 'condition' })
-    snack('Règle créée')
+    journal.value = anomalies.map(a => ({
+      id: a.id,
+      regle: a.description,
+      dossier: a.demandes?.reference ?? '—',
+      date: new Date(a.dateDetection).toLocaleDateString('fr-FR'),
+      severite: severiteFromGravite(a.graviteCode, false),
+      resolu: a.statutCode === 'resolue' || a.statutCode === 'rejetee',
+    }))
+  } catch (e) {
+    loadError.value = e instanceof Error ? e.message : 'Erreur de chargement du moteur de règles'
+  } finally {
+    loading.value = false
   }
-  ruleDialog.value = false
 }
 
-function deleteRule(id: string) {
-  regles.value = regles.value.filter(r => r.id !== id)
-  snack('Règle supprimée', 'error')
-}
-
-function onToggle(regle: Regle) {
-  snack(`Règle "${regle.description.slice(0, 30)}…" ${regle.active ? 'activée' : 'désactivée'}`)
-}
-
-function testRule(regle: Regle) {
-  testSuccess.value = regle.id
-  snack(`Test — "${regle.description.slice(0, 40)}…" : 3 dossiers concernés`)
-  setTimeout(() => { testSuccess.value = null }, 3000)
-  testDialog.value = true
-}
-
-function runTest() {
-  testLoading.value = true; testResult.value = []
-  const steps = [
-    { msg: '▶ Chargement des dossiers mock...', ok: true },
-    { msg: '✓ 2 dossiers sélectionnés', ok: true },
-    { msg: '→ Évaluation OASE-2026-0042 : condition VÉRIFIÉE', ok: true },
-    { msg: '  ⚡ Action : anomalie créée, agent notifié', ok: true },
-    { msg: '→ Évaluation OASE-2026-0039 : condition NON vérifiée', ok: false },
-    { msg: '✅ Test terminé — 1 dossier concerné / 2 testés', ok: true },
-  ]
-  let i = 0
-  const iv = setInterval(() => {
-    if (i < steps.length) testResult.value.push(steps[i++])
-    else { clearInterval(iv); testLoading.value = false }
-  }, 200)
-}
-
-function doRunAll() {
+async function doRunAll() {
   runAllLoading.value = true
-  setTimeout(() => { runAllLoading.value = false; runAllDialog.value = false; snack('Exécution terminée — 5 anomalies détectées') }, 2000)
+  try {
+    const res = await detecterAnomalies()
+    snack(`Détection terminée — ${res.detectees} anomalie(s) détectée(s)`)
+    runAllDialog.value = false
+    await charger()
+  } catch (e) {
+    snack(e instanceof Error ? e.message : 'Échec de la détection', 'error')
+  } finally {
+    runAllLoading.value = false
+  }
 }
 
-function exportJournal() { snack('Journal exporté en CSV') }
+onMounted(charger)
 </script>
 
 <style scoped>
@@ -791,7 +473,6 @@ function exportJournal() { snack('Journal exporté en CSV') }
   overflow: hidden;
 }
 .rule-node:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.1); }
-.rule-node.rule--open { box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
 .rule--bloquant { border-left-color: #C62828; }
 .rule--avertissement { border-left-color: #E65100; }
 .rule--info { border-left-color: #0277BD; }
@@ -801,9 +482,5 @@ function exportJournal() { snack('Journal exporté en CSV') }
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  cursor: pointer;
-  user-select: none;
 }
-.rule-header:hover { background: rgba(0,0,0,0.01); }
-.rule-body { padding: 0 16px 16px; }
 </style>

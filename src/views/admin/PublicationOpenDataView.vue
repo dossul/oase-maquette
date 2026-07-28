@@ -5,13 +5,19 @@
       subtitle="Préparation, anonymisation, validation et publication des jeux publics et indicateurs obligatoires"
       icon="mdi-publish"
     >
-      <template #actions>
-        <v-btn color="secondary" variant="tonal" size="small" prepend-icon="mdi-shield-lock-outline">Règles d'anonymisation</v-btn>
-        <v-btn color="primary" size="small" prepend-icon="mdi-send-check-outline">Publier un lot</v-btn>
-      </template>
     </PageHeader>
 
-    <v-row class="mb-4">
+    <v-alert v-if="loadError" type="error" variant="tonal" rounded="lg" density="compact" class="mb-4">
+      {{ loadError }}
+    </v-alert>
+
+    <v-row v-if="loading" class="mb-4">
+      <v-col v-for="n in 4" :key="n" cols="6" md="3">
+        <v-skeleton-loader type="card" rounded="lg"/>
+      </v-col>
+    </v-row>
+
+    <v-row v-else class="mb-4">
       <v-col v-for="kpi in kpis" :key="kpi.label" cols="6" md="3">
         <KpiCard v-bind="kpi" />
       </v-col>
@@ -21,7 +27,8 @@
       <v-col cols="12" md="8">
         <v-card rounded="lg" elevation="1" class="mb-4">
           <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Workflow de publication</v-card-title>
-          <v-stepper model-value="4" alt-labels>
+          <!-- Étapes du processus (documentation fonctionnelle — pas un état d'avancement réel) -->
+          <v-stepper alt-labels>
             <v-stepper-header>
               <v-stepper-item title="1. Sélection" value="1" />
               <v-stepper-item title="2. Anonymisation" value="2" />
@@ -43,6 +50,24 @@
       </v-col>
 
       <v-col cols="12" md="4">
+        <v-card rounded="lg" elevation="1" class="mb-4">
+          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Mesures exposées (GET /rapports/opendata)</v-card-title>
+          <v-progress-linear v-if="loading" indeterminate color="primary"/>
+          <v-list v-else-if="mesures.length" density="compact" class="pa-2">
+            <v-list-item
+              v-for="m in mesures" :key="m.codeMesure"
+              :title="m.codeMesure"
+              :subtitle="m.version?.libelle ?? ''"
+              prepend-icon="mdi-database-outline"
+              rounded="lg"
+            />
+          </v-list>
+          <div v-else class="text-center pa-6 text-medium-emphasis">
+            <v-icon icon="mdi-database-off-outline" size="36" class="mb-2 opacity-40"/>
+            <div class="text-body-2">Aucune mesure exposée.</div>
+          </div>
+        </v-card>
+
         <v-card rounded="lg" elevation="1" class="mb-4">
           <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Matrice de diffusion</v-card-title>
           <v-list density="compact" class="pa-2">
@@ -69,15 +94,29 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
+import { api } from '../../services/api'
 
-const kpis = [
-  { label: 'Datasets prêts', value: '7', icon: 'mdi-database-check-outline', color: 'primary', subtitle: 'Publication T2 2026' },
-  { label: 'Lots anonymisés', value: '5', icon: 'mdi-incognito', color: 'info', subtitle: 'Règles validées' },
-  { label: 'Publications versionnées', value: '18', icon: 'mdi-source-branch', color: 'success', subtitle: 'Historique conservé' },
-  { label: 'Rejets qualité', value: '2', icon: 'mdi-alert-circle-outline', color: 'warning', subtitle: 'À corriger avant diffusion' },
-]
+interface MesureOpenData {
+  codeMesure: string
+  version?: { libelle?: string; impotConcerne?: string | null } | null
+}
+interface Rapport { id: string; typeRapportCode?: string; periodeAnnee?: number }
+
+const loading = ref(true)
+const loadError = ref<string | null>(null)
+const mesures = ref<MesureOpenData[]>([])
+const rapports = ref<Rapport[]>([])
+
+const kpis = computed(() => [
+  { label: 'Mesures exposées', value: mesures.value.length, icon: 'mdi-database-check-outline', color: 'primary', subtitle: 'GET /rapports/opendata' },
+  { label: 'Rapports générés', value: rapports.value.length, icon: 'mdi-file-chart-outline', color: 'success', subtitle: 'GET /rapports' },
+  // TODO(endpoint): suivi des lots anonymisés / rejets qualité non exposé par l'API v1.
+  { label: 'Lots anonymisés', value: '—', icon: 'mdi-incognito', color: 'info', subtitle: 'Non instrumenté' },
+  { label: 'Rejets qualité', value: '—', icon: 'mdi-alert-circle-outline', color: 'warning', subtitle: 'Non instrumenté' },
+])
 
 const headers = [
   { title: 'Indicateur', key: 'indicateur' },
@@ -85,13 +124,32 @@ const headers = [
   { title: 'Statut', key: 'statut' },
 ]
 
-const rows = [
-  { indicateur: 'Inventaire ouvert des bases juridiques', source: 'Référentiel juridique', statut: 'Prêt' },
-  { indicateur: 'Mesures actives par impôt / secteur / contribuable', source: 'Registre central', statut: 'Prêt' },
-  { indicateur: 'Montants annuels agrégés par impôt / fonction budgétaire', source: 'Annexe budgetaire', statut: 'En validation' },
-  { indicateur: 'Rapports CONEDEF 2019-2024', source: 'Bibliothèque rapports', statut: 'Prêt' },
-  { indicateur: 'Indicateurs de qualité des données', source: 'Gouvernance données', statut: 'En validation' },
-]
+// Les 5 indicateurs obligatoires sont une exigence normative (documentation) ;
+// le statut reflète honnêtement la disponibilité réelle des données dans l'API v1.
+const rows = computed(() => [
+  { indicateur: 'Inventaire ouvert des bases juridiques', source: 'Référentiel juridique', statut: mesures.value.length ? 'Données disponibles' : 'Aucune donnée' },
+  { indicateur: 'Mesures actives par impôt / secteur / contribuable', source: 'Registre central', statut: mesures.value.length ? 'Données disponibles' : 'Aucune donnée' },
+  { indicateur: 'Montants annuels agrégés par impôt / fonction budgétaire', source: 'Annexe budgetaire', statut: 'Non instrumenté' },
+  { indicateur: 'Rapports CONEDEF 2019-2024', source: 'Bibliothèque rapports', statut: 'Non instrumenté' },
+  { indicateur: 'Indicateurs de qualité des données', source: 'Gouvernance données', statut: 'Non instrumenté' },
+])
 
-const statusColor = (value: string) => ({ 'Prêt': 'success', 'En validation': 'warning' } as Record<string, string>)[value] || 'secondary'
+const statusColor = (value: string) => ({ 'Données disponibles': 'success', 'Aucune donnée': 'warning', 'Non instrumenté': 'secondary' } as Record<string, string>)[value] || 'secondary'
+
+onMounted(async () => {
+  loading.value = true
+  loadError.value = null
+  try {
+    const [m, r] = await Promise.all([
+      api<MesureOpenData[]>('/rapports/opendata'),
+      api<Rapport[]>('/rapports'),
+    ])
+    mesures.value = Array.isArray(m) ? m : []
+    rapports.value = Array.isArray(r) ? r : []
+  } catch (e) {
+    loadError.value = e instanceof Error ? e.message : 'Erreur de chargement des données open data'
+  } finally {
+    loading.value = false
+  }
+})
 </script>

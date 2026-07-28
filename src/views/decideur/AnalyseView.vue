@@ -1,20 +1,24 @@
 <template>
   <div>
-    <PageHeader title="Analyse sectorielle et géographique" subtitle="Drill-down par secteur, type d'impôt ou région" icon="mdi-chart-areaspline"/>
+    <PageHeader title="Analyse sectorielle et géographique" subtitle="Drill-down par secteur, type d'impôt ou année — données réelles API" icon="mdi-chart-areaspline"/>
     <v-row class="mb-4">
       <v-col cols="6" md="3">
         <v-select v-model="filterSecteur" :items="secteurs" label="Secteur" clearable hide-details/>
       </v-col>
       <v-col cols="6" md="3">
-        <v-select v-model="filterImpot" :items="['Douanes','IS','TVA','IRCM','Tous']" label="Type d'impôt" hide-details/>
+        <v-select v-model="filterImpot" :items="impots" label="Type d'impôt" clearable hide-details/>
       </v-col>
       <v-col cols="6" md="3">
-        <v-select v-model="filterStatut" :items="['Accordée','Suspendue','Expirée','Toutes']" label="Statut" hide-details/>
+        <v-select v-model="filterStatut" :items="['Accordée','Rejetée','En instruction','Toutes']" label="Statut" hide-details/>
       </v-col>
       <v-col cols="6" md="3">
         <v-select v-model="compareYear" :items="['2026 vs 2025','2025 vs 2024','2024 vs 2023']" label="Comparaison" hide-details/>
       </v-col>
     </v-row>
+
+    <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
+    <v-alert v-if="error" type="error" variant="tonal" rounded="lg" density="compact" class="mb-4">{{ error }}</v-alert>
+
     <v-row>
       <v-col cols="12" md="8">
         <v-card rounded="lg" elevation="1" class="mb-4">
@@ -23,31 +27,36 @@
             <v-chip color="primary" size="x-small" variant="tonal" class="ms-2">Drill-down</v-chip>
           </v-card-title>
           <v-card-text>
+            <v-alert v-if="!loading && !drillData.length" type="info" variant="tonal" density="compact" rounded="lg">
+              Aucune demande ne correspond aux filtres sélectionnés.
+            </v-alert>
             <div v-for="s in drillData" :key="s.secteur" class="mb-4">
               <div class="d-flex align-center justify-space-between mb-1">
                 <span class="font-weight-semibold text-body-2 cursor-pointer text-primary" @click="filterSecteur=s.secteur">{{ s.secteur }}</span>
                 <div class="d-flex align-center ga-2">
-                  <span class="font-weight-bold">{{ s.n2026 }}M</span>
-                  <v-chip :color="s.variation>=0?'error':'success'" size="x-small" variant="tonal">{{ s.variation>=0?'+':'' }}{{ s.variation }}%</v-chip>
+                  <span class="font-weight-bold">{{ formatMontantCompact(s.montant) }}</span>
+                  <v-chip size="x-small" variant="tonal" color="info">{{ s.nb }} demande(s)</v-chip>
                 </div>
               </div>
-              <v-progress-linear :model-value="(s.n2026/234)*100" color="primary" rounded height="10" bg-color="surface-light"/>
+              <v-progress-linear :model-value="(s.montant / maxDrill) * 100" color="primary" rounded height="10" bg-color="surface-light"/>
               <div v-if="filterSecteur===s.secteur" class="mt-2 ms-2">
                 <v-chip v-for="b in s.contribuables" :key="b" size="x-small" variant="outlined" class="me-1 mb-1">{{ b }}</v-chip>
               </div>
             </div>
           </v-card-text>
         </v-card>
-        <v-card rounded="lg" elevation="1">
+        <v-card v-if="concentration" rounded="lg" elevation="1">
           <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Concentration — Les 5 premiers contribuables</v-card-title>
           <v-card-text>
             <v-alert type="info" variant="tonal" density="compact" rounded="lg" class="mb-4">
-              Les 5 premiers contribuables représentent <strong>47,3%</strong> du coût total des exonérations.
+              Les 5 premiers contribuables représentent <strong>{{ concentration.top5PctLabel }}%</strong> des montants demandés (périmètre : {{ concentration.nbContribuables }} contribuables).
             </v-alert>
-            <v-progress-linear :model-value="47.3" color="warning" rounded height="16" class="mb-2">
-              <template #default><span style="font-size:0.7rem;font-weight:700;color:white">47,3%</span></template>
+            <v-progress-linear :model-value="concentration.top5Pct" color="warning" rounded height="16" class="mb-2">
+              <template #default><span style="font-size:0.7rem;font-weight:700;color:white">{{ concentration.top5PctLabel }}%</span></template>
             </v-progress-linear>
-            <div class="text-caption text-medium-emphasis">Indice de concentration Herfindahl-Hirschman (HHI): 0.42 — Concentration modérée</div>
+            <div class="text-caption text-medium-emphasis">
+              Indice de concentration Herfindahl-Hirschman (HHI) : {{ concentration.hhiLabel }} — {{ concentration.hhiNiveau }}
+            </div>
           </v-card-text>
         </v-card>
       </v-col>
@@ -55,15 +64,27 @@
         <v-card rounded="lg" elevation="1" class="mb-4">
           <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Comparaison {{ compareYear }}</v-card-title>
           <v-card-text>
+            <v-alert v-if="!loading && !comparatif.length" type="info" variant="tonal" density="compact" rounded="lg">
+              Aucun montant approuvé sur les années comparées.
+            </v-alert>
             <div v-for="c in comparatif" :key="c.label" class="mb-3">
               <div class="d-flex justify-space-between text-caption mb-1">
-                <span>{{ c.label }}</span>
-                <v-chip :color="c.variation>=0?'error':'success'" size="x-small" variant="tonal">{{ c.variation>=0?'+':'' }}{{ c.variation }}%</v-chip>
+                <span class="text-truncate" style="max-width:60%">{{ c.label }}</span>
+                <v-chip v-if="c.variation !== null" :color="c.variation>=0?'error':'success'" size="x-small" variant="tonal">{{ c.variation>=0?'+':'' }}{{ c.variation }}%</v-chip>
               </div>
-              <div class="d-flex ga-1">
+              <div class="d-flex align-center ga-1 mb-1">
                 <v-progress-linear :model-value="c.n1" color="primary" rounded height="8" class="flex-1"/>
-                <v-progress-linear :model-value="c.n2" color="secondary" rounded height="8" class="flex-1"/>
+                <span class="text-caption font-weight-semibold" style="min-width:70px;text-align:right">{{ c.m1Label }}</span>
               </div>
+              <div class="d-flex align-center ga-1">
+                <v-progress-linear :model-value="c.n2" color="secondary" rounded height="8" class="flex-1"/>
+                <span class="text-caption text-medium-emphasis" style="min-width:70px;text-align:right">{{ c.m2Label }}</span>
+              </div>
+            </div>
+            <div class="text-caption text-medium-emphasis mt-2">
+              <v-icon icon="mdi-square" size="10" color="primary" class="me-1"/>{{ anneesComparaison[0] }}
+              <v-icon icon="mdi-square" size="10" color="secondary" class="ms-3 me-1"/>{{ anneesComparaison[1] }}
+              — montants approuvés (API /rapports/opendata)
             </div>
           </v-card-text>
         </v-card>
@@ -83,24 +104,128 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
+import { listerDemandesDecideur, type DemandeFile } from '../../services/decideur'
+import { listerMesuresOpenData, formatMontantCompact, type MesureOpenData } from '../../services/rapports'
+
 const filterSecteur = ref<string|null>(null)
-const filterImpot = ref('Tous')
+const filterImpot = ref<string|null>(null)
 const filterStatut = ref('Toutes')
 const compareYear = ref('2026 vs 2025')
-const secteurs = ['Mines & Hydrocarbures','Zone Franche','Agriculture','Énergie','Numérique','Santé','Transport']
-const drillData = [
-  { secteur: 'Mines & Hydrocarbures', n2026: 234, variation: +18.2, contribuables: ['MINES DU NORD TOGO','PETRO-TOGO SA','GOLDEN MINES'] },
-  { secteur: 'Zone Franche', n2026: 198, variation: +5.4, contribuables: ['LOMÉ TEXTILE ZF SAS','AGRO-PROCESSING ZES'] },
-  { secteur: 'Agriculture', n2026: 145, variation: -2.1, contribuables: ['AGRO-TOGO INVEST SA','AGRI-PLUS TOGO'] },
-  { secteur: 'Énergie', n2026: 112, variation: +32.1, contribuables: ['ENERGIE SOLAIRE TOGO','VOLTALIA TOGO'] },
-  { secteur: 'Numérique', n2026: 89, variation: +14.7, contribuables: ['NUMERIQUE AFRIQUE SA','TOGO TELECOM'] },
-]
-const comparatif = [
-  { label: 'Total exonérations', n1: 70, n2: 60, variation: 16.7 },
-  { label: 'Mines', n1: 65, n2: 55, variation: 18.2 },
-  { label: 'Zone Franche', n1: 55, n2: 52, variation: 5.8 },
-  { label: 'Agriculture', n1: 40, n2: 41, variation: -2.4 },
-]
+
+const loading = ref(false)
+const error = ref<string | null>(null)
+const demandes = ref<DemandeFile[]>([])
+const mesuresOd = ref<MesureOpenData[]>([])
+
+onMounted(async () => {
+  loading.value = true
+  error.value = null
+  try {
+    const [resDemandes, resMesures] = await Promise.all([
+      listerDemandesDecideur(),
+      listerMesuresOpenData(),
+    ])
+    demandes.value = resDemandes.data
+    mesuresOd.value = resMesures
+  } catch {
+    error.value = 'Impossible de charger les données d\'analyse.'
+  } finally {
+    loading.value = false
+  }
+})
+
+// ── Drill-down sectoriel (montants réels des demandes) ──────────────────────
+const STATUT_MAP: Record<string, string | null> = {
+  'Accordée': 'approuve',
+  'Rejetée': 'rejete',
+  'En instruction': 'en_instruction',
+  'Toutes': null,
+}
+
+const demandesFiltrees = computed(() => {
+  const statut = STATUT_MAP[filterStatut.value] ?? null
+  return demandes.value.filter((d) => !statut || d.statutCode === statut)
+})
+
+const secteurs = computed(() =>
+  [...new Set(demandes.value.map((d) => d.secteur || 'Non renseigné'))].sort(),
+)
+
+const drillData = computed(() => {
+  const agg = new Map<string, { montant: number; nb: number; contribuables: Set<string> }>()
+  for (const d of demandesFiltrees.value) {
+    const secteur = d.secteur || 'Non renseigné'
+    const a = agg.get(secteur) ?? { montant: 0, nb: 0, contribuables: new Set<string>() }
+    a.montant += Number(d.montantFcfa)
+    a.nb++
+    if (d.contribuable?.raisonSociale) a.contribuables.add(d.contribuable.raisonSociale)
+    agg.set(secteur, a)
+  }
+  return [...agg.entries()]
+    .map(([secteur, a]) => ({ secteur, montant: a.montant, nb: a.nb, contribuables: [...a.contribuables] }))
+    .sort((x, y) => y.montant - x.montant)
+})
+const maxDrill = computed(() => Math.max(1, ...drillData.value.map((s) => s.montant)))
+
+// ── Concentration (top 5 + HHI) — calculée sur les montants réels ──────────
+const concentration = computed(() => {
+  const agg = new Map<string, number>()
+  for (const d of demandesFiltrees.value) {
+    const nom = d.contribuable?.raisonSociale
+    if (!nom) continue
+    agg.set(nom, (agg.get(nom) ?? 0) + Number(d.montantFcfa))
+  }
+  const montants = [...agg.values()].sort((a, b) => b - a)
+  const total = montants.reduce((a, b) => a + b, 0)
+  if (!total || !montants.length) return null
+  const top5Pct = (montants.slice(0, 5).reduce((a, b) => a + b, 0) / total) * 100
+  const hhi = montants.reduce((acc, m) => acc + (m / total) ** 2, 0)
+  return {
+    top5Pct,
+    top5PctLabel: top5Pct.toLocaleString('fr-FR', { maximumFractionDigits: 1 }),
+    hhiLabel: hhi.toLocaleString('fr-FR', { maximumFractionDigits: 2 }),
+    hhiNiveau: hhi >= 0.25 ? 'Concentration élevée' : hhi >= 0.15 ? 'Concentration modérée' : 'Concentration faible',
+    nbContribuables: montants.length,
+  }
+})
+
+// ── Comparaison pluriannuelle (montants approuvés par année — open data) ────
+const anneesComparaison = computed(() => compareYear.value.split(' vs ').map(Number))
+
+const impots = computed(() =>
+  [...new Set(mesuresOd.value.map((m) => m.version?.impotConcerne).filter((i): i is string => !!i))].sort(),
+)
+
+const mesuresFiltrees = computed(() =>
+  mesuresOd.value.filter((m) => !filterImpot.value || m.version?.impotConcerne === filterImpot.value),
+)
+
+const comparatif = computed(() => {
+  const [y1, y2] = anneesComparaison.value
+  const montantAnnee = (m: MesureOpenData, annee: number) =>
+    Number(m.agregats?.montantParAnnee?.find((a) => a.annee === annee)?.montant ?? 0)
+
+  const lignes = mesuresFiltrees.value
+    .map((m) => ({ label: m.codeMesure, m1: montantAnnee(m, y1), m2: montantAnnee(m, y2) }))
+    .filter((l) => l.m1 > 0 || l.m2 > 0)
+    .sort((a, b) => (b.m1 + b.m2) - (a.m1 + a.m2))
+
+  const total1 = lignes.reduce((acc, l) => acc + l.m1, 0)
+  const total2 = lignes.reduce((acc, l) => acc + l.m2, 0)
+  const rows = [{ label: 'Total exonérations', m1: total1, m2: total2 }, ...lignes.slice(0, 3)]
+  const max = Math.max(1, ...rows.flatMap((r) => [r.m1, r.m2]))
+
+  return rows
+    .filter((r) => r.m1 > 0 || r.m2 > 0)
+    .map((r) => ({
+      label: r.label,
+      n1: (r.m1 / max) * 100,
+      n2: (r.m2 / max) * 100,
+      m1Label: formatMontantCompact(r.m1),
+      m2Label: formatMontantCompact(r.m2),
+      variation: r.m2 > 0 ? Math.round(((r.m1 - r.m2) / r.m2) * 1000) / 10 : null,
+    }))
+})
 </script>

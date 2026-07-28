@@ -6,79 +6,87 @@
       </template>
     </PageHeader>
 
-    <!-- SIGFiP status -->
-    <v-card variant="outlined" rounded="lg" class="mb-5" :color="sigfipStatus==='error'?'error':undefined">
-      <v-card-text class="pa-3 d-flex align-center ga-3">
-        <v-icon :icon="sigfipStatus==='error'?'mdi-api-off':'mdi-api'" :color="sigfipStatus==='error'?'error':'success'" size="22" />
-        <div class="flex-grow-1">
-          <div class="font-weight-semibold text-body-2">Connecteur SIGFiP — {{ sigfipStatus==='error'?'⚠ INDISPONIBLE':'Synchronisé' }}</div>
-          <div class="text-caption text-medium-emphasis">{{ sigfipStatus==='error'?'Dernière synchronisation: 27/04/2026 08:15 (il y a 2h30)':'Dernière synchronisation: 27/04/2026 10:45' }}</div>
-        </div>
-        <v-btn size="small" variant="tonal" :color="sigfipStatus==='error'?'error':'success'" prepend-icon="mdi-refresh" @click="sigfipStatus='ok'">Re-synchroniser</v-btn>
-      </v-card-text>
-    </v-card>
+    <!-- TODO(endpoint): bannière connecteur SIGFiP masquée — aucun endpoint de statut de synchronisation (vague B backend) -->
+
+    <v-progress-linear v-if="loading" indeterminate color="primary" class="mb-4" />
+    <v-alert v-if="loadError" type="warning" variant="tonal" density="compact" class="mb-4">
+      {{ loadError }}
+    </v-alert>
 
     <v-row class="mb-4">
       <v-col v-for="k in kpis" :key="k.label" cols="6" md="3"><KpiCard v-bind="k" /></v-col>
     </v-row>
 
-    <!-- Comparatif prévi/réa -->
-    <v-card rounded="lg" elevation="1" class="mb-4">
-      <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Comparatif Prévisions LFI vs Réalisations 2026 (Mds FCFA)</v-card-title>
-      <v-card-text>
-        <div class="d-flex flex-wrap ga-3 mb-4">
-          <v-chip color="primary" variant="tonal" size="small" prepend-icon="mdi-chart-line">Réalisations</v-chip>
-          <v-chip color="secondary" variant="outlined" size="small" prepend-icon="mdi-minus">Prévisions LFI</v-chip>
-        </div>
-        <div v-for="row in comparatif" :key="row.mois" class="mb-3">
-          <div class="d-flex justify-space-between text-caption mb-1">
-            <span class="font-weight-medium">{{ row.mois }}</span>
-            <span>Réa: <strong>{{ row.realise }}M</strong> / LFI: {{ row.lfi }}M
-              <v-chip :color="row.realise>row.lfi?'error':'success'" size="x-small" variant="tonal" class="ms-1">{{ row.realise>row.lfi?'+':'' }}{{ row.realise-row.lfi }}M</v-chip>
-            </span>
-          </div>
-          <v-progress-linear :model-value="(row.realise/row.lfi)*100" :color="row.realise>row.lfi?'error':'primary'" rounded height="8" />
-        </div>
-      </v-card-text>
-    </v-card>
+    <!-- TODO(endpoint): comparatif Prévisions LFI vs Réalisations masqué — aucune source de prévisions LFI dans l'API (vague B backend) -->
 
-    <!-- Budget table -->
+    <!-- TODO(endpoint): tableau des dépenses fiscales par secteur masqué — la nomenclature LFI sectorielle n'est pas exposée par l'API (vague B backend) -->
     <v-card rounded="lg" elevation="1">
-      <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Tableau des dépenses fiscales (nomenclature LFI)</v-card-title>
-      <v-data-table :headers="headers" :items="depenses" hover density="comfortable">
-        <template #item.ecart="{ item }">
-          <span :class="item.ecart>0?'text-error font-weight-bold':'text-success'">{{ item.ecart>0?'+':'' }}{{ item.ecart }}M</span>
+      <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Répartition par impôt (montants accordés réels)</v-card-title>
+      <v-data-table :headers="headers" :items="depensesParImpot" hover density="comfortable">
+        <template #item.montant="{ item }">
+          <span class="font-weight-medium">{{ item.montant }}</span>
         </template>
-        <template #item.alerte="{ item }">
-          <v-chip v-if="item.ecart>30" color="error" size="x-small" variant="tonal" prepend-icon="mdi-alert">Dépassement</v-chip>
-          <v-chip v-else color="success" size="x-small" variant="tonal">OK</v-chip>
+        <template #no-data>
+          <div class="text-center pa-6 text-medium-emphasis text-body-2">
+            Aucune donnée disponible (accès au tableau de bord P5 requis).
+          </div>
         </template>
       </v-data-table>
     </v-card>
   </div>
 </template>
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import ExportButton from '../../components/ExportButton.vue'
 import KpiCard from '../../components/KpiCard.vue'
-const sigfipStatus = ref<'ok'|'error'>('error')
-const kpis = [
-  { label: 'Total dépenses fiscales', value: '847,3 Mds', icon: 'mdi-chart-bar', color: 'primary', subtitle: 'Jan–Avr 2026', to: '/decideur/analyse' },
-  { label: 'Prévisions LFI 2026', value: '1 200 Mds', icon: 'mdi-file-chart', color: 'secondary', to: '/decideur/rapport-annuel' },
-  { label: 'Taux d\'exécution', value: '70,6%', icon: 'mdi-percent', color: 'info', trend: 3.2, to: '/backoffice/budget' },
-  { label: 'Dépassements sectoriels', value: '3', icon: 'mdi-alert', color: 'error', to: '/backoffice/dossiers' },
+import { api, ApiError } from '../../services/api'
+
+/** Réponse réelle de GET /dashboards/p5 (montants sérialisés en string). */
+interface KpisP5 {
+  montantTotalAccorde: string
+  montantParImpot: { impot: string; montant: string }[]
+  nombreContribuables: number
+}
+
+const loading = ref(false)
+const loadError = ref<string | null>(null)
+const p5 = ref<KpisP5 | null>(null)
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    p5.value = await api<KpisP5>('/dashboards/p5')
+  } catch (e) {
+    // Ex : rôle agent_dgbf non autorisé sur /dashboards/p5 côté backend actuel.
+    loadError.value = e instanceof ApiError && e.status === 403
+      ? 'Les indicateurs P5 ne sont pas accessibles avec votre profil (accès décideur/audit requis).'
+      : 'Impossible de charger les indicateurs budgétaires'
+  } finally {
+    loading.value = false
+  }
+})
+
+function formatMds(montant: string | number): string {
+  const mds = Number(montant) / 1e9
+  return mds >= 0.01
+    ? `${mds.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} Mds`
+    : `${Number(montant).toLocaleString('fr-FR')} FCFA`
+}
+
+const kpis = computed(() => [
+  { label: 'Total dépenses fiscales', value: p5.value ? formatMds(p5.value.montantTotalAccorde) : '—', icon: 'mdi-chart-bar', color: 'primary', subtitle: 'Montants accordés (P5)', to: '/decideur/analyse' },
+  // TODO(endpoint): prévisions LFI et taux d'exécution sans source API — masqués (vague B backend)
+  { label: 'Prévisions LFI 2026', value: '—', icon: 'mdi-file-chart', color: 'secondary', subtitle: 'Source LFI non raccordée', to: '/decideur/rapport-annuel' },
+  { label: 'Taux d\'exécution', value: '—', icon: 'mdi-percent', color: 'info', subtitle: 'Source LFI non raccordée', to: '/backoffice/budget' },
+  { label: 'Contribuables bénéficiaires', value: p5.value ? String(p5.value.nombreContribuables) : '—', icon: 'mdi-account-group', color: 'success', subtitle: 'Comptage réel (P5)', to: '/backoffice/dossiers' },
+])
+
+const headers = [
+  { title: 'Impôt', key: 'impot' },
+  { title: 'Montant accordé', key: 'montant' },
 ]
-const comparatif = [
-  { mois: 'Janvier', realise: 62, lfi: 70 }, { mois: 'Février', realise: 71, lfi: 70 },
-  { mois: 'Mars', realise: 85, lfi: 72 }, { mois: 'Avril', realise: 78, lfi: 72 },
-]
-const headers = [{ title: 'Secteur', key: 'secteur' }, { title: 'Type impôt', key: 'type' }, { title: 'Prévision LFI (M)', key: 'lfi' }, { title: 'Réalisation (M)', key: 'realise' }, { title: 'Écart (M)', key: 'ecart' }, { title: 'Alerte', key: 'alerte', sortable: false }]
-const depenses = [
-  { secteur: 'Mines & Hydrocarbures', type: 'Douanes + IS', lfi: 180, realise: 234, ecart: 54 },
-  { secteur: 'Zone Franche', type: 'IS + TVA + Douanes', lfi: 200, realise: 198, ecart: -2 },
-  { secteur: 'Agriculture', type: 'TVA + Douanes', lfi: 150, realise: 145, ecart: -5 },
-  { secteur: 'Énergie', type: 'IS + Douanes', lfi: 80, realise: 112, ecart: 32 },
-  { secteur: 'Numérique', type: 'IS + TVA', lfi: 100, realise: 89, ecart: -11 },
-]
+const depensesParImpot = computed(() =>
+  (p5.value?.montantParImpot ?? []).map((l) => ({ impot: l.impot, montant: `${Number(l.montant).toLocaleString('fr-FR')} FCFA` })),
+)
 </script>

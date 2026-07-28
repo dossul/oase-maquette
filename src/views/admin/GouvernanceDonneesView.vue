@@ -6,12 +6,21 @@
       icon="mdi-database-cog"
     >
       <template #actions>
-        <v-btn color="secondary" variant="tonal" size="small" prepend-icon="mdi-file-chart">Rapport qualite</v-btn>
-        <v-btn color="primary" size="small" prepend-icon="mdi-plus-circle">Nouvelle campagne</v-btn>
+        <v-btn color="primary" size="small" prepend-icon="mdi-refresh" :loading="loading" @click="charger">Rafraichir</v-btn>
       </template>
     </PageHeader>
 
-    <v-row class="mb-4">
+    <v-alert v-if="loadError" type="error" variant="tonal" rounded="lg" density="compact" class="mb-4">
+      {{ loadError }}
+    </v-alert>
+
+    <v-row v-if="loading" class="mb-4">
+      <v-col v-for="n in 4" :key="n" cols="6" md="3">
+        <v-skeleton-loader type="card" rounded="lg"/>
+      </v-col>
+    </v-row>
+
+    <v-row v-else class="mb-4">
       <v-col v-for="kpi in kpis" :key="kpi.label" cols="6" md="3">
         <KpiCard v-bind="kpi" />
       </v-col>
@@ -28,42 +37,47 @@
       <v-window-item value="qualite">
         <v-row>
           <v-col cols="12" md="7">
+            <!-- TODO(endpoint): pas de métrique de complétude par domaine dans l'API v1. -->
             <v-card rounded="lg" elevation="1" class="mb-4">
               <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Controle de completude par domaine</v-card-title>
-              <v-card-text>
-                <div v-for="item in qualityItems" :key="item.label" class="mb-3">
-                  <div class="d-flex justify-space-between text-caption mb-1">
-                    <span>{{ item.label }}</span>
-                    <span class="font-weight-bold">{{ item.value }}%</span>
-                  </div>
-                  <v-progress-linear :model-value="item.value" :color="qualityColor(item.value)" rounded height="10" />
-                  <div class="text-caption text-medium-emphasis mt-1">{{ item.hint }}</div>
-                </div>
-              </v-card-text>
+              <div class="text-center pa-8 text-medium-emphasis">
+                <v-icon icon="mdi-gauge-empty" size="40" class="mb-2 opacity-40"/>
+                <div class="text-body-2">Indicateurs de completude non instrumentes.</div>
+                <div class="text-caption">Ils seront calcules cote backend dans une version ulterieure.</div>
+              </div>
             </v-card>
 
             <v-card rounded="lg" elevation="1">
-              <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Anomalies de donnees prioritaires</v-card-title>
-              <v-data-table :headers="anomalyHeaders" :items="anomalies" hover>
+              <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold d-flex align-center justify-space-between">
+                Anomalies de donnees (moteur de regles reel)
+                <v-chip size="x-small" color="primary" variant="tonal">{{ anomalies.length }} anomalie(s)</v-chip>
+              </v-card-title>
+              <v-progress-linear v-if="loading" indeterminate color="primary"/>
+              <v-data-table v-else :headers="anomalyHeaders" :items="anomalies" hover>
                 <template #item.severite="{ item }">
                   <v-chip :color="severityColor(item.severite)" size="x-small" variant="tonal">{{ item.severite }}</v-chip>
                 </template>
                 <template #item.statut="{ item }">
-                  <v-chip :color="item.statut === 'Ouverte' ? 'error' : 'success'" size="x-small" variant="outlined">{{ item.statut }}</v-chip>
+                  <v-chip :color="item.statut === 'resolue' ? 'success' : 'error'" size="x-small" variant="outlined">{{ item.statut }}</v-chip>
+                </template>
+                <template #no-data>
+                  <div class="text-center pa-6 text-medium-emphasis">
+                    <v-icon icon="mdi-check-decagram-outline" size="36" class="mb-2 opacity-40"/>
+                    <div class="text-body-2">Aucune anomalie detectee par le moteur de regles.</div>
+                  </div>
                 </template>
               </v-data-table>
             </v-card>
           </v-col>
 
           <v-col cols="12" md="5">
+            <!-- TODO(endpoint): suivi des flux de certification non exposé par l'API v1. -->
             <v-card rounded="lg" elevation="1" class="mb-4">
               <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Etat des flux de certification</v-card-title>
-              <v-list density="comfortable" class="pa-2">
-                <v-list-item v-for="flow in certificationFlows" :key="flow.title" :title="flow.title" :subtitle="flow.subtitle" rounded="lg">
-                  <template #prepend><v-avatar :color="flow.color" size="34" rounded="lg"><v-icon :icon="flow.icon" color="white" size="18" /></v-avatar></template>
-                  <template #append><v-chip :color="flow.color" size="x-small" variant="tonal">{{ flow.badge }}</v-chip></template>
-                </v-list-item>
-              </v-list>
+              <div class="text-center pa-8 text-medium-emphasis">
+                <v-icon icon="mdi-source-branch-sync" size="40" class="mb-2 opacity-40"/>
+                <div class="text-body-2">Flux de certification non instrumentes.</div>
+              </div>
             </v-card>
 
             <v-card rounded="lg" elevation="1">
@@ -80,52 +94,44 @@
         </v-row>
       </v-window-item>
 
+      <!-- TODO(endpoint): campagnes de fiabilisation non exposées par l'API v1. -->
       <v-window-item value="campagnes">
         <v-card rounded="lg" elevation="1">
-          <v-data-table :headers="campagneHeaders" :items="campagnes" hover>
-            <template #item.avancement="{ item }">
-              <div class="d-flex align-center ga-3">
-                <v-progress-linear :model-value="item.avancement" color="primary" rounded height="8" style="max-width: 140px" />
-                <span class="text-caption font-weight-semibold">{{ item.avancement }}%</span>
-              </div>
-            </template>
-            <template #item.statut="{ item }">
-              <v-chip :color="statutCampagneColor(item.statut)" size="x-small" variant="tonal">{{ item.statut }}</v-chip>
-            </template>
-          </v-data-table>
+          <div class="text-center pa-10 text-medium-emphasis">
+            <v-icon icon="mdi-calendar-sync" size="48" class="mb-3 opacity-40"/>
+            <div class="text-body-1 font-weight-semibold mb-1">Aucune campagne instrumentee</div>
+            <div class="text-caption">Le suivi des campagnes de mise a jour sera disponible avec un endpoint dedie.</div>
+          </div>
         </v-card>
       </v-window-item>
 
       <v-window-item value="referentiels">
+        <v-alert type="info" variant="tonal" density="compact" rounded="lg" class="mb-3">
+          Nomenclatures officielles OASE (documentation de reference) — les taux de couverture seront calcules quand l'API l'exposera.
+        </v-alert>
         <v-row>
           <v-col v-for="refItem in referentiels" :key="refItem.nom" cols="12" md="6" lg="4">
             <v-card rounded="lg" elevation="1" class="h-100">
               <v-card-text class="pa-4">
                 <div class="d-flex align-center justify-space-between mb-2">
                   <div class="text-body-2 font-weight-semibold">{{ refItem.nom }}</div>
-                  <v-chip :color="refItem.statut === 'A jour' ? 'success' : 'warning'" size="x-small" variant="tonal">{{ refItem.statut }}</v-chip>
+                  <v-chip color="info" size="x-small" variant="tonal">Referentiel</v-chip>
                 </div>
-                <div class="text-caption text-medium-emphasis mb-3">{{ refItem.description }}</div>
-                <div class="text-caption mb-1"><strong>Point focal :</strong> {{ refItem.pointFocal }}</div>
-                <div class="text-caption mb-3"><strong>Derniere revue :</strong> {{ refItem.revue }}</div>
-                <v-progress-linear :model-value="refItem.couverture" color="primary" rounded height="8" class="mb-1" />
-                <div class="text-caption text-medium-emphasis">Couverture exploitable : {{ refItem.couverture }}%</div>
+                <div class="text-caption text-medium-emphasis">{{ refItem.description }}</div>
               </v-card-text>
             </v-card>
           </v-col>
         </v-row>
       </v-window-item>
 
+      <!-- TODO(endpoint): annuaire des points focaux + scores qualité non exposés par l'API v1. -->
       <v-window-item value="pointsfocaux">
         <v-card rounded="lg" elevation="1">
-          <v-data-table :headers="pointHeaders" :items="pointsFocaux" hover>
-            <template #item.score="{ item }">
-              <v-chip :color="qualityColor(item.score)" size="x-small" variant="tonal">{{ item.score }}%</v-chip>
-            </template>
-            <template #item.relances="{ item }">
-              <v-chip :color="item.relances > 2 ? 'warning' : 'success'" size="x-small" variant="outlined">{{ item.relances }}</v-chip>
-            </template>
-          </v-data-table>
+          <div class="text-center pa-10 text-medium-emphasis">
+            <v-icon icon="mdi-account-group-outline" size="48" class="mb-3 opacity-40"/>
+            <div class="text-body-1 font-weight-semibold mb-1">Points focaux non instrumentes</div>
+            <div class="text-caption">L'annuaire des points focaux et leurs scores seront disponibles avec un endpoint dedie.</div>
+          </div>
         </v-card>
       </v-window-item>
     </v-window>
@@ -133,98 +139,79 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
+import { listerAnomalies, type AnomalieAudit } from '../../services/audit'
 
 const tab = ref('qualite')
+const loading = ref(true)
+const loadError = ref<string | null>(null)
+const anomaliesApi = ref<AnomalieAudit[]>([])
 
-const kpis = [
-  { label: 'Completude moyenne', value: '84 %', icon: 'mdi-check-decagram', color: 'success', subtitle: '17 attributs cibles' },
-  { label: 'Lots a certifier', value: '12', icon: 'mdi-stamp', color: 'warning', subtitle: 'UPF / DGBF / OTR' },
-  { label: 'Referentiels normes', value: '11', icon: 'mdi-shape-plus', color: 'info', subtitle: 'Nomenclatures officielles OASE' },
-  { label: 'Points focaux actifs', value: '5 / 5', icon: 'mdi-account-check', color: 'primary', subtitle: 'Campagne 2026' },
-]
+const anomalies = computed(() =>
+  anomaliesApi.value.map(a => ({
+    domaine: a.categorieCode,
+    description: a.description,
+    reference: a.demandes?.reference ?? '—',
+    severite: a.graviteCode,
+    statut: a.statutCode,
+  })),
+)
 
-const qualityItems = [
-  { label: 'Identifiants mesure / decision', value: 96, hint: 'Tres bon niveau sur les dossiers pilotes' },
-  { label: 'Montants et bases taxables', value: 71, hint: 'Ecarts encore visibles sur les fichiers anciens' },
-  { label: 'Pieces justificatives 1er rang', value: 82, hint: 'Controle obligatoire avant soumission cible' },
-  { label: 'Liens systemes sources', value: 68, hint: 'DAS et GUDEF restent a consolider' },
-  { label: 'References budgetaires', value: 74, hint: 'A completer avant synchronisation annexe LFI' },
-]
+const nbOuvertes = computed(() => anomaliesApi.value.filter(a => a.statutCode === 'nouvelle' || a.statutCode === 'en_cours').length)
+const nbCritiques = computed(() => anomaliesApi.value.filter(a => /critique|elevee/i.test(a.graviteCode ?? '')).length)
 
-const anomalies = [
-  { domaine: 'Annee d’adoption', volume: 554, severite: 'Elevee', statut: 'Ouverte' },
-  { domaine: 'Libelles juridiques heterogenes', volume: 67, severite: 'Moyenne', statut: 'En traitement' },
-  { domaine: 'Pieces 1er rang absentes', volume: 29, severite: 'Elevee', statut: 'Ouverte' },
-  { domaine: 'Correspondance GUDEF manquante', volume: 18, severite: 'Critique', statut: 'Ouverte' },
-]
+const kpis = computed(() => [
+  { label: 'Anomalies detectees', value: anomaliesApi.value.length, icon: 'mdi-alert-outline', color: 'primary', subtitle: 'GET /anomalies (reel)' },
+  { label: 'Anomalies ouvertes', value: nbOuvertes.value, icon: 'mdi-alert-circle-outline', color: 'warning', subtitle: 'Nouvelles ou en cours' },
+  { label: 'Gravite elevee / critique', value: nbCritiques.value, icon: 'mdi-alert-octagon-outline', color: 'error', subtitle: 'A traiter en priorite' },
+  // TODO(endpoint): complétude moyenne non calculable côté API v1.
+  { label: 'Completude moyenne', value: '—', icon: 'mdi-check-decagram', color: 'success', subtitle: 'Non instrumente' },
+])
 
 const anomalyHeaders = [
-  { title: 'Domaine', key: 'domaine' },
-  { title: 'Volume', key: 'volume' },
+  { title: 'Categorie', key: 'domaine' },
+  { title: 'Description', key: 'description' },
+  { title: 'Dossier', key: 'reference' },
   { title: 'Severite', key: 'severite' },
   { title: 'Statut', key: 'statut' },
 ]
 
-const certificationFlows = [
-  { title: 'Lot MRD 2024 consolide', subtitle: 'Pret pour arbitrage UPF', badge: 'Certification J+2', icon: 'mdi-database-check', color: 'success' },
-  { title: 'Flux accords de siege', subtitle: 'Pieces et listes personnel a regulariser', badge: 'Relance active', icon: 'mdi-flag-outline', color: 'warning' },
-  { title: 'Rapprochement GUDEF / SIGFiP', subtitle: 'Controle croise DGTCP en attente', badge: 'En ecart', icon: 'mdi-source-branch-sync', color: 'error' },
-]
-
-const campagnes = [
-  { nom: 'Campagne fiabilisation annees d’adoption', pilote: 'UPF', perimetre: '554 mesures', avancement: 62, statut: 'En cours' },
-  { nom: 'Uniformisation bases juridiques', pilote: 'UPF / OTR', perimetre: '326 mesures CGI', avancement: 44, statut: 'En cours' },
-  { nom: 'Sous-registre accords de siege', pilote: 'MAE / OTR', perimetre: '398 mesures', avancement: 28, statut: 'Critique' },
-  { nom: 'Qualification references budgetaires', pilote: 'DGBF / DGTCP', perimetre: 'Annexe LFI 2026', avancement: 83, statut: 'Validee' },
-]
-
-const campagneHeaders = [
-  { title: 'Campagne', key: 'nom' },
-  { title: 'Pilote', key: 'pilote' },
-  { title: 'Perimetre', key: 'perimetre' },
-  { title: 'Avancement', key: 'avancement' },
-  { title: 'Statut', key: 'statut' },
-]
-
+// Nomenclatures officielles OASE — contenu normatif de reference (sans metrique fictive).
 const referentiels = [
-  { nom: 'R_FAMILLE_TEXTE', description: 'Familles de textes, codes, lois de finances, conventions et accords', pointFocal: 'UPF', revue: '31/05/2026', couverture: 91, statut: 'A jour' },
-  { nom: 'R_SYSTEME_INFORMATION', description: 'Sydonia, E-TAX, DAS, GUDEF, SIGFiP, SIGTAS', pointFocal: 'DSI/MEF', revue: '29/05/2026', couverture: 81, statut: 'A jour' },
-  { nom: 'R_TYPE_ACTE', description: 'Loi, decret, convention, accord, arrete, agrement', pointFocal: 'UPF', revue: '28/05/2026', couverture: 93, statut: 'A jour' },
-  { nom: 'R_NATURE_MESURE', description: 'Exoneration, franchise, taux reduit, report, credit, suspension', pointFocal: 'UPF', revue: '26/05/2026', couverture: 86, statut: 'A jour' },
-  { nom: 'R_IMPOT_TAXE', description: 'TVA, IS, IRPP, DD, RS, TPI, ADA, DAPP, TSR et autres taxes', pointFocal: 'OTR', revue: '30/05/2026', couverture: 89, statut: 'A jour' },
-  { nom: 'R_TYPE_CONTRIBUABLE', description: 'Entreprise, ONG, organisme international, diplomatique, projet public', pointFocal: 'MEF / MAE', revue: '27/05/2026', couverture: 83, statut: 'A jour' },
-  { nom: 'R_SECTEUR_BRANCHE', description: 'Nomenclature sectorielle et branche NES', pointFocal: 'INSEED', revue: '15/05/2026', couverture: 69, statut: 'A revoir' },
-  { nom: 'R_ORGANE', description: 'Structures attributrices, gestionnaires et de controle', pointFocal: 'MEF / OTR', revue: '31/05/2026', couverture: 88, statut: 'A jour' },
-  { nom: 'R_PORTEE_DUREE', description: 'Temporaire, permanente, renouvelable, par phase', pointFocal: 'UPF', revue: '23/05/2026', couverture: 77, statut: 'A revoir' },
-  { nom: 'R_OBJECTIF_POLITIQUE', description: 'Objectif fiscal, economique, social, sectoriel', pointFocal: 'UPF / DGEAE', revue: '27/05/2026', couverture: 74, statut: 'A revoir' },
-  { nom: 'R_FONCTION_BUDGETAIRE', description: 'Fonction de politique publique et rattachement budgetaire', pointFocal: 'DGBF', revue: '25/05/2026', couverture: 72, statut: 'A revoir' },
+  { nom: 'R_FAMILLE_TEXTE', description: 'Familles de textes, codes, lois de finances, conventions et accords' },
+  { nom: 'R_SYSTEME_INFORMATION', description: 'Sydonia, E-TAX, DAS, GUDEF, SIGFiP, SIGTAS' },
+  { nom: 'R_TYPE_ACTE', description: 'Loi, decret, convention, accord, arrete, agrement' },
+  { nom: 'R_NATURE_MESURE', description: 'Exoneration, franchise, taux reduit, report, credit, suspension' },
+  { nom: 'R_IMPOT_TAXE', description: 'TVA, IS, IRPP, DD, RS, TPI, ADA, DAPP, TSR et autres taxes' },
+  { nom: 'R_TYPE_CONTRIBUABLE', description: 'Entreprise, ONG, organisme international, diplomatique, projet public' },
+  { nom: 'R_SECTEUR_BRANCHE', description: 'Nomenclature sectorielle et branche NES' },
+  { nom: 'R_ORGANE', description: 'Structures attributrices, gestionnaires et de controle' },
+  { nom: 'R_PORTEE_DUREE', description: 'Temporaire, permanente, renouvelable, par phase' },
+  { nom: 'R_OBJECTIF_POLITIQUE', description: 'Objectif fiscal, economique, social, sectoriel' },
+  { nom: 'R_FONCTION_BUDGETAIRE', description: 'Fonction de politique publique et rattachement budgetaire' },
 ]
 
-const pointsFocaux = [
-  { structure: 'UPF', responsable: 'Cellule juridique', referentiel: 'Base juridique / type acte', score: 94, relances: 0 },
-  { structure: 'OTR / DGI', responsable: 'Controle impots', referentiel: 'Impots interieurs / E-TAX', score: 88, relances: 1 },
-  { structure: 'OTR / DGD', responsable: 'CDDI / Sydonia', referentiel: 'Douanes / code additionnel', score: 86, relances: 1 },
-  { structure: 'SAZOF', responsable: 'Service conventions', referentiel: 'Zone franche / agrements', score: 79, relances: 2 },
-  { structure: 'DGMG', responsable: 'Cellule conventions', referentiel: 'Conventions minieres', score: 63, relances: 4 },
-]
-
-const pointHeaders = [
-  { title: 'Structure', key: 'structure' },
-  { title: 'Responsable', key: 'responsable' },
-  { title: 'Referentiel', key: 'referentiel' },
-  { title: 'Score qualite', key: 'score' },
-  { title: 'Relances', key: 'relances' },
-]
-
-const qualityColor = (value: number) => {
-  if (value >= 90) return 'success'
-  if (value >= 75) return 'warning'
-  return 'error'
+const severityColor = (value: string) => {
+  if (/critique/i.test(value)) return 'error'
+  if (/elevee|haute/i.test(value)) return 'warning'
+  if (/moyenne/i.test(value)) return 'info'
+  return 'secondary'
 }
 
-const severityColor = (value: string) => ({ Critique: 'error', Elevee: 'warning', Moyenne: 'info' } as Record<string, string>)[value] || 'secondary'
-const statutCampagneColor = (value: string) => ({ Validee: 'success', 'En cours': 'info', Critique: 'error' } as Record<string, string>)[value] || 'secondary'
+async function charger() {
+  loading.value = true
+  loadError.value = null
+  try {
+    anomaliesApi.value = await listerAnomalies()
+  } catch (e) {
+    anomaliesApi.value = []
+    loadError.value = e instanceof Error ? e.message : 'Erreur de chargement des anomalies'
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(charger)
 </script>

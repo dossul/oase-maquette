@@ -4,13 +4,13 @@
       title="Mobile MVP OASE"
       subtitle="Projection mobile des parcours minimaux : suivi dossier, notifications, verification QR et synchronisation"
       icon="mdi-cellphone"
-    />
+    >
+      <template #actions>
+        <v-chip color="info" variant="tonal" size="small" prepend-icon="mdi-cellphone-arrow-down">Projection mobile — maquette conceptuelle</v-chip>
+      </template>
+    </PageHeader>
 
-    <v-row class="mb-4">
-      <v-col v-for="kpi in kpis" :key="kpi.label" cols="6" md="3">
-        <KpiCard v-bind="kpi" />
-      </v-col>
-    </v-row>
+    <!-- TODO(endpoint): KPIs d'usage mobile sans endpoint — section masquee. -->
 
     <v-row>
       <v-col cols="12" md="4">
@@ -19,30 +19,34 @@
           <v-card rounded="xl" class="overflow-hidden">
             <div style="background:linear-gradient(135deg,#1A3A5C 0%,#2774AE 65%,#1B8F4C 100%);padding:20px;color:#fff">
               <div class="text-subtitle-2 font-weight-bold">OASE Mobile</div>
-              <div class="text-caption" style="opacity:0.8">Demande ZF-2026-00482</div>
+              <div class="text-caption" style="opacity:0.8">{{ dossier ? `Demande ${dossier.reference}` : 'Aucune demande' }}</div>
             </div>
             <div class="pa-4">
-              <v-chip color="success" size="small" variant="tonal" prepend-icon="mdi-progress-check" class="mb-3">Validation en cours</v-chip>
-              <div class="text-body-2 font-weight-bold mb-1">Suivi rapide du dossier</div>
-              <div class="text-caption text-medium-emphasis mb-3">Etape actuelle : contre-signature DGBF</div>
-              <v-timeline density="compact" side="end" truncate-line="both">
-                <v-timeline-item dot-color="success" size="small">
-                  <div class="text-caption font-weight-semibold">Depot confirme</div>
-                  <div class="text-caption text-medium-emphasis">27/05 09:14</div>
-                </v-timeline-item>
-                <v-timeline-item dot-color="info" size="small">
-                  <div class="text-caption font-weight-semibold">Instruction OTR</div>
-                  <div class="text-caption text-medium-emphasis">28/05 14:08</div>
-                </v-timeline-item>
-                <v-timeline-item dot-color="warning" size="small">
-                  <div class="text-caption font-weight-semibold">Visa budgetaire</div>
-                  <div class="text-caption text-medium-emphasis">En attente</div>
-                </v-timeline-item>
-              </v-timeline>
+              <template v-if="dossier">
+                <v-chip color="info" size="small" variant="tonal" prepend-icon="mdi-progress-check" class="mb-3">{{ statutLabel }}</v-chip>
+                <div class="text-body-2 font-weight-bold mb-1">Suivi rapide du dossier</div>
+                <div class="text-caption text-medium-emphasis mb-3">{{ dossier.contribuable?.raisonSociale ?? 'Dossier en cours de traitement' }}</div>
+                <v-timeline density="compact" side="end" truncate-line="both">
+                  <v-timeline-item dot-color="success" size="small">
+                    <div class="text-caption font-weight-semibold">Depot</div>
+                    <div class="text-caption text-medium-emphasis">{{ formatDate(dossier.dateDepot) }}</div>
+                  </v-timeline-item>
+                  <v-timeline-item dot-color="info" size="small">
+                    <div class="text-caption font-weight-semibold">Statut actuel : {{ statutLabel }}</div>
+                    <div class="text-caption text-medium-emphasis">{{ formatDate(dossier.updatedAt) }}</div>
+                  </v-timeline-item>
+                </v-timeline>
+              </template>
+              <v-alert v-else type="info" variant="tonal" rounded="lg" density="compact" class="mb-2">
+                Aucune demande accessible pour ce compte.
+              </v-alert>
               <v-btn block color="primary" rounded="lg" prepend-icon="mdi-qrcode-scan" class="mt-2">Verifier QR</v-btn>
             </div>
           </v-card>
         </v-card>
+        <div class="text-caption text-medium-emphasis text-center mt-2" style="max-width: 320px; margin: 0 auto;">
+          Aperçu conceptuel — le dossier affiché est une demande réelle (API /demandes).
+        </div>
       </v-col>
 
       <v-col cols="12" md="8">
@@ -83,15 +87,29 @@
 </template>
 
 <script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
-import KpiCard from '../../components/KpiCard.vue'
+import { api } from '../../services/api'
+import type { DemandeApi } from '../../services/backoffice'
+import { STATUT_LABELS, type StatutDemande } from '../../types'
 
-const kpis = [
-  { label: 'Parcours mobiles', value: '4', icon: 'mdi-cellphone-check', color: 'primary', subtitle: 'MVP visible' },
-  { label: 'Notifications push', value: '3', icon: 'mdi-bell-badge-outline', color: 'info', subtitle: 'Evenements critiques' },
-  { label: 'Verification QR', value: 'Oui', icon: 'mdi-qrcode-scan', color: 'success', subtitle: 'Document signe' },
-  { label: 'Mode hors ligne', value: 'Partiel', icon: 'mdi-wifi-strength-off-outline', color: 'warning', subtitle: 'Synchronisation differee' },
-]
+// Démo de suivi : on utilise une VRAIE demande accessible au compte connecté (GET /demandes?limit=1).
+const dossier = ref<DemandeApi | null>(null)
+
+onMounted(async () => {
+  try {
+    const res = await api<{ data: DemandeApi[] }>('/demandes?limit=1')
+    dossier.value = res.data[0] ?? null
+  } catch {
+    dossier.value = null
+  }
+})
+
+const statutLabel = computed(() =>
+  dossier.value ? (STATUT_LABELS[dossier.value.statutCode as StatutDemande] ?? dossier.value.statutCode) : '',
+)
+
+const formatDate = (iso: string | null) => (iso ? new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—')
 
 const headers = [
   { title: 'Parcours', key: 'parcours' },

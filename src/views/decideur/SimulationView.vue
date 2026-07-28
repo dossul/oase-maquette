@@ -51,6 +51,29 @@
       </v-alert>
     </v-expand-transition>
 
+    <v-alert
+      v-if="inseedError"
+      type="warning"
+      variant="tonal"
+      rounded="lg"
+      density="compact"
+      class="mb-4"
+      icon="mdi-cloud-off-outline"
+    >
+      {{ inseedError }}
+    </v-alert>
+    <v-alert
+      v-else-if="inseedCharge"
+      type="success"
+      variant="tonal"
+      rounded="lg"
+      density="compact"
+      class="mb-4"
+      icon="mdi-database-check"
+    >
+      Paramètres INSEED chargés depuis l'API — PIB {{ pibTogo.toLocaleString('fr-FR') }} Mds FCFA ({{ inseedMeta.anneeRef }}), source {{ inseedMeta.source }}.
+    </v-alert>
+
     <v-row>
       <!-- ── Formulaire ── -->
       <v-col cols="12" md="5">
@@ -189,9 +212,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
-import { secteurParamsList, pibTogo, getSecteurParam } from '../../composables/useRefParams'
+import { secteurParamsList, pibTogo, getSecteurParam, chargerReferentielInseed, inseedCharge, inseedError, inseedMeta } from '../../composables/useRefParams'
+
+// Paramètres INSEED réels (GET /referentiels/inseed) — repli sur valeurs par défaut si indisponible
+onMounted(() => { chargerReferentielInseed() })
 
 // ── Données de référence ───────────────────────────────────────────────────
 const types = [

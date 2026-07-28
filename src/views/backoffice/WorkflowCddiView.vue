@@ -83,6 +83,11 @@
               <template #item.regime="{ item }">
                 <v-chip size="x-small" :color="regimeColor(item.regime)" variant="tonal">{{ item.regime }}</v-chip>
               </template>
+              <template #no-data>
+                <div class="text-center pa-6 text-medium-emphasis text-body-2">
+                  Aucune franchise accordée remontée — le connecteur GESTEXO n'est pas encore raccordé à l'API OASE.
+                </div>
+              </template>
             </v-data-table>
           </v-card-text>
         </v-window-item>
@@ -96,6 +101,9 @@
             </v-alert>
 
             <!-- Pipeline visuel 2a/2b/2c/2d pour chaque dossier en cours -->
+            <div v-if="enCours.length === 0" class="text-center pa-6 text-medium-emphasis text-body-2">
+              Aucun dossier en cours d'instruction remonté — le connecteur SYDONIAWORLD n'est pas encore raccordé à l'API OASE.
+            </div>
             <div v-for="dossier in enCours" :key="dossier.declaration" class="mb-4">
               <v-card variant="outlined" rounded="lg" class="pa-3" :color="dossier.joursEcoules > 9 ? 'error' : undefined">
                 <div class="d-flex align-center justify-space-between mb-3 flex-wrap ga-2">
@@ -145,6 +153,9 @@
               <template #item.motif="{ item }">
                 <span class="text-caption text-error">{{ item.motif }}</span>
               </template>
+              <template #no-data>
+                <div class="text-center pa-6 text-medium-emphasis text-body-2">Aucun rejet remonté.</div>
+              </template>
             </v-data-table>
           </v-card-text>
         </v-window-item>
@@ -157,6 +168,9 @@
               OASE a déclenché une notification automatique vers le <strong>Directeur CDDI</strong>.
             </v-alert>
             <v-row dense>
+              <v-col v-if="alertesDelai.length === 0" cols="12">
+                <div class="text-center pa-6 text-medium-emphasis text-body-2">Aucune alerte de délai active.</div>
+              </v-col>
               <v-col v-for="alerte in alertesDelai" :key="alerte.declaration" cols="12" md="6">
                 <v-card variant="tonal" color="error" rounded="lg" class="pa-3 mb-2">
                   <div class="d-flex align-center justify-space-between mb-1">
@@ -186,6 +200,9 @@
         <v-chip size="x-small" color="secondary" variant="tonal">Lecture seule — opéré dans SYDONIAWORLD + GESTEXO</v-chip>
       </v-card-title>
       <v-card-text class="pa-4 pt-0">
+        <v-alert type="info" variant="tonal" rounded="lg" density="compact" class="mb-3 text-caption" prepend-icon="mdi-book-open-outline">
+          Schéma de documentation normative (référentiel institutionnel MRD) — ne reflète pas l'activité réelle des dossiers.
+        </v-alert>
         <v-row dense>
           <v-col v-for="etape in circuitComplet" :key="etape.id" cols="12" sm="6" md="4" lg="3">
             <v-card
@@ -218,12 +235,18 @@
       <v-card-text class="pa-4 pt-0">
         <v-row>
           <v-col cols="12" md="8">
+            <!-- TODO(endpoint): reporting mensuel GESTEXO masqué — aucune source API (vague B backend) -->
             <v-data-table :headers="headersReporting" :items="reportingMensuel" hover density="compact">
               <template #item.montant="{ item }">
                 <span class="font-weight-medium">{{ item.montant }}</span>
               </template>
               <template #item.statut="{ item }">
                 <v-chip size="x-small" :color="item.statut === 'Transmis DGBF' ? 'success' : 'warning'" variant="tonal">{{ item.statut }}</v-chip>
+              </template>
+              <template #no-data>
+                <div class="text-center pa-6 text-medium-emphasis text-body-2">
+                  Reporting mensuel non disponible — la consolidation GESTEXO → DAS → DGBF n'est pas encore raccordée à l'API OASE.
+                </div>
               </template>
             </v-data-table>
           </v-col>
@@ -257,16 +280,24 @@ import ExportButton from '../../components/ExportButton.vue'
 
 const mainTab = ref('accordees')
 
-// ── Données mock — représentent ce qui est lu depuis GESTEXO ────────────────
-const allDossiers = [
-  { declaration: 'SW-2026-00482', regime: 'Zone Franche', montant: '84 500 000 FCFA', dateSaisie: '15/05/2026', joursEcoules: 6, etapeActuelle: 2, statut: 'accorde', refGestexo: 'GEST-2026-00482', quittance: 'QUIT-2026-1422', remarque: 'Liquidation enregistrée dans GESTEXO — quittancement émis.' },
-  { declaration: 'SW-2026-00483', regime: 'Diplomatique', montant: '12 400 000 FCFA', dateSaisie: '17/05/2026', joursEcoules: 4, etapeActuelle: 1, statut: 'encours', refGestexo: null, quittance: null, remarque: 'Bloqué en 2b — en attente validation Chef de subdivision.' },
-  { declaration: 'SW-2026-00484', regime: 'ONG / Projet', montant: '31 900 000 FCFA', dateSaisie: '10/05/2026', joursEcoules: 11, etapeActuelle: 2, statut: 'alerte', refGestexo: null, quittance: null, remarque: 'Délai 9j dépassé — bloqué en 2c depuis 3 jours ouvrables.', etapeBloquee: '2c — Chef de bureau', motif: 'Pièce complémentaire demandée non fournie (Autorisation MAE).' },
-  { declaration: 'SW-2026-00485', regime: 'Zone Franche', montant: '22 750 000 FCFA', dateSaisie: '20/05/2026', joursEcoules: 1, etapeActuelle: 0, statut: 'encours', refGestexo: null, quittance: null, remarque: 'Entrée en 2a — vérification technique initiale en cours.' },
-  { declaration: 'SW-2026-00480', regime: 'Extractif', montant: '156 200 000 FCFA', dateSaisie: '02/05/2026', joursEcoules: 8, etapeActuelle: 3, statut: 'accorde', refGestexo: 'GEST-2026-00480', quittance: 'QUIT-2026-1398', remarque: 'Toutes les étapes validées — référence GESTEXO générée en étape 2d.' },
-  { declaration: 'SW-2026-00479', regime: 'Diplomatique', montant: '8 100 000 FCFA', dateSaisie: '28/04/2026', joursEcoules: 2, etapeActuelle: -1, statut: 'rejete', refGestexo: null, quittance: null, etapeRejet: '2a — Vérificateur', motif: 'Déclaration SYDONIAWORLD incomplète — données tarifaires manquantes. À redéposer.', remarque: '' },
-  { declaration: 'SW-2026-00478', regime: 'ONG / Projet', montant: '14 300 000 FCFA', dateSaisie: '25/04/2026', joursEcoules: 13, etapeActuelle: 1, statut: 'alerte', refGestexo: null, quittance: null, etapeBloquee: '2b — Chef de subdivision', motif: 'Dossier incomplet — BL introuvable dans SYDONIAWORLD.', remarque: 'Alerte J+9 envoyée au Directeur CDDI le 06/05/2026.' },
-]
+// ── Dossiers lus depuis GESTEXO ─────────────────────────────────────────────
+// TODO(endpoint): aucun connecteur GESTEXO/SYDONIAWORLD n'est exposé par l'API OASE — état vide honnête (vague B backend)
+interface DossierSydonia {
+  declaration: string
+  regime: string
+  montant: string
+  dateSaisie: string
+  joursEcoules: number
+  etapeActuelle: number
+  statut: string
+  refGestexo: string | null
+  quittance: string | null
+  remarque: string
+  etapeBloquee?: string
+  motif?: string
+  etapeRejet?: string
+}
+const allDossiers: DossierSydonia[] = []
 
 const accordees  = computed(() => allDossiers.filter(d => d.statut === 'accorde'))
 const enCours    = computed(() => allDossiers.filter(d => d.statut === 'encours'))
@@ -313,10 +344,11 @@ const circuitComplet = [
 
 // ── KPIs ────────────────────────────────────────────────────────────────────
 const kpis = [
-  { label: 'Franchises accordées', value: String(accordees.value.length + 2), icon: 'mdi-check-circle', color: 'success', subtitle: 'Référence GESTEXO générée' },
+  { label: 'Franchises accordées', value: String(accordees.value.length), icon: 'mdi-check-circle', color: 'success', subtitle: 'Référence GESTEXO générée' },
   { label: 'En cours d\'instruction', value: String(enCours.value.length), icon: 'mdi-clock-outline', color: 'warning', subtitle: 'Circuit 2a–2d en cours' },
   { label: 'Alertes délai (> 9j)', value: String(alertesDelai.value.length), icon: 'mdi-alarm', color: 'error', subtitle: 'Notification Directeur CDDI' },
-  { label: 'Délai moyen circuit', value: '7.2 j', icon: 'mdi-timer-outline', color: 'info', subtitle: 'Cible ≤ 9 j ouvrables' },
+  // TODO(endpoint): délai moyen non calculable sans connecteur GESTEXO — masqué (vague B backend)
+  { label: 'Délai moyen circuit', value: '—', icon: 'mdi-timer-outline', color: 'info', subtitle: 'Cible ≤ 9 j ouvrables' },
 ]
 
 // ── Headers tables ───────────────────────────────────────────────────────────
@@ -344,12 +376,8 @@ const headersReporting = [
   { title: 'Statut transmission', key: 'statut' },
 ]
 
-const reportingMensuel = [
-  { mois: 'Mai 2026', nbFranchises: 18, montant: '1 240 000 000 FCFA', statut: 'Transmis DGBF' },
-  { mois: 'Avril 2026', nbFranchises: 22, montant: '1 850 000 000 FCFA', statut: 'Transmis DGBF' },
-  { mois: 'Mars 2026', nbFranchises: 15, montant: '980 000 000 FCFA', statut: 'Transmis DGBF' },
-  { mois: 'Fév. 2026', nbFranchises: 19, montant: '1 120 000 000 FCFA', statut: 'En attente DAS' },
-]
+// TODO(endpoint): reporting mensuel GESTEXO non raccordé — tableau masqué côté template (vague B backend)
+const reportingMensuel: { mois: string; nbFranchises: number; montant: string; statut: string }[] = []
 
 const reportingChain = ['GESTEXO', 'OTR / CDDI', 'DAS', 'DGBF', 'Situations recettes mensuelles']
 

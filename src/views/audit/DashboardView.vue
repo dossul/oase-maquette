@@ -39,8 +39,40 @@
           </v-list>
         </v-card>
         <v-card rounded="lg" elevation="1">
-          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Missions d'audit en cours</v-card-title>
-          <v-data-table :headers="missionHeaders" :items="missions" density="comfortable" hover/>
+          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold d-flex align-center justify-space-between">
+            Missions d'audit en cours
+            <v-btn size="x-small" variant="tonal" to="/audit/missions">Voir tout</v-btn>
+          </v-card-title>
+          <v-progress-linear v-if="missionsLoading" indeterminate color="primary"/>
+          <v-alert v-else-if="missionsError" type="error" variant="tonal" density="compact" rounded="lg" class="ma-3">
+            {{ missionsError }}
+          </v-alert>
+          <v-list v-else-if="missionsEnCours.length" lines="two" class="pa-0">
+            <v-list-item v-for="(m, i) in missionsEnCours" :key="m.id" :divider="i<missionsEnCours.length-1" class="px-4 py-3">
+              <template #prepend>
+                <v-avatar color="primary" size="36" rounded="lg" variant="tonal">
+                  <v-icon icon="mdi-briefcase-search" size="18"/>
+                </v-avatar>
+              </template>
+              <template #title>
+                <div class="d-flex align-center ga-2">
+                  <span class="font-weight-semibold text-body-2">{{ m.reference }}</span>
+                  <v-chip size="x-small" variant="outlined" color="secondary">{{ m.type }}</v-chip>
+                  <v-chip v-if="m.organe" size="x-small" variant="tonal" color="info">{{ m.organe }}</v-chip>
+                </div>
+              </template>
+              <template #subtitle>
+                <span class="text-caption">{{ m.titre }}<template v-if="m.auditeur"> — {{ m.auditeur.prenom }} {{ m.auditeur.nom }}</template></span>
+              </template>
+              <template #append>
+                <v-btn size="x-small" variant="tonal" color="primary" to="/audit/missions">Suivre</v-btn>
+              </template>
+            </v-list-item>
+          </v-list>
+          <div v-else class="text-center pa-8 text-medium-emphasis">
+            <v-icon icon="mdi-briefcase-search-outline" size="48" class="mb-3 opacity-30"/>
+            <div class="text-body-2">Aucune mission en cours.</div>
+          </div>
         </v-card>
       </v-col>
       <v-col cols="12" md="4">
@@ -63,6 +95,7 @@ import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
 import { listerAnomalies, type AnomalieAudit } from '../../services/audit'
+import { listerMissions, type MissionApi } from '../../services/missions'
 
 interface AnomalieLigne {
   id: string
@@ -77,6 +110,12 @@ interface AnomalieLigne {
 const anomalies = ref<AnomalieLigne[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
+
+// Missions réelles (GET /missions) — seules les missions « en_cours » sont affichées ici.
+const missions = ref<MissionApi[]>([])
+const missionsLoading = ref(false)
+const missionsError = ref<string | null>(null)
+const missionsEnCours = computed(() => missions.value.filter(m => m.statut === 'en_cours'))
 
 const POIDS_GRAVITE: Record<string, number> = { critique: 0, elevee: 1, moyenne: 2, faible: 3 }
 const STATUTS_CLOS = ['resolue', 'traitee', 'rejetee']
@@ -98,6 +137,14 @@ onMounted(async () => {
     error.value = 'Impossible de charger les anomalies'
   } finally {
     loading.value = false
+  }
+  missionsLoading.value = true
+  try {
+    missions.value = await listerMissions()
+  } catch {
+    missionsError.value = 'Impossible de charger les missions (GET /missions)'
+  } finally {
+    missionsLoading.value = false
   }
 })
 
@@ -122,11 +169,6 @@ const kpis = computed(() => [
   { label: 'Élevées', value: anomalies.value.filter(a => a.gravite === 'elevee').length, icon: 'mdi-alert', color: 'error', to: '/audit/anomalies' },
   { label: 'Taux de non-conformité', value: tauxNonConformite.value, icon: 'mdi-check-circle', color: 'success', to: '/audit/anomalies' },
 ])
-const missionHeaders = [{ title: 'Mission', key: 'ref' }, { title: 'Institution', key: 'institution' }, { title: 'Période', key: 'periode' }, { title: 'Statut', key: 'statut' }]
-const missions = [
-  { ref: 'AUDIT-IGF-2026-001', institution: 'OTR Douanes', periode: 'Jan–Mar 2026', statut: 'En cours' },
-  { ref: 'AUDIT-CC-2026-002', institution: 'DGBF', periode: 'Avr 2026', statut: 'Planifiée' },
-]
 const graviteColor = (g: string) => ({ critique: 'error', elevee: 'warning', moyenne: 'info', faible: 'success' }[g] || 'default')
 const categorieColor = (c: string) => ({ juridique: 'error', financiere: 'warning', procedurale: 'info', temporelle: 'secondary', quota: 'warning' }[c] || 'default')
 

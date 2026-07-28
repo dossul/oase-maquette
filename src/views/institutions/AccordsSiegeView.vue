@@ -11,11 +11,7 @@
       </template>
     </PageHeader>
 
-    <v-row class="mb-4">
-      <v-col v-for="kpi in kpis" :key="kpi.label" cols="6" md="3">
-        <KpiCard v-bind="kpi" />
-      </v-col>
-    </v-row>
+    <!-- TODO(endpoint): aucun endpoint n'expose les KPIs du sous-registre MAE (accords suivis, mises a jour, notifications) — section masquee. -->
 
     <!-- Parcours normé Process 6 -->
     <v-card rounded="lg" elevation="1" class="mb-4">
@@ -47,7 +43,8 @@
     </v-card>
 
     <v-card rounded="lg" elevation="1" class="mb-4">
-      <v-data-table :headers="headers" :items="rows" hover @click:row="(_, { item }) => selected = item">
+      <!-- TODO(endpoint): GET /conventions?regime=accord_siege (ou sous-registre MAE dédié) requis pour lister les organisations réelles. -->
+      <v-data-table :headers="headers" :items="rows" hover no-data-text="Aucun accord de siège enregistré — en attente de l'alimentation du sous-registre MAE." @click:row="(_, { item }) => selected = item">
         <template #item.statut="{ item }">
           <v-chip :color="statusColor(item.statut)" size="x-small" variant="tonal">{{ item.statut }}</v-chip>
         </template>
@@ -150,14 +147,7 @@
           </v-list>
         </v-card>
 
-        <v-card rounded="lg" elevation="1">
-          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Sous-registre MAE</v-card-title>
-          <v-card-text>
-            <div class="text-body-2 mb-2"><strong>Stock suivi :</strong> 398 accords / etablissements</div>
-            <div class="text-body-2 mb-2"><strong>Personnel diplomatique trace :</strong> 1 204 fiches</div>
-            <div class="text-body-2"><strong>Derniere campagne :</strong> 29/05/2026</div>
-          </v-card-text>
-        </v-card>
+        <!-- TODO(endpoint): GET /conventions/stats ou sous-registre MAE requis — carte "Sous-registre MAE" (stock, fiches, campagne) masquee. -->
 
         <v-card rounded="lg" elevation="1" class="mt-4">
           <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Vigilances diplomatiques</v-card-title>
@@ -176,14 +166,21 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
-import KpiCard from '../../components/KpiCard.vue'
 
-const kpis = [
-  { label: 'Accords suivis', value: '398', icon: 'mdi-flag-checkered', color: 'primary', subtitle: 'Sous-registre MAE' },
-  { label: 'Mises a jour annuelles', value: '61', icon: 'mdi-calendar-refresh', color: 'info', subtitle: 'Campagne en cours' },
-  { label: 'Dossiers a regulariser', value: '12', icon: 'mdi-alert-circle-outline', color: 'warning', subtitle: 'Pieces ou listes manquantes' },
-  { label: 'Notifications OTR envoye es', value: '47', icon: 'mdi-email-check-outline', color: 'success', subtitle: 'Traçabilite preservee' },
-]
+// TODO(endpoint): GET /conventions?regime=accord_siege requis — aucune organisation réelle
+// n'est encore exposée par l'API, la table reste vide plutôt que d'afficher des données fictives.
+interface AccordRow {
+  organisation: string
+  reference: string
+  validite: string
+  statut: string
+  signature: string
+  notification: string
+  maj: string
+  avantages: string
+  codeAdditionnel: string
+  confidentialite: string
+}
 
 const processHeaders = [
   { title: 'Étape', key: 'etape' },
@@ -212,12 +209,9 @@ const headers = [
   { title: 'Actions', key: 'actions', sortable: false },
 ]
 
-const rows = [
-  { organisation: 'Ambassade du Canada', reference: 'AS-2024-018', validite: '2024-2027', statut: 'A jour', signature: 'Accord signe le 12/04/2024', notification: 'OTR notifie le 15/04/2024', maj: 'Prochaine mise a jour au 30/06/2026', avantages: 'TVA achats locaux, franchises vehicules, importations materiels diplomatiques', codeAdditionnel: 'DOU-DIP-2026-03', confidentialite: 'Restreint' },
-  { organisation: 'UNICEF Togo', reference: 'AS-2025-004', validite: '2025-2028', statut: 'A completer', signature: 'Accord signe le 09/01/2025', notification: 'OTR notifie le 16/01/2025', maj: 'Liste personnel a confirmer', avantages: 'Franchises importation, TVA achats locaux', codeAdditionnel: 'DOU-OI-2026-09', confidentialite: 'Interne' },
-]
+const rows: AccordRow[] = []
 
-const selected = ref(rows[0])
+const selected = ref<AccordRow | null>(null)
 
 // Bases juridiques multiples et cumulatives (Processus 6)
 const basesJuridiquesOrg = [
@@ -228,7 +222,7 @@ const basesJuridiquesOrg = [
 ]
 
 const statusColor = (value: string) => ({ 'A jour': 'success', 'A completer': 'warning' } as Record<string, string>)[value] || 'secondary'
-const o2Rows = (item: (typeof rows)[number]) => [
+const o2Rows = (item: AccordRow) => [
   { label: 'id_mesure / reference accord', value: `MES-${item.reference} / ${item.reference}` },
   { label: 'base juridique / articles', value: 'Accord de siege + protocoles d application' },
   { label: 'contribuable / type', value: `${item.organisation} / corps diplomatique ou OI` },

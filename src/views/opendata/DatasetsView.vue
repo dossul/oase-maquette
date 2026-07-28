@@ -9,6 +9,7 @@
             <v-col cols="6" md="3"><v-select v-model="filterTheme" :items="themes" label="Thème" hide-details clearable/></v-col>
           </v-row>
         </v-card-text>
+        <v-progress-linear v-if="loading" indeterminate color="primary" />
         <v-list class="pa-0">
           <v-list-item v-for="(d, i) in filteredDatasets" :key="d.id" :divider="i<filteredDatasets.length-1" class="px-4 py-4">
             <template #prepend>
@@ -20,19 +21,22 @@
             <template #subtitle>
               <div class="text-caption mt-1">{{ d.description }}</div>
               <div class="d-flex align-center ga-2 mt-1">
-                <v-chip size="x-small" variant="outlined">Période: {{ d.periode }}</v-chip>
-                <v-chip size="x-small" variant="outlined">MàJ: {{ d.majDate }}</v-chip>
                 <v-chip size="x-small" variant="outlined">{{ d.lignes }} enregistrements</v-chip>
-                <v-chip size="x-small" :color="d.statut === 'Publié' ? 'success' : 'warning'" variant="tonal">{{ d.statut }}</v-chip>
+                <v-chip size="x-small" color="success" variant="tonal">{{ d.statut }}</v-chip>
               </div>
             </template>
             <template #append>
               <div class="d-flex ga-1">
-                <v-btn v-for="fmt in d.formats" :key="fmt" size="x-small" :color="fmtColor(fmt)" variant="tonal" @click="() => {}">{{ fmt }}</v-btn>
+                <v-btn size="x-small" color="info" variant="tonal" @click="telechargerJson">JSON</v-btn>
               </div>
             </template>
           </v-list-item>
         </v-list>
+        <v-card-text v-if="!loading && !filteredDatasets.length" class="pa-4">
+          <v-alert type="info" variant="tonal" rounded="lg" density="compact">
+            Aucun jeu de données publié pour le moment.
+          </v-alert>
+        </v-card-text>
       </v-card>
 
       <v-row class="mb-6">
@@ -80,43 +84,26 @@
         </v-card-text>
       </v-card>
 
-      <v-card rounded="lg" elevation="1" class="mb-6">
-        <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Provenance et qualite</v-card-title>
-        <v-data-table :headers="qualityHeaders" :items="qualityRows" hover density="comfortable">
-          <template #item.qualite="{ item }">
-            <v-chip :color="item.qualite === 'Certifie' ? 'success' : 'warning'" size="x-small" variant="tonal">{{ item.qualite }}</v-chip>
-          </template>
-        </v-data-table>
-      </v-card>
+      <!-- TODO(endpoint): métadonnées de provenance/qualité par jeu sans endpoint — carte masquee. -->
 
       <!-- Swagger API -->
       <v-card rounded="lg" elevation="1">
         <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold d-flex align-center ga-2">
           <v-icon icon="mdi-api" color="primary" size="20"/>
-          API REST publique — Documentation développeurs
+          API REST — Documentation développeurs
         </v-card-title>
         <v-card-text class="pa-4">
           <v-alert type="info" variant="tonal" rounded="lg" density="compact" class="mb-4">
-            Une API REST publique est disponible pour accéder programmatiquement aux données agrégées. Aucune authentification requise.
+            L'API OASE expose les mesures d'exonération publiables. L'accès requiert actuellement une session authentifiée ; l'ouverture anonyme est en préparation.
           </v-alert>
           <div class="pa-4 rounded-lg mb-4" style="background:#1E293B;font-family:monospace;font-size:0.8rem;color:#E2E8F0">
-            <span style="color:#94A3B8">GET</span> <span style="color:#38BDF8">https://opendata.oase.mef.tg/api/v1/exonerations</span><br/>
-            <span style="color:#94A3B8">GET</span> <span style="color:#38BDF8">https://opendata.oase.mef.tg/api/v1/exonerations?annee=2025&secteur=mines</span><br/>
-            <span style="color:#94A3B8">GET</span> <span style="color:#38BDF8">https://opendata.oase.mef.tg/api/v1/depenses-fiscales/totaux</span>
+            <span style="color:#94A3B8">GET</span> <span style="color:#38BDF8">/api/v1/rapports/opendata</span><br/>
+            <span style="color:#94A3B8">GET</span> <span style="color:#38BDF8">/api/v1/rapports</span>
           </div>
-          <v-expansion-panels variant="accordion">
-            <v-expansion-panel title="GET /exonerations — Liste des exonérations agrégées">
+          <v-expansion-panels v-if="echantillon" variant="accordion">
+            <v-expansion-panel title="Extrait réel — GET /api/v1/rapports/opendata (premier enregistrement)">
               <template #text>
-                <div class="pa-3 rounded-lg" style="background:#1E293B;font-family:monospace;font-size:0.75rem;color:#E2E8F0">
-                  { "data": [ { "secteur": "Mines", "type": "douaniere", "annee": 2025, "montant_mds_fcfa": 234.1, "nb_contribuables": 12 } ], "total": 1102, "page": 1 }
-                </div>
-              </template>
-            </v-expansion-panel>
-            <v-expansion-panel title="GET /depenses-fiscales/totaux — Totaux par année">
-              <template #text>
-                <div class="pa-3 rounded-lg" style="background:#1E293B;font-family:monospace;font-size:0.75rem;color:#E2E8F0">
-                  { "2025": { "total_mds": 724.3, "pct_pib": 3.8 }, "2024": { "total_mds": 680.1, "pct_pib": 3.6 } }
-                </div>
+                <div class="pa-3 rounded-lg" style="background:#1E293B;font-family:monospace;font-size:0.75rem;color:#E2E8F0;white-space:pre-wrap">{{ echantillon }}</div>
               </template>
             </v-expansion-panel>
           </v-expansion-panels>
@@ -126,34 +113,60 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
+import { listerMesuresOpenData, type MesureOpenData } from '../../services/rapports'
+
 const search = ref('')
 const filterTheme = ref(null)
-const themes = ['Exonérations douanières','Exonérations fiscales','Zones franches','Synthèse annuelle','Données régionales']
-const datasets = [
-  { id: 1, titre: 'Exonérations douanières 2018–2025', description: 'Données agrégées par secteur, type de produit et année', periode: '2018–2025', majDate: '01/03/2026', lignes: '8 ans × 10 secteurs', formats: ['CSV','JSON','XLSX'], theme: 'Exonérations douanières', statut: 'Publié' },
-  { id: 2, titre: 'Exonérations fiscales IS/TVA 2018–2025', description: 'Impôt sur les sociétés et TVA interne, par secteur', periode: '2018–2025', majDate: '01/03/2026', lignes: '8 ans × 10 secteurs', formats: ['CSV','JSON'], theme: 'Exonérations fiscales', statut: 'Publié' },
-  { id: 3, titre: 'Conventions Zones Franches actives 2026', description: 'Données agrégées ZFI/ZES — Emplois, investissements', periode: '2026', majDate: '01/04/2026', lignes: '45 conventions', formats: ['CSV','XLSX'], theme: 'Zones franches', statut: 'En validation' },
-  { id: 4, titre: 'Rapport annuel dépenses fiscales 2025', description: 'Synthèse complète conforme directive UEMOA 06/2009', periode: '2025', majDate: '28/02/2026', lignes: 'Rapport complet', formats: ['JSON','XLSX'], theme: 'Synthèse annuelle', statut: 'Publié' },
-  { id: 5, titre: 'Répartition géographique par région 2025', description: 'Exonérations par région administrative du Togo', periode: '2025', majDate: '01/03/2026', lignes: '5 régions', formats: ['CSV','JSON'], theme: 'Données régionales', statut: 'Publié' },
-]
-const filteredDatasets = computed(() => datasets.filter(d => {
+const themes = ['Mesures d\'exonération']
+
+// Jeu de données réel : mesures d'exonération publiées (GET /rapports/opendata).
+const loading = ref(false)
+const mesures = ref<MesureOpenData[]>([])
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    mesures.value = await listerMesuresOpenData()
+  } catch {
+    mesures.value = []
+  } finally {
+    loading.value = false
+  }
+})
+
+const datasets = computed(() =>
+  mesures.value.length
+    ? [
+        {
+          id: 1,
+          titre: 'Mesures d\'exonération publiées',
+          description: 'Codes mesure et bases juridiques associées — données réelles issues du registre OASE',
+          lignes: String(mesures.value.length),
+          theme: 'Mesures d\'exonération',
+          statut: 'Publié',
+        },
+      ]
+    : [],
+)
+
+const filteredDatasets = computed(() => datasets.value.filter(d => {
   if (filterTheme.value && d.theme !== filterTheme.value) return false
   if (search.value && !d.titre.toLowerCase().includes(search.value.toLowerCase())) return false
   return true
 }))
-const fmtColor = (f: string) => ({ CSV: 'success', JSON: 'info', XLSX: 'primary' }[f] || 'secondary')
-const qualityHeaders = [
-  { title: 'Jeu', key: 'jeu' },
-  { title: 'Source', key: 'source' },
-  { title: 'Qualite', key: 'qualite' },
-  { title: 'Derniere validation', key: 'validation' },
-]
-const qualityRows = [
-  { jeu: 'Exonérations douanières 2018–2025', source: 'Sydonia / OASE', qualite: 'Certifie', validation: '01/03/2026' },
-  { jeu: 'Exonérations fiscales IS/TVA 2018–2025', source: 'E-TAX / DAS / OASE', qualite: 'Certifie', validation: '01/03/2026' },
-  { jeu: 'Conventions Zones Franches actives 2026', source: 'SAZOF / OASE', qualite: 'A confirmer', validation: '28/05/2026' },
-  { jeu: 'Répartition géographique 2025', source: 'Registre central', qualite: 'Certifie', validation: '01/03/2026' },
-]
+
+/** Téléchargement JSON du jeu réel (généré côté client à partir des données API). */
+function telechargerJson() {
+  const blob = new Blob([JSON.stringify(mesures.value, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'oase-mesures-exoneration-publiees.json'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+const echantillon = computed(() => (mesures.value.length ? JSON.stringify(mesures.value[0], null, 2) : null))
 </script>

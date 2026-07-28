@@ -17,35 +17,20 @@
       </v-col>
     </v-row>
 
+    <v-alert v-if="error" type="error" variant="tonal" rounded="lg" density="compact" class="mb-4">{{ error }}</v-alert>
+
     <v-row>
       <v-col cols="12" md="8">
         <v-card rounded="lg" elevation="1" class="mb-4">
           <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Rapports d'evaluation disponibles</v-card-title>
-          <v-data-table :headers="headers" :items="reports" hover>
+          <v-data-table :headers="headers" :items="reports" :loading="loading" hover no-data-text="Aucun rapport généré pour le moment.">
             <template #item.statut="{ item }">
               <v-chip :color="statusColor(item.statut)" size="x-small" variant="tonal">{{ item.statut }}</v-chip>
-            </template>
-            <template #item.couverture="{ item }">
-              <div class="d-flex align-center ga-3">
-                <v-progress-linear :model-value="item.couverture" color="primary" rounded height="8" style="max-width: 120px" />
-                <span class="text-caption font-weight-semibold">{{ item.couverture }}%</span>
-              </div>
             </template>
           </v-data-table>
         </v-card>
 
-        <v-card rounded="lg" elevation="1">
-          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Cohérence sectorielle</v-card-title>
-          <v-card-text>
-            <div v-for="item in sectors" :key="item.label" class="mb-3">
-              <div class="d-flex justify-space-between text-caption mb-1">
-                <span>{{ item.label }}</span>
-                <span class="font-weight-bold">{{ item.value }}</span>
-              </div>
-              <v-progress-linear :model-value="item.progress" :color="item.color" rounded height="10" />
-            </div>
-          </v-card-text>
-        </v-card>
+        <!-- TODO(endpoint): jauges de cohérence sectorielle sans endpoint — section masquee. -->
       </v-col>
 
       <v-col cols="12" md="4">
@@ -75,35 +60,48 @@
 </template>
 
 <script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
+import { listerRapports, labelTypeRapport, type RapportApi } from '../../services/rapports'
 
-const kpis = [
-  { label: 'Rapports consolides', value: '6', icon: 'mdi-file-chart-outline', color: 'primary', subtitle: '2019 a 2024' },
-  { label: 'Mesures evaluables 2024', value: '532 / 1316', icon: 'mdi-chart-donut', color: 'info', subtitle: 'Revenue forgone' },
-  { label: 'Annexe LFI en preparation', value: '2027', icon: 'mdi-briefcase-clock-outline', color: 'warning', subtitle: 'Cycle en cours' },
-  { label: 'Ecarts sectoriels critiques', value: '2', icon: 'mdi-scale-balance', color: 'error', subtitle: 'Primaire et industrie' },
-]
+const loading = ref(false)
+const error = ref<string | null>(null)
+const rapports = ref<RapportApi[]>([])
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    rapports.value = await listerRapports()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Impossible de charger les rapports.'
+  } finally {
+    loading.value = false
+  }
+})
+
+// KPI calculé sur données réelles (GET /rapports). Les KPIs "mesures évaluables", "annexe LFI"
+// et "écarts sectoriels" sont masqués : aucun endpoint ne les expose (TODO backend).
+const kpis = computed(() => [
+  { label: 'Rapports generes', value: String(rapports.value.length), icon: 'mdi-file-chart-outline', color: 'primary', subtitle: 'Source : API /rapports' },
+])
 
 const headers = [
   { title: 'Rapport', key: 'rapport' },
   { title: 'Periode', key: 'periode' },
-  { title: 'Couverture', key: 'couverture' },
   { title: 'Statut', key: 'statut' },
+  { title: 'Genere le', key: 'genereLe' },
 ]
 
-const reports = [
-  { rapport: 'Rapport dépenses fiscales 2024', periode: 'Exercice 2024', couverture: 41, statut: 'En consolidation' },
-  { rapport: 'Rapport dépenses fiscales 2023', periode: 'Exercice 2023', couverture: 88, statut: 'Publie' },
-  { rapport: 'Rapport dépenses fiscales 2022', periode: 'Exercice 2022', couverture: 84, statut: 'Publie' },
-]
+const reports = computed(() =>
+  rapports.value.map((r) => ({
+    rapport: labelTypeRapport(r.typeRapportCode),
+    periode: r.periodeAnnee ? `Exercice ${r.periodeAnnee}${r.periodeMois ? ` — mois ${r.periodeMois}` : ''}` : '—',
+    statut: r.statutCode,
+    genereLe: r.dateFin ? new Date(r.dateFin).toLocaleDateString('fr-FR') : '—',
+  })),
+)
 
-const sectors = [
-  { label: 'Tertiaire vs priorites nationales', value: 'Sur-represente', progress: 82, color: 'warning' },
-  { label: 'Primaire / agriculture', value: 'Sous-couvert', progress: 31, color: 'error' },
-  { label: 'Industrie / transformation', value: 'A renforcer', progress: 48, color: 'warning' },
-  { label: 'Extractif', value: 'A qualifier', progress: 55, color: 'info' },
-]
-
-const statusColor = (value: string) => ({ Publie: 'success', 'En consolidation': 'warning' } as Record<string, string>)[value] || 'secondary'
+const statusColor = (value: string) =>
+  ({ completed: 'success', running: 'info', failed: 'error', pending: 'warning' } as Record<string, string>)[value] || 'secondary'
 </script>

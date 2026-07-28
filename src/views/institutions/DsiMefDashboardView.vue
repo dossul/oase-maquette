@@ -10,35 +10,21 @@
       </template>
     </PageHeader>
 
-    <v-row class="mb-4">
-      <v-col v-for="kpi in kpis" :key="kpi.label" cols="6" md="3">
-        <KpiCard v-bind="kpi" />
-      </v-col>
-    </v-row>
+    <!-- TODO(endpoint): KPIs interfaces/disponibilité/secrets/alertes sans endpoint de monitoring — section masquee. -->
 
     <v-row>
       <v-col cols="12" md="8">
         <v-card rounded="lg" elevation="1" class="mb-4">
           <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Interfaces et contraintes de cadrage visibles</v-card-title>
-          <v-data-table :headers="headers" :items="rows" hover>
-            <template #item.mode="{ item }">
-              <v-chip :color="modeColor(item.mode)" size="x-small" variant="tonal">{{ item.mode }}</v-chip>
-            </template>
-          </v-data-table>
-        </v-card>
-
-        <v-card rounded="lg" elevation="1">
-          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">PCA, sauvegardes et securite</v-card-title>
-          <v-card-text>
-            <div v-for="item in controls" :key="item.label" class="mb-3">
-              <div class="d-flex justify-space-between text-caption mb-1">
-                <span>{{ item.label }}</span>
-                <span class="font-weight-bold">{{ item.value }}</span>
-              </div>
-              <v-progress-linear :model-value="item.progress" :color="item.color" rounded height="8" />
-            </div>
+          <!-- TODO(endpoint): GET /connecteurs ou catalogue d'interfaces requis pour les états réels. -->
+          <v-card-text class="pa-4">
+            <v-alert type="info" variant="tonal" rounded="lg" density="compact">
+              Le catalogue d'interfaces n'est pas encore exposé par l'API. Les états d'interconnexion (Sydonia, GESTEXO, DAS, SIGFiP) seront affichés dès disponibilité.
+            </v-alert>
           </v-card-text>
         </v-card>
+
+        <!-- TODO(endpoint): métriques PCA/sauvegardes/sécurité sans endpoint de supervision — carte masquee. -->
       </v-col>
 
       <v-col cols="12" md="4">
@@ -69,35 +55,4 @@
 
 <script setup lang="ts">
 import PageHeader from '../../components/PageHeader.vue'
-import KpiCard from '../../components/KpiCard.vue'
-
-const kpis = [
-  { label: 'Interfaces pilotes', value: '9', icon: 'mdi-api', color: 'primary', subtitle: 'Dont DAS et GUDEF' },
-  { label: 'Disponibilite cible', value: '99.9%', icon: 'mdi-server', color: 'success', subtitle: 'PCA / sauvegardes' },
-  { label: 'Secrets critiques', value: '14', icon: 'mdi-key-variant', color: 'warning', subtitle: 'A gouverner' },
-  { label: 'Alertes securite ouvertes', value: '3', icon: 'mdi-alert-circle-outline', color: 'error', subtitle: 'A traiter prioritairement' },
-]
-
-const headers = [
-  { title: 'Interface', key: 'interface' },
-  { title: 'Frequence', key: 'frequence' },
-  { title: 'Protocole', key: 'protocole' },
-  { title: 'Mode', key: 'mode' },
-]
-
-const rows = [
-  { interface: 'Sydonia World', frequence: 'Quotidien', protocole: 'XML / API REST', mode: 'API-first' },
-  { interface: 'GESTEXO', frequence: 'Continu', protocole: 'API OTR', mode: 'Interop future' },
-  { interface: 'DAS', frequence: 'Annuel', protocole: 'CSV', mode: 'Batch' },
-  { interface: 'SIGFiP', frequence: 'Annuel', protocole: 'CSV / API', mode: 'Hybride' },
-]
-
-const controls = [
-  { label: 'Sauvegardes chiffrees', value: '96%', progress: 96, color: 'success' },
-  { label: 'Catalogue interfaces documente', value: '74%', progress: 74, color: 'warning' },
-  { label: 'Journal securite exploitable', value: '81%', progress: 81, color: 'info' },
-  { label: 'Tests de restauration', value: '67%', progress: 67, color: 'warning' },
-]
-
-const modeColor = (value: string) => ({ 'API-first': 'success', Batch: 'info', Hybride: 'warning', 'Interop future': 'secondary' } as Record<string, string>)[value] || 'secondary'
 </script>

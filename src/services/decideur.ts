@@ -9,6 +9,24 @@ export interface DashboardP4 {
   totalDemandes: number
   repartitionParStatut: { statutCode: string; _count: { id: number } }[]
   evolutionJournaliere: { dateDepot: string | null; _count: { id: number } }[]
+  /** Délai moyen dépôt → décision (heures), null si aucune demande décidée. */
+  delaiMoyenTraitementHeures: number | null
+  nombreDemandesDecidees: number
+}
+
+/** Mesure du registre central (GET /registre-central/mesures) — agrégats réels par base juridique. */
+export interface MesureRegistre {
+  baseJuridiqueId: string
+  codeMesure: string
+  libelle: string | null
+  impotConcerne: string | null
+  typeTexte1: string | null
+  organeGestionCode: string | null
+  estActive: boolean | null
+  nombreDemandes: number
+  nombreApprouvees: number
+  montantTotalAccorde: string
+  derniereDecision: { typeCode: string; date: string } | null
 }
 
 export interface DashboardP5 {
@@ -69,6 +87,11 @@ export function getDashboardP4(): Promise<DashboardP4> {
 
 export function getDashboardP5(): Promise<DashboardP5> {
   return api<DashboardP5>('/dashboards/p5')
+}
+
+/** Registre central des mesures (rôles decideur/auditeur/admin_si). */
+export function listerMesuresRegistre(): Promise<MesureRegistre[]> {
+  return api<MesureRegistre[]>('/registre-central/mesures')
 }
 
 export function listerQuotas(): Promise<Quota[]> {

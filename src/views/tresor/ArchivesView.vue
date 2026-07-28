@@ -15,12 +15,15 @@
       <v-col v-for="kpi in kpis" :key="kpi.label" cols="6" md="3">
         <KpiCard v-bind="kpi" />
       </v-col>
+      <!-- TODO(endpoint): KPIs archives conformes / renouvellements sans compteurs dédiés — masques. -->
     </v-row>
+
+    <v-alert v-if="error" type="error" variant="tonal" rounded="lg" density="compact" class="mb-4">{{ error }}</v-alert>
 
     <v-row>
       <v-col cols="12" md="8">
         <v-card rounded="lg" elevation="1">
-          <v-data-table :headers="headers" :items="archives" hover>
+          <v-data-table :headers="headers" :items="archives" :loading="loading" hover no-data-text="Aucune demande archivée pour le moment.">
             <template #item.type="{ item }">
               <v-chip size="x-small" color="primary" variant="tonal">{{ item.type }}</v-chip>
             </template>
@@ -46,52 +49,62 @@
           </v-list>
         </v-card>
 
-        <v-card rounded="lg" elevation="1">
-          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Lots imminents</v-card-title>
-          <v-list density="comfortable" class="pa-2">
-            <v-list-item v-for="lot in lots" :key="lot.title" :title="lot.title" :subtitle="lot.subtitle" rounded="lg">
-              <template #append><v-chip :color="lot.color" size="x-small" variant="tonal">{{ lot.badge }}</v-chip></template>
-            </v-list-item>
-          </v-list>
-        </v-card>
+        <!-- TODO(endpoint): lots d'archivage groupés sans endpoint — carte "Lots imminents" masquee. -->
       </v-col>
     </v-row>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
+import { api } from '../../services/api'
+import type { DemandeApi } from '../../services/backoffice'
+import { STATUT_LABELS, type StatutDemande } from '../../types'
 
-const kpis = [
-  { label: 'Mesures a archiver', value: '42', icon: 'mdi-archive-arrow-down', color: 'warning', subtitle: 'Echeance <= 90 jours' },
-  { label: 'Archives conformes', value: '248', icon: 'mdi-archive-check', color: 'success', subtitle: 'Journal et pieces conserves' },
-  { label: 'Renouvellements ouverts', value: '9', icon: 'mdi-refresh-circle', color: 'error', subtitle: 'Decision attendue' },
-  { label: 'Mesures deja renouvelees', value: '17', icon: 'mdi-check-circle', color: 'info', subtitle: 'Campagne 2026' },
-]
+const loading = ref(false)
+const error = ref<string | null>(null)
+const demandes = ref<DemandeApi[]>([])
+const total = ref(0)
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    const res = await api<{ data: DemandeApi[]; meta?: { total?: number } }>('/demandes?statutCode=archive&limit=50')
+    demandes.value = res.data
+    total.value = res.meta?.total ?? res.data.length
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Impossible de charger les archives.'
+  } finally {
+    loading.value = false
+  }
+})
+
+// KPI calculé sur données réelles (GET /demandes?statutCode=archive).
+const kpis = computed(() => [
+  { label: 'Demandes archivees', value: String(total.value), icon: 'mdi-archive-check', color: 'success', subtitle: 'Source : API /demandes' },
+])
 
 const headers = [
-  { title: 'Mesure', key: 'mesure' },
+  { title: 'Reference', key: 'mesure' },
   { title: 'Contribuable', key: 'contribuable' },
-  { title: 'Type', key: 'type' },
-  { title: 'Echeance', key: 'echeance' },
+  { title: 'Secteur', key: 'type' },
+  { title: 'Depot', key: 'echeance' },
   { title: 'Statut', key: 'statut' },
   { title: 'Actions', key: 'actions', sortable: false },
 ]
 
-const archives = [
-  { mesure: 'MES-2024-00977', contribuable: 'Programme logement social', type: 'LFI / loi speciale', echeance: '31/12/2024', statut: 'Archivee' },
-  { mesure: 'MES-2026-00124', contribuable: 'Mission diplomatique Canada', type: 'Accord de siege', echeance: '31/12/2026', statut: 'Renouvellement' },
-  { mesure: 'MES-2025-00411', contribuable: 'Mines du Nord Togo', type: 'Convention miniere', echeance: '15/03/2030', statut: 'Suivi phase' },
-  { mesure: 'MES-2025-00210', contribuable: 'Zone franche textile Kara', type: 'Zone franche', echeance: '30/09/2026', statut: 'A archiver' },
-]
-
-const lots = [
-  { title: 'Lot accords de siege', subtitle: '18 dossiers a revoir avant cloture', badge: 'J-30', color: 'warning' },
-  { title: 'Lot zones franches', subtitle: '11 dossiers arrivent a echeance', badge: 'J-60', color: 'info' },
-  { title: 'Lot lois speciales 2024', subtitle: 'Pret pour bascule archive', badge: 'Pret', color: 'success' },
-]
+const archives = computed(() =>
+  demandes.value.map((d) => ({
+    mesure: d.reference,
+    contribuable: d.contribuable?.raisonSociale ?? '—',
+    type: d.secteur ?? '—',
+    echeance: d.dateDepot ? new Date(d.dateDepot).toLocaleDateString('fr-FR') : '—',
+    statut: STATUT_LABELS[d.statutCode as StatutDemande] ?? d.statutCode,
+  })),
+)
 
 const statusColor = (value: string) =>
-  ({ Archivee: 'success', Renouvellement: 'warning', 'Suivi phase': 'info', 'A archiver': 'error' } as Record<string, string>)[value] || 'secondary'
+  ({ Archivee: 'success', Archivé: 'success', Renouvellement: 'warning', 'Suivi phase': 'info', 'A archiver': 'error' } as Record<string, string>)[value] || 'secondary'
 </script>

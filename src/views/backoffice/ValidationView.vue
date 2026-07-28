@@ -11,7 +11,7 @@
               <v-col cols="6"><div class="label-micro text-medium-emphasis">NIF</div><div class="text-body-2">{{ demande.nif }}</div></v-col>
               <v-col cols="6"><div class="label-micro text-medium-emphasis">Type</div><div class="text-body-2">{{ demande.type }}</div></v-col>
               <v-col cols="6"><div class="label-micro text-medium-emphasis">Montant accordé</div><div class="font-weight-bold text-primary">{{ formatMontant(demande.montantFCFA) }}</div></v-col>
-              <v-col cols="6"><div class="label-micro text-medium-emphasis">Durée</div><div class="text-body-2">12 mois</div></v-col>
+              <v-col cols="6"><div class="label-micro text-medium-emphasis">Durée</div><div class="text-body-2">{{ dureeLabel }}</div></v-col>
               <v-col cols="6"><div class="label-micro text-medium-emphasis">Base juridique</div><div class="text-body-2">{{ demande.baseJuridique }}</div></v-col>
             </v-row>
           </v-card-text>
@@ -80,10 +80,10 @@
                   <div style="font-size:0.65rem;color:#36454F">Ministère de l'Économie et des Finances</div>
                   <v-divider class="my-3" />
                   <div style="font-size:0.9rem;font-weight:700;color:#2774AE">ATTESTATION D'EXONÉRATION</div>
-                  <div style="font-size:0.7rem;color:#6B7280">N° OASE-2026-ATT-0039</div>
+                  <div style="font-size:0.7rem;color:#6B7280">N° {{ demande.reference }}</div>
                 </div>
                 <div style="font-size:0.72rem;color:#374151;line-height:1.6">
-                  Le Ministère de l'Économie et des Finances, vu les dispositions de <strong>{{ demande.baseJuridique }}</strong>, accorde à <strong>{{ demande.contribuable }}</strong> (NIF: {{ demande.nif }}) une exonération fiscale d'un montant de <strong>{{ formatMontant(demande.montantFCFA) }}</strong> pour une durée de <strong>12 mois</strong> à compter du <strong>27/04/2026</strong>.
+                  Le Ministère de l'Économie et des Finances, vu les dispositions de <strong>{{ demande.baseJuridique }}</strong>, accorde à <strong>{{ demande.contribuable }}</strong> (NIF: {{ demande.nif }}) une exonération fiscale d'un montant de <strong>{{ formatMontant(demande.montantFCFA) }}</strong> pour une durée de <strong>{{ dureeLabel }}</strong> à compter du <strong>{{ dateDebutEffet }}</strong>.
                 </div>
                 <div class="mt-4 text-end">
                   <div style="font-size:0.65rem;color:#6B7280">Signature électronique</div>
@@ -96,8 +96,9 @@
                   <div style="font-size:0.6rem;color:#9CA3AF">QR Code de vérification<br/>Lien d'authenticité OASE</div>
                 </div>
                 <div class="mt-3" style="font-size:0.58rem;color:#64748B;border-top:1px dashed #CBD5E1;padding-top:8px">
-                  Empreinte SHA-256 : 8f1c...a7d9<br/>
-                  Jeton TSA : TSA-2026-0039-14<br/>
+                  <!-- Empreinte et jeton TSA générés côté serveur au moment de la signature -->
+                  Empreinte SHA-256 : générée à la signature<br/>
+                  Jeton TSA : généré à la signature<br/>
                   Diffusion : restreinte aux habilitations OTR / DGBF
                 </div>
               </v-card>
@@ -134,8 +135,9 @@
               <v-chip color="info" variant="tonal" prepend-icon="mdi-clock-check-outline">Horodatage TSA</v-chip>
               <v-chip color="warning" variant="tonal" prepend-icon="mdi-history">Journalisation active</v-chip>
             </div>
-            <div class="text-body-2 mb-2"><strong>Empreinte :</strong> `8f1c...a7d9`</div>
-            <div class="text-body-2 mb-2"><strong>Jeton TSA :</strong> TSA-2026-0039-14</div>
+            <!-- TODO(endpoint): exposer l'empreinte SHA-256 et le jeton TSA réels après signature (GET /attestations/:id) -->
+            <div class="text-body-2 mb-2"><strong>Empreinte :</strong> générée à la signature</div>
+            <div class="text-body-2 mb-2"><strong>Jeton TSA :</strong> généré à la signature</div>
             <div class="text-body-2 mb-2"><strong>Autorite :</strong> PKI souveraine MEF</div>
             <div class="text-body-2"><strong>Contre-signature :</strong> Visa DGBF requis pour les actes budgetaires</div>
           </v-card-text>
@@ -188,6 +190,7 @@ const demande = ref({
   type: '—',
   montantFCFA: 0,
   baseJuridique: '—',
+  dateEcheance: null as string | null,
 })
 const typeActe = ref('attestation')
 const regimeTab = ref('invest')
@@ -198,6 +201,22 @@ const signing = ref(false)
 const signed = ref(false)
 const signError = ref<string | null>(null)
 const formatMontant = (v: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF', maximumFractionDigits: 0 }).format(v)
+
+/** Date de début d'effet calculée : dateEcheance − 12 mois si connue, sinon date du jour. */
+const dateDebutEffet = computed(() => {
+  const d = demande.value.dateEcheance ? new Date(demande.value.dateEcheance) : new Date()
+  if (demande.value.dateEcheance) d.setMonth(d.getMonth() - 12)
+  return d.toLocaleDateString('fr-FR')
+})
+/** Durée réelle de l'acte si l'échéance est connue (aujourd'hui → échéance), sinon durée réglementaire par défaut (12 mois). */
+const dureeLabel = computed(() => {
+  if (!demande.value.dateEcheance) return '12 mois'
+  const fin = new Date(demande.value.dateEcheance)
+  const debut = new Date()
+  let mois = (fin.getFullYear() - debut.getFullYear()) * 12 + (fin.getMonth() - debut.getMonth())
+  if (fin.getDate() < debut.getDate()) mois -= 1
+  return mois > 0 ? `${mois} mois` : '12 mois'
+})
 
 onMounted(async () => {
   if (auth.user) signataire.value = `${auth.user.prenom} ${auth.user.nom}`
@@ -210,6 +229,7 @@ onMounted(async () => {
       type: d.secteur ?? 'Exonération',
       montantFCFA: Number(d.montantFcfa ?? 0),
       baseJuridique: d.baseJuridiqueVersionId ?? '—',
+      dateEcheance: d.dateEcheance ?? null,
     }
   } catch {
     // Le récapitulatif conserve les valeurs par défaut ; la signature reste bloquée côté API.
@@ -224,7 +244,7 @@ const o2Rows = computed(() => [
   { label: 'montant exonere', value: formatMontant(demande.value.montantFCFA) },
   { label: 'type d acte', value: typeActe.value },
   { label: 'signataire', value: signataire.value || '—' },
-  { label: 'piece PDF / hash / horodatage', value: 'attestation_oase.pdf / —' },
+  { label: 'piece PDF / hash / horodatage', value: `attestation_${demande.value.reference}.pdf / —` },
 ])
 const regimeCards = [
   {

@@ -15,16 +15,16 @@
       <v-col v-for="kpi in kpis" :key="kpi.label" cols="6" md="3">
         <KpiCard v-bind="kpi" />
       </v-col>
+      <!-- TODO(endpoint): phases recherche/exploitation et écarts ITIE sans endpoint — KPIs masques. -->
     </v-row>
+
+    <v-alert v-if="error" type="error" variant="tonal" rounded="lg" density="compact" class="mb-4">{{ error }}</v-alert>
 
     <v-row>
       <v-col cols="12" md="8">
         <v-card rounded="lg" elevation="1" class="mb-4">
-          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Conventions par phase</v-card-title>
-          <v-data-table :headers="headers" :items="rows" hover>
-            <template #item.phase="{ item }">
-              <v-chip :color="phaseColor(item.phase)" size="x-small" variant="tonal">{{ item.phase }}</v-chip>
-            </template>
+          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Conventions suivies</v-card-title>
+          <v-data-table :headers="headers" :items="rows" :loading="loading" hover no-data-text="Aucune convention enregistrée pour le moment.">
             <template #item.statut="{ item }">
               <v-chip :color="statusColor(item.statut)" size="x-small" variant="outlined">{{ item.statut }}</v-chip>
             </template>
@@ -44,17 +44,8 @@
           </v-stepper>
         </v-card>
 
-        <v-card rounded="lg" elevation="1" class="mt-4">
-          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">O2 et pieces critiques par convention</v-card-title>
-          <v-data-table :headers="o2Headers" :items="o2Rows" hover>
-            <template #item.confidentialite="{ item }">
-              <v-chip :color="item.confidentialite === 'Confidentiel' ? 'error' : 'warning'" size="x-small" variant="outlined">{{ item.confidentialite }}</v-chip>
-            </template>
-            <template #item.phase="{ item }">
-              <v-chip :color="phaseColor(item.phase)" size="x-small" variant="tonal">{{ item.phase }}</v-chip>
-            </template>
-          </v-data-table>
-        </v-card>
+        <!-- TODO(endpoint): lignes O2 par convention (codes additionnels, montants, hashes de pièces)
+             sans endpoint probant — carte masquee pour ne pas afficher de références fictives. -->
       </v-col>
 
       <v-col cols="12" md="4">
@@ -69,18 +60,7 @@
           </v-list>
         </v-card>
 
-        <v-card rounded="lg" elevation="1">
-          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Ecarts ITIE</v-card-title>
-          <v-card-text>
-            <div v-for="gap in gaps" :key="gap.label" class="mb-3">
-              <div class="d-flex justify-space-between text-caption mb-1">
-                <span>{{ gap.label }}</span>
-                <span class="font-weight-bold">{{ gap.value }}</span>
-              </div>
-              <v-progress-linear :model-value="gap.progress" :color="gap.color" rounded height="8" />
-            </div>
-          </v-card-text>
-        </v-card>
+        <!-- TODO(endpoint): rapprochement ITIE sans endpoint — carte "Ecarts ITIE" masquee. -->
 
         <v-card rounded="lg" elevation="1" class="mt-4">
           <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Checklists extractives visibles</v-card-title>
@@ -98,51 +78,50 @@
 </template>
 
 <script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
+import { listerConventionsReelles, type ConventionApi } from '../../services/backoffice'
 
-const kpis = [
-  { label: 'Conventions actives', value: '22', icon: 'mdi-file-document-outline', color: 'primary', subtitle: 'Mines et hydrocarbures' },
-  { label: 'Phases recherche', value: '9', icon: 'mdi-magnify-scan', color: 'info', subtitle: 'Avantages imports equipements' },
-  { label: 'Phases exploitation', value: '11', icon: 'mdi-factory', color: 'success', subtitle: 'IS / IRPP / TVA locale' },
-  { label: 'Ecarts ITIE ouverts', value: '4', icon: 'mdi-alert-circle-outline', color: 'warning', subtitle: 'A rapprocher' },
-]
+const loading = ref(false)
+const error = ref<string | null>(null)
+const conventions = ref<ConventionApi[]>([])
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    conventions.value = await listerConventionsReelles()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Impossible de charger les conventions.'
+  } finally {
+    loading.value = false
+  }
+})
+
+// KPI calculé sur données réelles (GET /conventions). Les KPIs par phase et les écarts
+// ITIE sont masqués : aucun endpoint ne les expose (TODO backend).
+const kpis = computed(() => [
+  { label: 'Conventions enregistrees', value: String(conventions.value.length), icon: 'mdi-file-document-outline', color: 'primary', subtitle: 'Source : API /conventions' },
+])
 
 const headers = [
-  { title: 'Convention', key: 'convention' },
-  { title: 'Operateur', key: 'operateur' },
-  { title: 'Phase', key: 'phase' },
+  { title: 'Reference', key: 'reference' },
+  { title: 'Contribuable', key: 'contribuable' },
+  { title: 'Regime', key: 'regime' },
   { title: 'Statut', key: 'statut' },
   { title: 'Echeance', key: 'echeance' },
 ]
 
-const rows = [
-  { convention: 'CM-2025-17', operateur: 'Mines du Nord Togo', phase: 'Recherche', statut: 'En suivi', echeance: '15/03/2030' },
-  { convention: 'CP-2024-08', operateur: 'Petro Togo SA', phase: 'Exploitation', statut: 'Ratifiée', echeance: '01/12/2059' },
-  { convention: 'CM-2026-02', operateur: 'Golden Mines', phase: 'Production', statut: 'Conseil des ministres', echeance: '09/09/2061' },
-]
+const rows = computed(() =>
+  conventions.value.map((c) => ({
+    reference: c.reference,
+    contribuable: c.contribuables?.raisonSociale ?? '—',
+    regime: c.regimeCode,
+    statut: c.statutCode,
+    echeance: c.dateFin ? new Date(c.dateFin).toLocaleDateString('fr-FR') : '—',
+  })),
+)
 
-const gaps = [
-  { label: 'Correspondance avantages / ITIE', value: '82%', progress: 82, color: 'success' },
-  { label: 'Chronologie phases', value: '69%', progress: 69, color: 'warning' },
-  { label: 'Pieces ministerielles rattachees', value: '74%', progress: 74, color: 'info' },
-]
-
-const o2Headers = [
-  { title: 'Convention', key: 'convention' },
-  { title: 'Phase', key: 'phase' },
-  { title: 'Code additionnel', key: 'codeAdditionnel' },
-  { title: 'Montant brut taxable', key: 'montantBrut' },
-  { title: 'Pieces / hash', key: 'piece' },
-  { title: 'Confidentialite', key: 'confidentialite' },
-]
-
-const o2Rows = [
-  { convention: 'CM-2025-17', phase: 'Recherche', codeAdditionnel: 'DOU-MIN-2026-08', montantBrut: '420 000 000 FCFA', piece: 'convention_miniere_17.pdf / 1ab3...ff04', confidentialite: 'Confidentiel' },
-  { convention: 'CP-2024-08', phase: 'Exploitation', codeAdditionnel: 'DOU-PET-2026-05', montantBrut: '1 260 000 000 FCFA', piece: 'convention_petrole_08.pdf / 7ce2...ab41', confidentialite: 'Restreint' },
-  { convention: 'CM-2026-02', phase: 'Production', codeAdditionnel: 'DOU-MIN-2026-12', montantBrut: '860 000 000 FCFA', piece: 'annexe_production_02.pdf / 9af0...cd33', confidentialite: 'Confidentiel' },
-]
-
-const phaseColor = (value: string) => ({ Recherche: 'info', Exploitation: 'warning', Production: 'success' } as Record<string, string>)[value] || 'secondary'
-const statusColor = (value: string) => ({ 'En suivi': 'info', Ratifiée: 'success', 'Conseil des ministres': 'warning' } as Record<string, string>)[value] || 'secondary'
+const statusColor = (value: string) =>
+  ({ active: 'success', en_attente: 'warning', expiree: 'error' } as Record<string, string>)[value] || 'secondary'
 </script>
