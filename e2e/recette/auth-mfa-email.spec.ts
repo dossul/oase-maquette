@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { readFileSync, existsSync } from 'fs'
-import { join } from 'path'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
 import { ImapFlow } from 'imapflow'
 import { USERS, api, apiLogin, PASSWORD, watchConsoleErrors } from './helpers'
 
@@ -20,7 +21,7 @@ import { USERS, api, apiLogin, PASSWORD, watchConsoleErrors } from './helpers'
  */
 
 const COMPTE_MFA = 'no_reply@il7.info'
-const MAIL_CONF_PATH = join(__dirname, 'assets', 'mail.local.json')
+const MAIL_CONF_PATH = join(dirname(fileURLToPath(import.meta.url)), 'assets', 'mail.local.json')
 
 interface MailConf {
   imap: { host: string; port: number; secure: boolean; user: string; pass: string }
@@ -119,7 +120,7 @@ test.describe('TC-AUTH-02 (email) — MFA par e-mail réel', () => {
     await setMfaGlobal(request, true, 'email')
     // reset-mfa garantit mfaActive=true (régénère aussi un secret TOTP, sans effet ici)
     const reset = await api(request, adminToken).post(`/utilisateurs/${userId}/reset-mfa`)
-    expect(reset.status()).toBe(200)
+    expect([200, 201], 'reset-mfa admin (NestJS renvoie 201 sur POST)').toContain(reset.status())
   }
 
   test('API — code reçu par e-mail réel accepté, faux code rejeté', async ({ request }) => {

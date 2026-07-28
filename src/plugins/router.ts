@@ -124,7 +124,11 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const auth = useAuthStore()
-  const publicRoutes = ['login', 'reset-password', 'activate', 'opendata']
+  // OASE [BUG #12] fix : '/mfa' doit être publique — la page de vérification MFA
+  // s'affiche AVANT qu'une session existe (le mfa_token temporaire est en sessionStorage,
+  // pas d'access_token). Sans cela, le garde rebouclait /mfa → /login et le flux MFA
+  // UI était impossible.
+  const publicRoutes = ['login', 'reset-password', 'activate', 'opendata', 'mfa']
   const isPublic = publicRoutes.some((r) => to.path.startsWith(`/${r}`)) || to.meta.layout === 'public'
 
   // Garde-fou : les routes marquées demoOnly ne sont accessibles qu'en mode démo.

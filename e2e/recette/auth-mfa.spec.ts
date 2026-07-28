@@ -56,7 +56,7 @@ test.describe('TC-AUTH-02 — MFA TOTP', () => {
     // Admin : MFA global ON (canal TOTP) + secret TOTP frais pour le compte
     await setMfaGlobal(request, true, 'totp')
     const reset = await api(request, adminToken).post(`/utilisateurs/${userId}/reset-mfa`)
-    expect(reset.status(), 'reset-mfa admin').toBe(200)
+    expect([200, 201], 'reset-mfa admin (NestJS renvoie 201 sur POST)').toContain(reset.status())
     const { mfaSecret } = await reset.json()
     expect(mfaSecret, 'secret TOTP retourné par reset-mfa').toBeTruthy()
 
