@@ -117,6 +117,9 @@ test.describe('SMOKE — Rôles secondaires (login → écrans métier → 0 err
           page.getByText(ecran.titre).first(),
           `${role.nom} → titre « ${ecran.titre} » sur ${ecran.path}`,
         ).toBeVisible({ timeout: 15000 })
+        // Attendre la fin des appels API déclenchés au mount : sans cela une erreur
+        // API peut arriver APRÈS l'assertion finale (race observée en headless sur DGBF).
+        await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {})
       }
 
       if (apiErrors.length) {

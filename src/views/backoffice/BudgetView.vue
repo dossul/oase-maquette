@@ -58,7 +58,7 @@ onMounted(async () => {
   try {
     p5.value = await api<KpisP5>('/dashboards/p5')
   } catch (e) {
-    // Ex : rôle agent_dgbf non autorisé sur /dashboards/p5 côté backend actuel.
+    // Filet de sécurité : profil non autorisé sur /dashboards/p5 (agent_dgbf autorisé depuis la recette smoke).
     loadError.value = e instanceof ApiError && e.status === 403
       ? 'Les indicateurs P5 ne sont pas accessibles avec votre profil (accès décideur/audit requis).'
       : 'Impossible de charger les indicateurs budgétaires'
