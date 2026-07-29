@@ -235,3 +235,133 @@ test.describe('Extractif E2 — Répertoire minier (permis réels)', () => {
     expect(apiErrors, `appels API en erreur :\n${apiErrors.join('\n')}`).toEqual([])
   })
 })
+
+test.describe('Extractif E3 — Flux financiers (production, exportations, redevances, CFLDR)', () => {
+  test('TC-EXTR-05 — API : 4 flux alimentés, valeurs réelles, doublons refusés', async ({ request }) => {
+    const token = await apiLogin(request, DGMG)
+    const client = api(request, token)
+
+    // Production (feuille 4) : SNPT juin 2024 — volumes et valeur exacts du seed
+    const resProd = await client.get('/flux-extractifs/productions?annee=2024')
+    expect(resProd.status()).toBe(200)
+    const productions = (await resProd.json()) as Array<{
+      annee: number
+      mois: number
+      substance: string
+      volumeProduitT: string
+      valeurMarchandeFcfa: string
+      contribuables?: { nif: string }
+      permisMiniers?: { reference: string } | null
+    }>
+    expect(productions.length, 'au moins 3 lignes de production 2024').toBeGreaterThanOrEqual(3)
+    const prodSnpt = productions.find((p) => p.contribuables?.nif === '1000160416' && p.mois === 6)
+    expect(prodSnpt, 'production SNPT juin 2024 présente').toBeTruthy()
+    expect(Number(prodSnpt!.volumeProduitT), '95 000 t produites').toBe(95000)
+    expect(Number(prodSnpt!.valeurMarchandeFcfa), 'valeur marchande 1,25 Mds FCFA').toBe(1250000000)
+    expect(prodSnpt!.permisMiniers?.reference, 'production rattachée au permis SNPT').toBe('PE-2020-SNPT')
+
+    // Exportations (feuille 3) : SNPT juin → Inde
+    const exportations = (await (await client.get('/flux-extractifs/exportations?annee=2024')).json()) as Array<{
+      mois: number
+      volumeT: string
+      destination: string | null
+      contribuables?: { nif: string }
+    }>
+    expect(exportations.length, 'au moins 3 exportations 2024').toBeGreaterThanOrEqual(3)
+    const expSnpt = exportations.find((e) => e.contribuables?.nif === '1000160416' && e.mois === 6)
+    expect(expSnpt!.destination).toBe('Inde')
+    expect(Number(expSnpt!.volumeT)).toBe(85000)
+
+    // Redevances (feuille 5) : SNPT T1 — dû = payé = 122,5 M FCFA
+    const redevances = (await (await client.get('/flux-extractifs/redevances?annee=2024')).json()) as Array<{
+      trimestre: number
+      montantDuFcfa: string
+      montantPayeFcfa: string
+      referencePaiement: string | null
+      contribuables?: { nif: string }
+    }>
+    expect(redevances.length, 'au moins 3 redevances 2024').toBeGreaterThanOrEqual(3)
+    const redSnptT1 = redevances.find((r) => r.contribuables?.nif === '1000160416' && r.trimestre === 1)
+    expect(Number(redSnptT1!.montantDuFcfa)).toBe(122500000)
+    expect(Number(redSnptT1!.montantPayeFcfa)).toBe(122500000)
+    expect(redSnptT1!.referencePaiement).toBe('QTR-2024-T1-SNPT')
+
+    // Transferts CFLDR (feuille 6) : SNPT soldé, STM partiel (30 M / 60,75 M)
+    const transferts = (await (await client.get('/flux-extractifs/transferts-communes?annee=2024')).json()) as Array<{
+      commune: string
+      montantDuFcfa: string
+      montantEncaisseFcfa: string
+      contribuables?: { nif: string }
+    }>
+    expect(transferts.length, 'au moins 2 transferts CFLDR 2024').toBeGreaterThanOrEqual(2)
+    const cfldrSnpt = transferts.find((t) => t.contribuables?.nif === '1000160416')
+    expect(cfldrSnpt!.commune).toBe('Lacs 1')
+    expect(Number(cfldrSnpt!.montantDuFcfa), 'dû CFLDR = 0,75 % du CA').toBe(93750000)
+    expect(Number(cfldrSnpt!.montantEncaisseFcfa)).toBe(93750000)
+    const cfldrStm = transferts.find((t) => t.contribuables?.nif === '1001950093')
+    expect(Number(cfldrStm!.montantEncaisseFcfa), 'encaissement STM volontairement partiel').toBeLessThan(Number(cfldrStm!.montantDuFcfa))
+
+    // Intégrité : doublon de période refusé (409)
+    const doublon = await client.post('/flux-extractifs/productions', {
+      contribuableId: 'c0000000-0000-0000-0000-000000000201',
+      annee: 2024,
+      mois: 6,
+      substance: 'Phosphates',
+      volumeProduitT: 1,
+    })
+    expect(doublon.status(), 'doublon production période refusé').toBe(409)
+
+    // RBAC : un contribuable lit mais n'écrit pas
+    const clientContribuable = api(request, await apiLogin(request, 'kossiwa.amele@texlome.tg'))
+    expect((await clientContribuable.get('/flux-extractifs/productions')).status()).toBe(200)
+    const ecriture = await clientContribuable.post('/flux-extractifs/redevances', {
+      contribuableId: 'c0000000-0000-0000-0000-000000000201',
+      annee: 2025,
+      trimestre: 1,
+      substance: 'Or',
+    })
+    expect(ecriture.status(), 'écriture flux refusée au contribuable').toBe(403)
+  })
+
+  test('TC-EXTR-06 — UI : écran flux alimenté, 4 onglets, soldes calculés', async ({ page, request }) => {
+    const consoleErrors = watchConsoleErrors(page)
+    const apiErrors = watchApiErrors(page)
+
+    await injectSession(page, request, DGMG)
+    await page.goto('/extractif/flux')
+    await expect(page.getByRole('heading', { name: 'Flux financiers extractifs' })).toBeVisible({ timeout: 15000 })
+    await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {})
+
+    // KPIs alimentés par l'API (pas « — » vide)
+    await expect(page.getByText('Lignes de production')).toBeVisible()
+    await expect(page.getByText('Redevances recouvrées')).toBeVisible()
+    await expect(page.getByText('CFLDR versé aux communes')).toBeVisible()
+
+    // Onglet Production : vraies lignes — JAMAIS l'état vide
+    await expect(page.getByText('Aucune production déclarée.'), 'état vide interdit').not.toBeVisible()
+    await expect(page.getByText('06/2024').first()).toBeVisible()
+    await expect(page.getByText('95 000 t').first(), 'volume SNPT juin 2024').toBeVisible()
+    await expect(page.getByText('PE-2020-SNPT').first(), 'production rattachée au permis SNPT').toBeVisible()
+
+    // Onglet Exportations : destination Inde
+    await page.getByRole('tab', { name: 'Exportations' }).click()
+    await expect(page.getByText('Inde')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('85 000 t')).toBeVisible()
+
+    // Onglet Redevances : SNPT soldée, référence réelle
+    await page.getByRole('tab', { name: 'Redevances minières' }).click()
+    await expect(page.getByText('QTR-2024-T1-SNPT')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('122 500 000 FCFA').first()).toBeVisible()
+    await expect(page.getByText('Soldée').first()).toBeVisible()
+
+    // Onglet Transferts : SNPT soldé, STM reste 30 750 000 FCFA
+    await page.getByRole('tab', { name: 'Transferts communes (CFLDR)' }).click()
+    await expect(page.getByText('Lacs 1')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('Tône 3')).toBeVisible()
+    await expect(page.getByText('Reste 30 750 000 FCFA')).toBeVisible()
+
+    const erreursJs = consoleErrors.filter((e) => !e.includes('favicon') && !e.includes('Failed to load resource'))
+    expect(erreursJs, 'erreurs JS flux financiers').toEqual([])
+    expect(apiErrors, `appels API en erreur :\n${apiErrors.join('\n')}`).toEqual([])
+  })
+})

@@ -192,3 +192,68 @@ export async function listerPermisMiniers(params: { typePermis?: string; statut?
   const res = await api<PermisMinierApi[] | { data: PermisMinierApi[] }>(`/permis-miniers${suffixe}`)
   return Array.isArray(res) ? res : (res.data ?? [])
 }
+
+// ---------------------------------------------------------- Flux financiers extractifs
+
+export interface ProductionApi {
+  id: string
+  annee: number
+  mois: number
+  substance: string
+  volumeProduitT: string | number | null
+  volumeVenduT: string | number | null
+  volumeTraiteT: string | number | null
+  valeurMarchandeFcfa: string | number | null
+  valeurMarchandeUsd: string | number | null
+  chiffreAffairesFcfa: string | number | null
+  contribuables?: { id: string; raisonSociale: string; nif: string } | null
+  permisMiniers?: { id: string; reference: string } | null
+}
+
+export interface ExportationApi {
+  id: string
+  annee: number
+  mois: number
+  substance: string
+  volumeT: string | number | null
+  valeurFcfa: string | number | null
+  valeurUsd: string | number | null
+  destination: string | null
+  contribuables?: { id: string; raisonSociale: string; nif: string } | null
+}
+
+export interface RedevanceApi {
+  id: string
+  annee: number
+  trimestre: number
+  substance: string
+  baseAssietteFcfa: string | number | null
+  taux: string | number | null
+  montantDuFcfa: string | number | null
+  montantPayeFcfa: string | number | null
+  datePaiement: string | null
+  referencePaiement: string | null
+  contribuables?: { id: string; raisonSociale: string; nif: string } | null
+}
+
+export interface TransfertCommuneApi {
+  id: string
+  annee: number
+  commune: string
+  chiffreAffairesAnnuelFcfa: string | number | null
+  montantDuFcfa: string | number | null
+  montantEncaisseFcfa: string | number | null
+  dateEncaissement: string | null
+  contribuables?: { id: string; raisonSociale: string; nif: string } | null
+}
+
+async function listerFlux<T>(chemin: string, annee?: number): Promise<T[]> {
+  const suffixe = annee ? `?annee=${annee}` : ''
+  const res = await api<T[] | { data: T[] }>(`/flux-extractifs/${chemin}${suffixe}`)
+  return Array.isArray(res) ? res : (res.data ?? [])
+}
+
+export const listerProductions = (annee?: number) => listerFlux<ProductionApi>('productions', annee)
+export const listerExportations = (annee?: number) => listerFlux<ExportationApi>('exportations', annee)
+export const listerRedevances = (annee?: number) => listerFlux<RedevanceApi>('redevances', annee)
+export const listerTransfertsCommunes = (annee?: number) => listerFlux<TransfertCommuneApi>('transferts-communes', annee)

@@ -37,8 +37,14 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
       if (!window.location.pathname.startsWith('/login')) {
         window.location.href = '/login'
       }
+      throw new ApiError(401, 'Session expirée')
     }
-    throw new ApiError(401, 'Session expirée')
+    // Appel anonyme (login, reset-password…) : on conserve le message et le
+    // code métier du backend (CREDENTIALS_INVALIDES, MFA_…) au lieu du
+    // générique « Session expirée » qui trompait l'utilisateur.
+    const err401 = await res.json().catch(() => ({ message: res.statusText }))
+    const message401 = Array.isArray(err401.message) ? err401.message.join(', ') : err401.message
+    throw new ApiError(401, message401 || err401.code || res.statusText, err401.code)
   }
 
   if (!res.ok) {
