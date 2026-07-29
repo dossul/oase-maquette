@@ -3,6 +3,7 @@ import { readFileSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { ImapFlow } from 'imapflow'
+import { simpleParser } from 'mailparser'
 import { USERS, api, apiLogin, PASSWORD, watchConsoleErrors } from './helpers'
 
 /**
@@ -69,9 +70,14 @@ async function attendreCodeParMail(conf: MailConf, timeoutMs = 90000): Promise<s
       const liste = Array.isArray(uids) ? uids : []
       for (const uid of liste) {
         const msg = await client.fetchOne(String(uid), { source: true })
-        const brut = msg?.source?.toString('utf-8') ?? ''
-        if (!/code de vérification/i.test(brut)) continue
-        const m = brut.replace(/=\r?\n/g, '').match(/(?<!\d)(\d{6})(?!\d)/)
+        if (!msg?.source) continue
+        // OASE fix (29/07) : la source MIME brute encode le texte accentué
+        // (quoted-printable/base64) — « vérification » devient « v=C3=A9rification »
+        // et le filtre ne matchait jamais. On PARSE le mail (sujet + texte décodés).
+        const parsed = await simpleParser(msg.source)
+        const contenu = `${parsed.subject ?? ''}\n${parsed.text ?? ''}`
+        if (!/code de vérification/i.test(contenu)) continue
+        const m = contenu.match(/(?<!\d)(\d{6})(?!\d)/)
         if (m) {
           await client.messageFlagsAdd(String(uid), ['\\Seen']).catch(() => {})
           return m[1]
