@@ -365,3 +365,112 @@ test.describe('Extractif E3 — Flux financiers (production, exportations, redev
     expect(apiErrors, `appels API en erreur :\n${apiErrors.join('\n')}`).toEqual([])
   })
 })
+
+test.describe('Extractif E4 — Rapportage ITIE (statistiques + export déclaration)', () => {
+  test('TC-EXTR-07 — API : statistiques calculées exactes, non-calculables déclarés, CSV Annexe 1.1', async ({ request }) => {
+    const token = await apiLogin(request, DGMG)
+    const client = api(request, token)
+
+    const res = await client.get('/itie/statistiques?annee=2024')
+    expect(res.status(), 'GET /itie/statistiques').toBe(200)
+    const stats = (await res.json()) as {
+      calculees: {
+        societesPerimetre: number
+        conventionsActives: number
+        permisActifs: number
+        productionParSubstance: Array<{ substance: string; volumeT: number; valeurFcfa: number }>
+        redevances: { montantDuFcfa: number; montantPayeFcfa: number; tauxRecouvrement: number }
+        transfertsCfldr: { montantDuFcfa: number; montantEncaisseFcfa: number; tauxVersement: number }
+        repartitionParEntite: Array<{ nif: string; redevanceDuFcfa: number; ecartRedevanceFcfa: number }>
+      }
+      nonCalculables: Array<{ indicateur: string; sourceRequise: string }>
+    }
+
+    // Périmètre réel : 10 sociétés / 10 conventions / 10 permis
+    expect(stats.calculees.societesPerimetre).toBe(10)
+    expect(stats.calculees.conventionsActives).toBe(10)
+    expect(stats.calculees.permisActifs).toBe(10)
+
+    // Production phosphates 2024 : 95 000 + 98 000 = 193 000 t, 2,54 Mds FCFA
+    const phosphates = stats.calculees.productionParSubstance.find((p) => p.substance === 'Phosphates')
+    expect(phosphates!.volumeT).toBe(193000)
+    expect(phosphates!.valeurFcfa).toBe(2540000000)
+
+    // Redevances : dû = payé = 122,5 + 126 + 72 = 320,5 M FCFA → 100 %
+    expect(stats.calculees.redevances.montantDuFcfa).toBe(320500000)
+    expect(stats.calculees.redevances.montantPayeFcfa).toBe(320500000)
+    expect(stats.calculees.redevances.tauxRecouvrement).toBe(100)
+
+    // CFLDR : dû 154,5 M, encaissé 123,75 M → 80 % (STM partiel)
+    expect(stats.calculees.transfertsCfldr.montantDuFcfa).toBe(154500000)
+    expect(stats.calculees.transfertsCfldr.montantEncaisseFcfa).toBe(123750000)
+    expect(stats.calculees.transfertsCfldr.tauxVersement).toBe(80)
+
+    // Répartition : SNPT et STM présents avec écart redevance nul
+    const snpt = stats.calculees.repartitionParEntite.find((e) => e.nif === '1000160416')
+    expect(snpt, 'SNPT dans la répartition').toBeTruthy()
+    expect(snpt!.redevanceDuFcfa).toBe(248500000)
+    expect(snpt!.ecartRedevanceFcfa).toBe(0)
+
+    // Honnêteté : les indicateurs externes sont déclarés NON calculables avec source
+    expect(stats.nonCalculables.length).toBeGreaterThanOrEqual(4)
+    const libelles = stats.nonCalculables.map((n) => n.indicateur + ' ' + n.sourceRequise).join(' ')
+    expect(libelles).toContain('PIB')
+    expect(libelles).toContain('INSEED')
+    expect(libelles).toContain('Réconciliation')
+
+    // Export CSV au format Annexe 1.1 feuille 1
+    const resCsv = await client.get('/itie/export-declaration?annee=2024')
+    expect(resCsv.status()).toBe(200)
+    expect(resCsv.headers()['content-type']).toContain('text/csv')
+    const csv = await resCsv.text()
+    expect(csv.split('\n')[0]).toContain('ref;nomenclature_flux;paye_a_recu_par;montant_fcfa;montant_devise;commentaires')
+    expect(csv).toContain('QTR-2024-T1-SNPT')
+    expect(csv).toContain('122500000')
+    expect(csv).toContain('CFLDR-2024-Lacs 1')
+
+    // RBAC : lecture autorisée au contribuable (transparence ITIE)
+    const clientContribuable = api(request, await apiLogin(request, 'kossiwa.amele@texlome.tg'))
+    expect((await clientContribuable.get('/itie/statistiques?annee=2024')).status()).toBe(200)
+  })
+
+  test('TC-EXTR-08 — UI : écran ITIE alimenté, écarts visibles, non-calculables affichés, export CSV', async ({ page, request }) => {
+    const consoleErrors = watchConsoleErrors(page)
+    const apiErrors = watchApiErrors(page)
+
+    await injectSession(page, request, DGMG)
+    await page.goto('/extractif/itie')
+    await expect(page.getByRole('heading', { name: 'Rapportage ITIE' })).toBeVisible({ timeout: 15000 })
+    await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {})
+
+    // KPIs alimentés par l'API
+    await expect(page.getByText('Sociétés du périmètre')).toBeVisible()
+    await expect(page.getByText('Permis actifs')).toBeVisible()
+
+    // Production par substance : vrais agrégats
+    await expect(page.getByText('Production 2024 par substance')).toBeVisible()
+    await expect(page.getByText('193 000 t').first(), 'agrégat phosphates 2024').toBeVisible()
+    await expect(page.getByText('Manganèse').first()).toBeVisible()
+
+    // Répartition par entité : SNPT avec écart « Aucun »
+    await expect(page.getByText('Répartition des revenus par entité du périmètre')).toBeVisible()
+    await expect(page.getByText('SOCIETE NOUVELLE DES PHOSPHATES DU TOGO (SNPT)')).toBeVisible()
+    await expect(page.getByText('248 500 000 FCFA').first()).toBeVisible()
+    await expect(page.getByText('Aucun').first()).toBeVisible()
+
+    // Non-calculables affichés honnêtement — JAMAIS de valeurs fictives
+    await expect(page.getByText('Indicateurs ITIE non calculables depuis OASE')).toBeVisible()
+    await expect(page.getByText('Contribution du secteur extractif au PIB')).toBeVisible()
+    await expect(page.getByText(/Source requise : PIB national.*INSEED/).first()).toBeVisible()
+
+    // Export CSV réel (téléchargement déclenché)
+    const telechargement = page.waitForEvent('download', { timeout: 15000 })
+    await page.getByRole('button', { name: 'Exporter la déclaration (CSV)' }).click()
+    const fichier = await telechargement
+    expect(fichier.suggestedFilename()).toBe('declaration-itie-2024.csv')
+
+    const erreursJs = consoleErrors.filter((e) => !e.includes('favicon') && !e.includes('Failed to load resource'))
+    expect(erreursJs, 'erreurs JS rapportage ITIE').toEqual([])
+    expect(apiErrors, `appels API en erreur :\n${apiErrors.join('\n')}`).toEqual([])
+  })
+})

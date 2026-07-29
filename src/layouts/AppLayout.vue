@@ -253,6 +253,7 @@ const navByPersona: Record<string, NavItem[]> = {
     { title: 'Tableau de bord extractif', icon: 'mdi-pickaxe', to: '/extractif/dashboard' },
     { title: 'Répertoire minier', icon: 'mdi-map-marker-radius-outline', to: '/extractif/repertoire' },
     { title: 'Flux financiers', icon: 'mdi-swap-horizontal-bold', to: '/extractif/flux' },
+    { title: 'Rapportage ITIE', icon: 'mdi-file-compare-outline', to: '/extractif/itie' },
     { title: 'Notifications', icon: 'mdi-bell', to: '/notifications' },
   ],
   decideur: [

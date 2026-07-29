@@ -257,3 +257,49 @@ export const listerProductions = (annee?: number) => listerFlux<ProductionApi>('
 export const listerExportations = (annee?: number) => listerFlux<ExportationApi>('exportations', annee)
 export const listerRedevances = (annee?: number) => listerFlux<RedevanceApi>('redevances', annee)
 export const listerTransfertsCommunes = (annee?: number) => listerFlux<TransfertCommuneApi>('transferts-communes', annee)
+
+// ---------------------------------------------------------- Rapportage ITIE
+
+export interface StatistiquesItieApi {
+  annee: number
+  calculees: {
+    societesPerimetre: number
+    conventionsActives: number
+    permisActifs: number
+    productionParSubstance: Array<{ substance: string; volumeT: number; valeurFcfa: number }>
+    exportationsParSubstance: Array<{ substance: string; volumeT: number; valeurFcfa: number }>
+    redevances: { montantDuFcfa: number; montantPayeFcfa: number; tauxRecouvrement: number }
+    transfertsCfldr: { montantDuFcfa: number; montantEncaisseFcfa: number; tauxVersement: number }
+    repartitionParEntite: Array<{
+      nif: string
+      raisonSociale: string
+      volumeProductionT: number
+      valeurExportationsFcfa: number
+      redevanceDuFcfa: number
+      redevancePayeeFcfa: number
+      ecartRedevanceFcfa: number
+    }>
+  }
+  nonCalculables: Array<{ indicateur: string; sourceRequise: string }>
+}
+
+export async function statistiquesItie(annee: number): Promise<StatistiquesItieApi> {
+  return api<StatistiquesItieApi>(`/itie/statistiques?annee=${annee}`)
+}
+
+/** Télécharge le CSV de déclaration ITIE (fetch authentifié → blob → lien temporaire). */
+export async function telechargerDeclarationItie(annee: number): Promise<void> {
+  const base = import.meta.env.VITE_API_URL || '/api/v1'
+  const token = localStorage.getItem('oase_token')
+  const res = await fetch(`${base}/itie/export-declaration?annee=${annee}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) throw new Error(`Export ITIE impossible (${res.status})`)
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `declaration-itie-${annee}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}

@@ -88,6 +88,7 @@ const router = createRouter({
     { path: '/extractif/dashboard', component: () => import('../views/institutions/ExtractifDashboardView.vue'), meta: { layout: 'app', persona: 'P3quater — DGMG / Extractif', role: 'agent_dgmg' } },
     { path: '/extractif/repertoire', component: () => import('../views/institutions/ExtractifRepertoireView.vue'), meta: { layout: 'app', persona: 'P3quater — DGMG / Extractif', role: 'agent_dgmg' } },
     { path: '/extractif/flux', component: () => import('../views/institutions/ExtractifFluxView.vue'), meta: { layout: 'app', persona: 'P3quater — DGMG / Extractif', role: 'agent_dgmg' } },
+    { path: '/extractif/itie', component: () => import('../views/institutions/ExtractifItieView.vue'), meta: { layout: 'app', persona: 'P3quater — DGMG / Extractif', role: 'agent_dgmg' } },
     { path: '/conedef/dashboard', component: () => import('../views/institutions/ConeDefDashboardView.vue'), meta: { layout: 'app', persona: 'P4bis — CONEDEF', role: 'agent_conedef' } },
     { path: '/dsi/dashboard', component: () => import('../views/institutions/DsiMefDashboardView.vue'), meta: { layout: 'app', persona: 'P7bis — DSI / MEF', role: 'agent_dsi_mef' } },
 

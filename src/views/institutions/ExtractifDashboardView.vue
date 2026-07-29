@@ -6,8 +6,8 @@
       icon="mdi-pickaxe"
     >
       <template #actions>
-        <!-- Pas de bouton « Croiser ITIE » tant que le endpoint ITIE (phase E4) n'existe pas —
-             un bouton sans action réelle est de la décoration. -->
+        <!-- Phase E4 livrée : le bouton mène au vrai écran de rapportage ITIE (/extractif/itie). -->
+        <v-btn color="primary" variant="tonal" size="small" prepend-icon="mdi-file-compare-outline" to="/extractif/itie">Croiser ITIE</v-btn>
         <v-btn color="secondary" variant="tonal" size="small" prepend-icon="mdi-refresh" :loading="loading" @click="charger">Actualiser</v-btn>
       </template>
     </PageHeader>
