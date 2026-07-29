@@ -76,7 +76,7 @@ test.describe('Extractif E1 — Conventions du périmètre ITIE (données réell
 
     await injectSession(page, request, DGMG)
     await page.goto('/extractif/dashboard')
-    await expect(page.getByText('Tableau de bord extractif')).toBeVisible({ timeout: 15000 })
+    await expect(page.getByRole('heading', { name: 'Tableau de bord extractif' })).toBeVisible({ timeout: 15000 })
     await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {})
 
     // KPI alimenté par l'API (pas 0 !)
