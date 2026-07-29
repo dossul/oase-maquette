@@ -251,6 +251,7 @@ const navByPersona: Record<string, NavItem[]> = {
   ],
   agent_dgmg: [
     { title: 'Tableau de bord extractif', icon: 'mdi-pickaxe', to: '/extractif/dashboard' },
+    { title: 'Répertoire minier', icon: 'mdi-map-marker-radius-outline', to: '/extractif/repertoire' },
     { title: 'Notifications', icon: 'mdi-bell', to: '/notifications' },
   ],
   decideur: [

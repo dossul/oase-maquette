@@ -159,3 +159,36 @@ export async function listerConventionsReelles(): Promise<ConventionApi[]> {
   const res = await api<ConventionApi[] | { data: ConventionApi[] }>('/conventions')
   return Array.isArray(res) ? res : (res.data ?? [])
 }
+
+// ---------------------------------------------------------- Permis miniers
+
+export interface PermisMinierApi {
+  id: string
+  reference: string
+  contribuableId: string
+  conventionId: string | null
+  typePermis: 'recherche' | 'exploitation' | 'carriere'
+  substance: string
+  dateDemande: string
+  dateOctroi: string
+  dureeAnnees: number
+  superficieKm2: string | number | null
+  localite: string | null
+  longitude: string | number | null
+  latitude: string | number | null
+  rapportEiePublic: boolean
+  lienRapportEie: string | null
+  modeOctroi: string
+  statut: string
+  contribuables?: { id: string; raisonSociale: string; nif: string } | null
+  conventions?: { id: string; reference: string } | null
+}
+
+export async function listerPermisMiniers(params: { typePermis?: string; statut?: string } = {}): Promise<PermisMinierApi[]> {
+  const qs = new URLSearchParams()
+  if (params.typePermis) qs.set('typePermis', params.typePermis)
+  if (params.statut) qs.set('statut', params.statut)
+  const suffixe = qs.size ? `?${qs.toString()}` : ''
+  const res = await api<PermisMinierApi[] | { data: PermisMinierApi[] }>(`/permis-miniers${suffixe}`)
+  return Array.isArray(res) ? res : (res.data ?? [])
+}
