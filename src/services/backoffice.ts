@@ -66,6 +66,7 @@ export interface ConventionApi {
   montantEstime: string | number | null
   emploisEngages: number | null
   emploisCrees: number | null
+  objet?: string | null
   contribuables?: { id: string; raisonSociale: string; nif: string } | null
 }
 
