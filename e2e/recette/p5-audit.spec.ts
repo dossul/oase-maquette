@@ -165,9 +165,12 @@ test.describe('P5 — Audit & Contrôle', () => {
     await expect(page.getByRole('heading', { name: 'Consultation des dossiers' })).toBeVisible()
     await expect(page.getByText(/Lecture seule — Aucune action possible/)).toBeVisible()
 
-    // Ouvrir le premier dossier de la liste
-    const premiereLigne = page.locator('.v-data-table tbody tr').first()
-    await expect(premiereLigne).toBeVisible()
+    // Ouvrir le premier dossier de la liste.
+    // ⚠️ Attendre une VRAIE ligne de données (référence DEM-) : la première ligne du
+    // tbody pendant le chargement est le placeholder « Loading items… » — cliquer
+    // dessus ne déclenche pas @click:row (flaky constaté en prod le 28/07/2026).
+    const premiereLigne = page.locator('.v-data-table tbody tr', { hasText: 'DEM-' }).first()
+    await expect(premiereLigne).toBeVisible({ timeout: 15000 })
     await premiereLigne.click()
 
     // Panneau de détail : informations complètes affichées
