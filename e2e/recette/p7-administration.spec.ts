@@ -189,8 +189,10 @@ test.describe('P7 — Administration système', () => {
     await injectAdminSession(page, request)
 
     await page.goto('/admin/utilisateurs')
-    // Ouvrir la fiche détail du premier utilisateur actif du tableau
-    await page.getByRole('row').nth(1).click()
+    // Attendre le chargement réel de la table avant de cliquer (sinon le clic tombe sur le skeleton)
+    await expect(page.getByRole('cell').first()).toBeVisible({ timeout: 15000 })
+    // Ouvrir la fiche détail via le bouton « Permissions » de la première ligne (chemin explicite @click.stop)
+    await page.getByRole('row').nth(1).getByRole('button', { name: 'Permissions' }).click()
     await expect(page.getByText('Profil de permissions')).toBeVisible()
     await expect(page.getByText('Canaux de notification')).toBeVisible()
 

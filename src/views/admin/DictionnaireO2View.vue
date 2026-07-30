@@ -6,8 +6,9 @@
       icon="mdi-table-column-plus-after"
     >
       <template #actions>
-        <v-btn color="secondary" variant="tonal" size="small" prepend-icon="mdi-file-export-outline">Exporter le dictionnaire</v-btn>
-        <v-btn color="primary" size="small" prepend-icon="mdi-check-decagram-outline">Valider une version</v-btn>
+        <v-btn color="secondary" variant="tonal" size="small" prepend-icon="mdi-file-export-outline" @click="exporterDictionnaire">
+          Exporter le dictionnaire
+        </v-btn>
       </template>
     </PageHeader>
 
@@ -166,4 +167,33 @@ const referentials = [
 
 const statusColor = (value: string) =>
   ({ Visible: 'success', 'Ajoute V2': 'primary' } as Record<string, string>)[value] || 'secondary'
+
+/** Export CSV réel du dictionnaire normatif (attributs + entités + référentiels). */
+function exporterDictionnaire() {
+  const lines: string[] = [
+    'Dictionnaire O2 et referentiels normes OASE — Export',
+    `Date: ${new Date().toLocaleString('fr-FR')}`,
+    '',
+    '=== ATTRIBUTS O2 ===',
+    ['#', 'Attribut', 'Description', 'Obligatoire', 'Statut'].join(';'),
+    ...attributes.map(a => [a.id, a.nom, a.description, a.obligatoire ? 'Oui' : 'Non', a.statut].join(';')),
+    '',
+    '=== ENTITES LOGIQUES ===',
+    ['Entite', 'Description', 'Champs critiques', 'Vues cibles', 'Statut'].join(';'),
+    ...entities.map(e => [e.nom, e.description, e.champs, e.vues, e.statut].join(';')),
+    '',
+    '=== REFERENTIELS NORMES ===',
+    ['Referentiel', 'Description', 'Point focal', 'Statut'].join(';'),
+    ...referentials.map(r => [r.nom, r.description, r.pointFocal, r.statut].join(';')),
+  ]
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `dictionnaire_o2_oase_${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
 </script>

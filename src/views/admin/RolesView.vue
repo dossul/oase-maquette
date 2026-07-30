@@ -2,231 +2,120 @@
   <div>
     <PageHeader
       title="Rôles & habilitations"
-      subtitle="Matrice CRUD granulaire — Profils de permissions — Affectation utilisateurs"
+      subtitle="Matrice RBAC réelle (dérivée de l'API) — Affectation & statuts utilisateurs — Journal d'audit"
       icon="mdi-shield-key"
     >
       <template #actions>
-        <v-btn color="secondary" variant="tonal" size="small" prepend-icon="mdi-file-export" class="me-2" @click="exportMatrix">
+        <v-btn
+          color="secondary"
+          variant="tonal"
+          size="small"
+          prepend-icon="mdi-file-export"
+          :disabled="matriceLoading || entreesFiltrees.length === 0"
+          @click="exportMatrix"
+        >
           Exporter matrice
-        </v-btn>
-        <v-btn color="primary" size="small" prepend-icon="mdi-plus" @click="openNewRole">
-          Créer un rôle
         </v-btn>
       </template>
     </PageHeader>
 
-    <v-alert type="warning" variant="tonal" rounded="lg" density="compact" class="mb-4">
-      <!-- TODO(endpoint): pas d'endpoint RBAC (rôles/permissions/profils) dans l'API v1.
-           La matrice, les modules et les profils sont une configuration de référence locale,
-           non persistée. Les utilisateurs et le journal proviennent de l'API réelle
-           (GET /utilisateurs, GET /audit-logs) ; suspension/réactivation via PATCH /utilisateurs/:id. -->
-      Matrice, modules et profils : configuration de référence (non persistée — pas d'endpoint RBAC dans l'API v1).
-      Utilisateurs, journal et changements de statut : données réelles de l'API.
+    <v-alert type="info" variant="tonal" rounded="lg" density="compact" class="mb-4">
+      Matrice <strong>réelle</strong>, dérivée des <code>@Roles</code> de l'API (GET /admin/rbac/matrice) —
+      la même source de vérité que le garde RBAC. Lecture seule : toute modification d'habilitation
+      passe par le code. Affectation, statuts et journal : données réelles (utilisateurs, audit).
     </v-alert>
 
-    <!-- Legend -->
-    <v-card rounded="lg" elevation="0" variant="outlined" class="mb-4 pa-3">
-      <div class="d-flex flex-wrap align-center ga-2">
-        <span class="text-caption text-medium-emphasis font-weight-bold me-1">Légende :</span>
-        <v-chip v-for="lg in crudLegend" :key="lg.key" :color="lg.color" size="x-small" variant="tonal" class="font-weight-bold">
-          {{ lg.key.toUpperCase() }} — {{ lg.label }}
-        </v-chip>
-        <span class="text-caption text-medium-emphasis ms-auto d-none d-md-block">Cliquez sur une cellule pour éditer les droits</span>
-      </div>
-    </v-card>
-
     <v-tabs v-model="mainTab" color="primary" density="compact" class="mb-1">
-      <v-tab value="matrix" prepend-icon="mdi-table-lock">Matrice CRUD</v-tab>
-      <v-tab value="modules" prepend-icon="mdi-view-module">Modules</v-tab>
-      <v-tab value="profils" prepend-icon="mdi-card-account-details">Profils</v-tab>
+      <v-tab value="matrix" prepend-icon="mdi-table-lock">Matrice RBAC</v-tab>
       <v-tab value="affectation" prepend-icon="mdi-account-group">Affectation</v-tab>
       <v-tab value="journal" prepend-icon="mdi-history">Journal</v-tab>
     </v-tabs>
 
     <v-window v-model="mainTab">
 
-      <!-- ══ MATRICE CRUD ══ -->
+      <!-- ══ MATRICE RBAC RÉELLE ══ -->
       <v-window-item value="matrix">
         <v-card rounded="lg" elevation="1" class="mt-3">
-          <v-card-text class="pa-0" style="overflow-x:auto">
+          <div class="d-flex flex-wrap align-center ga-3 pa-4 pb-2">
+            <v-text-field
+              v-model="recherche"
+              prepend-inner-icon="mdi-magnify"
+              label="Filtrer (chemin, méthode, contrôleur, rôle)"
+              density="compact"
+              variant="outlined"
+              hide-details
+              clearable
+              style="max-width: 420px"
+            />
+            <v-chip size="small" variant="tonal" color="primary">
+              {{ entreesFiltrees.length }} endpoint(s) protégé(s)
+            </v-chip>
+            <v-chip size="small" variant="tonal" color="secondary">
+              {{ matriceRoles.length }} rôle(s)
+            </v-chip>
+          </div>
+          <v-progress-linear v-if="matriceLoading" indeterminate color="primary"/>
+          <v-alert v-else-if="matriceError" type="error" variant="tonal" density="compact" rounded="lg" class="ma-3">
+            {{ matriceError }}
+          </v-alert>
+          <v-card-text v-else class="pa-0" style="overflow-x:auto">
             <table class="perm-table">
               <thead>
                 <tr class="header-row">
-                  <th class="feat-col sticky-col">Fonctionnalité</th>
-                  <th v-for="role in matrixRoles" :key="role" class="role-col text-center">
-                    <v-chip :color="roleColor(role)" size="x-small" variant="tonal">{{ role }}</v-chip>
+                  <th class="feat-col sticky-col">Endpoint (méthode + chemin)</th>
+                  <th v-for="role in matriceRoles" :key="role" class="role-col text-center">
+                    <v-chip :color="roleColor(role)" size="x-small" variant="tonal">
+                      <code class="role-code">{{ role }}</code>
+                    </v-chip>
                   </th>
                 </tr>
               </thead>
               <tbody>
-                <template v-for="group in matrixGroups" :key="group.label">
+                <template v-for="groupe in entreesGroupees" :key="groupe.controleur">
                   <tr class="group-row">
-                    <td :colspan="matrixRoles.length + 1" class="px-3 py-1">
-                      <span class="text-caption font-weight-bold text-medium-emphasis group-label">{{ group.label }}</span>
+                    <td :colspan="matriceRoles.length + 1" class="px-3 py-1">
+                      <span class="text-caption font-weight-bold text-medium-emphasis group-label">
+                        {{ groupe.controleur.toUpperCase() }} ({{ groupe.entrees.length }})
+                      </span>
                     </td>
                   </tr>
-                  <tr v-for="perm in group.perms" :key="perm.key" class="perm-row">
+                  <tr v-for="e in groupe.entrees" :key="`${e.http} ${e.chemin}`" class="perm-row">
                     <td class="pa-3 sticky-col feat-bg">
-                      <div class="text-body-2 font-weight-medium">{{ perm.label }}</div>
-                      <code class="perm-key">{{ perm.key }}</code>
+                      <div class="d-flex align-center ga-2">
+                        <v-chip :color="httpColor(e.http)" size="x-small" variant="flat" class="http-chip">{{ e.http }}</v-chip>
+                        <code class="text-body-2 font-weight-medium endpoint-path">{{ e.chemin }}</code>
+                      </div>
+                      <code class="perm-key">{{ e.controleur }}.{{ e.methode }}</code>
                     </td>
-                    <td v-for="role in matrixRoles" :key="role" class="pa-2 text-center">
-                      <v-menu :close-on-content-click="false" location="bottom center" offset="4">
-                        <template #activator="{ props }">
-                          <div v-bind="props" class="crud-cell">
-                            <span
-                              v-for="k in crudKeys"
-                              :key="k"
-                              class="crud-letter"
-                              :class="getCrud(role, perm.key, k) ? 'crud-on' : 'crud-off'"
-                              :style="getCrud(role, perm.key, k) ? { background: crudColorMap[k] } : {}"
-                            >{{ k.toUpperCase() }}</span>
-                          </div>
-                        </template>
-                        <v-card rounded="lg" elevation="6" min-width="220">
-                          <div class="d-flex align-center pa-3 pb-2">
-                            <v-chip :color="roleColor(role)" size="x-small" variant="tonal" class="me-2">{{ role }}</v-chip>
-                            <span class="text-caption font-weight-semibold text-truncate" style="max-width:130px">{{ perm.label }}</span>
-                          </div>
-                          <v-divider/>
-                          <v-card-text class="pa-2">
-                            <div v-for="k in crudKeys" :key="k" class="d-flex align-center justify-space-between py-1 px-1">
-                              <div class="d-flex align-center ga-2">
-                                <v-avatar :color="crudColorMap[k]" size="20">
-                                  <span style="font-size:9px;font-weight:800;color:#fff">{{ k.toUpperCase() }}</span>
-                                </v-avatar>
-                                <span class="text-caption">{{ crudLabelMap[k] }}</span>
-                              </div>
-                              <v-switch
-                                :model-value="getCrud(role, perm.key, k)"
-                                @update:model-value="v => setCrud(role, perm.key, k, !!v)"
-                                hide-details
-                                density="compact"
-                                :color="crudColorMap[k]"
-                                inset
-                              />
-                            </div>
-                          </v-card-text>
-                          <v-divider/>
-                          <v-card-actions class="pa-2">
-                            <v-btn size="x-small" variant="text" color="error" @click="clearCrud(role, perm.key)">Tout retirer</v-btn>
-                            <v-spacer/>
-                            <v-btn size="x-small" color="success" variant="tonal" @click="setFullCrud(role, perm.key)">Tout accorder</v-btn>
-                          </v-card-actions>
-                        </v-card>
-                      </v-menu>
-                    </td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </v-card-text>
-        </v-card>
-      </v-window-item>
-
-      <!-- ══ MODULES ══ -->
-      <v-window-item value="modules">
-        <v-card rounded="lg" elevation="1" class="mt-3">
-          <v-card-title class="pa-4 pb-1 text-body-1 font-weight-semibold">Accès aux modules par rôle</v-card-title>
-          <v-card-subtitle class="px-4 pb-3 text-caption">Routes applicatives accessibles selon le rôle</v-card-subtitle>
-          <v-card-text class="pa-0" style="overflow-x:auto">
-            <table class="perm-table">
-              <thead>
-                <tr class="header-row">
-                  <th class="feat-col sticky-col">Module / Route</th>
-                  <th v-for="role in matrixRoles" :key="role" class="role-col text-center">
-                    <v-chip :color="roleColor(role)" size="x-small" variant="tonal">{{ role }}</v-chip>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <template v-for="mod in moduleGroups" :key="mod.label">
-                  <tr class="group-row">
-                    <td :colspan="matrixRoles.length + 1" class="px-3 py-1">
-                      <v-icon :icon="mod.icon" size="12" class="me-1 text-medium-emphasis"/>
-                      <span class="text-caption font-weight-bold text-medium-emphasis group-label">{{ mod.label }}</span>
-                    </td>
-                  </tr>
-                  <tr v-for="route in mod.routes" :key="route.path" class="perm-row">
-                    <td class="pa-3 sticky-col feat-bg">
-                      <div class="text-body-2 font-weight-medium">{{ route.label }}</div>
-                      <code class="perm-key">{{ route.path }}</code>
-                    </td>
-                    <td v-for="role in matrixRoles" :key="role" class="pa-2 text-center">
-                      <v-checkbox
-                        :model-value="hasModuleAccess(role, route.path)"
-                        @update:model-value="toggleModule(role, route.path, $event)"
-                        hide-details
-                        density="compact"
-                        color="primary"
+                    <td v-for="role in matriceRoles" :key="role" class="pa-2 text-center">
+                      <v-icon
+                        v-if="e.roles.includes(role)"
+                        icon="mdi-shield-check"
+                        size="16"
+                        :color="roleColor(role)"
                       />
+                      <span v-else class="text-medium-emphasis" style="opacity:.3">—</span>
                     </td>
                   </tr>
                 </template>
+                <tr v-if="entreesFiltrees.length === 0">
+                  <td :colspan="matriceRoles.length + 1" class="text-center pa-8 text-medium-emphasis">
+                    <v-icon icon="mdi-table-search" size="36" class="mb-2 opacity-40"/>
+                    <div class="text-body-2">Aucun endpoint ne correspond au filtre.</div>
+                  </td>
+                </tr>
               </tbody>
             </table>
           </v-card-text>
         </v-card>
-      </v-window-item>
-
-      <!-- ══ PROFILS ══ -->
-      <v-window-item value="profils">
-        <div class="d-flex align-center justify-space-between mt-3 mb-4">
-          <div class="text-body-2 text-medium-emphasis">{{ profiles.length }} profil(s) défini(s)</div>
-          <v-btn color="primary" size="small" prepend-icon="mdi-plus" @click="openNewProfile">Créer un profil</v-btn>
-        </div>
-        <v-row>
-          <v-col v-for="p in profiles" :key="p.id" cols="12" md="6" lg="4">
-            <v-card rounded="lg" elevation="1" class="h-100">
-              <v-card-title class="pa-4 pb-2 d-flex align-center ga-2">
-                <v-icon :icon="p.icon" :color="p.color" size="20"/>
-                <span class="text-body-1 font-weight-semibold flex-grow-1 text-truncate">{{ p.name }}</span>
-                <v-chip :color="p.color" size="x-small" variant="tonal">{{ p.baseRole }}</v-chip>
-              </v-card-title>
-              <v-card-text class="pa-4 pt-1">
-                <div class="text-caption text-medium-emphasis mb-3">{{ p.description }}</div>
-                <div class="d-flex flex-wrap ga-1 mb-3">
-                  <v-chip
-                    v-for="perm in p.permissions"
-                    :key="perm"
-                    size="x-small"
-                    variant="outlined"
-                    color="primary"
-                  >{{ perm }}</v-chip>
-                </div>
-                <v-divider class="mb-3"/>
-                <div class="d-flex align-center justify-space-between">
-                  <div class="text-caption text-medium-emphasis">
-                    <v-icon icon="mdi-account-multiple" size="14" class="me-1"/>
-                    {{ p.usersCount }} utilisateur(s)
-                  </div>
-                  <div class="d-flex ga-1">
-                    <v-btn size="x-small" variant="text" icon="mdi-pencil" color="secondary" @click="editProfile(p)"/>
-                    <v-btn size="x-small" variant="text" icon="mdi-account-plus" color="primary" @click="openAssignProfile(p)"/>
-                    <v-btn size="x-small" variant="text" icon="mdi-delete" color="error" @click="deleteProfile(p.id)"/>
-                  </div>
-                </div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-          <!-- Empty state -->
-          <v-col v-if="profiles.length === 0" cols="12">
-            <div class="text-center pa-8 text-medium-emphasis">
-              <v-icon icon="mdi-card-account-details-outline" size="48" class="mb-3 opacity-40"/>
-              <div>Aucun profil créé. Créez un profil pour regrouper des permissions réutilisables.</div>
-            </div>
-          </v-col>
-        </v-row>
       </v-window-item>
 
       <!-- ══ AFFECTATION ══ -->
       <v-window-item value="affectation">
         <v-card rounded="lg" elevation="1" class="mt-3">
           <div class="d-flex align-center justify-space-between pa-4">
-            <div class="text-body-1 font-weight-semibold">Affectation des rôles aux utilisateurs</div>
-            <v-btn size="small" color="primary" variant="tonal" prepend-icon="mdi-account-plus" @click="assignUserDialog=true">
-              Assigner un profil
-            </v-btn>
+            <div class="text-body-1 font-weight-semibold">Utilisateurs et statuts d'accès</div>
+            <v-chip size="small" variant="tonal" color="primary">{{ users.length }} compte(s)</v-chip>
           </div>
           <v-divider/>
           <v-alert v-if="usersError" type="error" variant="tonal" density="compact" rounded="lg" class="ma-3">{{ usersError }}</v-alert>
@@ -234,25 +123,19 @@
             :headers="userHeaders"
             :items="users"
             :loading="usersLoading"
+            :items-per-page="25"
             hover
           >
             <template #item.role="{ item }">
-              <v-chip :color="roleColor(item.role)" size="x-small" variant="tonal">{{ item.role }}</v-chip>
-            </template>
-            <template #item.profil="{ item }">
-              <v-chip v-if="item.profil" color="primary" size="x-small" variant="outlined">{{ item.profil }}</v-chip>
-              <span v-else class="text-caption text-medium-emphasis">—</span>
+              <v-chip :color="roleColor(item.roleCode)" size="x-small" variant="tonal">
+                <code class="role-code">{{ item.roleCode }}</code>
+              </v-chip>
             </template>
             <template #item.statut="{ item }">
               <v-chip :color="item.statut === 'Actif' ? 'success' : 'error'" size="x-small" variant="tonal">{{ item.statut }}</v-chip>
             </template>
             <template #item.actions="{ item }">
               <div class="d-flex ga-1">
-                <v-tooltip text="Modifier le profil" location="top">
-                  <template #activator="{ props }">
-                    <v-btn v-bind="props" icon="mdi-account-edit" size="x-small" variant="text" color="primary" @click="editUserProfile(item)"/>
-                  </template>
-                </v-tooltip>
                 <v-tooltip text="Révoquer l'accès" location="top">
                   <template #activator="{ props }">
                     <v-btn v-bind="props" icon="mdi-account-remove" size="x-small" variant="text" color="error" @click="revokeUserAccess(item)"/>
@@ -279,7 +162,12 @@
       <!-- ══ JOURNAL ══ -->
       <v-window-item value="journal">
         <v-card rounded="lg" elevation="1" class="mt-3">
-          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Journal des modifications (audit réel)</v-card-title>
+          <div class="d-flex align-center justify-space-between pa-4 pb-2">
+            <div class="text-body-1 font-weight-semibold">Journal des modifications (audit réel)</div>
+            <v-btn size="small" variant="text" prepend-icon="mdi-refresh" :loading="journalLoading" @click="chargerJournal">
+              Actualiser
+            </v-btn>
+          </div>
           <v-progress-linear v-if="journalLoading" indeterminate color="primary"/>
           <v-list v-else density="compact" class="pa-2">
             <div v-if="journalRoles.length === 0" class="text-center pa-6 text-medium-emphasis">
@@ -307,71 +195,6 @@
 
     </v-window>
 
-    <!-- ── Create/Edit Role Dialog ── -->
-    <v-dialog v-model="newRoleDialog" max-width="500">
-      <v-card rounded="xl">
-        <v-card-title class="pa-5 pb-3">{{ editRoleMode ? 'Modifier le rôle' : 'Créer un rôle personnalisé' }}</v-card-title>
-        <v-divider/>
-        <v-card-text class="pa-5">
-          <v-text-field v-model="roleForm.name" label="Nom du rôle" placeholder="ex: Auditeur DGBF" class="mb-3" hide-details/>
-          <v-select v-model="roleForm.baseRole" :items="matrixRoles" label="Hériter de (rôle de base)" class="mb-3" hide-details clearable/>
-          <v-textarea v-model="roleForm.description" label="Description des habilitations" rows="2" hide-details/>
-        </v-card-text>
-        <v-divider/>
-        <v-card-actions class="pa-4">
-          <v-spacer/>
-          <v-btn variant="text" @click="newRoleDialog=false">Annuler</v-btn>
-          <v-btn color="primary" @click="saveRole">{{ editRoleMode ? 'Enregistrer' : 'Créer' }}</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <!-- ── Create/Edit Profile Dialog ── -->
-    <v-dialog v-model="newProfileDialog" max-width="560" scrollable>
-      <v-card rounded="xl">
-        <v-card-title class="pa-5 pb-3">{{ editProfileMode ? 'Modifier le profil' : 'Créer un profil de permissions' }}</v-card-title>
-        <v-divider/>
-        <v-card-text class="pa-5">
-          <v-text-field v-model="profileForm.name" label="Nom du profil" placeholder="ex: Inspecteur junior IGF" class="mb-3" hide-details/>
-          <v-select v-model="profileForm.baseRole" :items="matrixRoles" label="Rôle de base" class="mb-3" hide-details/>
-          <v-select
-            v-model="profileForm.permissions"
-            :items="allPermKeys"
-            multiple
-            chips
-            closable-chips
-            label="Permissions spécifiques incluses"
-            class="mb-3"
-            hide-details
-          />
-          <v-textarea v-model="profileForm.description" label="Description" rows="2" hide-details/>
-        </v-card-text>
-        <v-divider/>
-        <v-card-actions class="pa-4">
-          <v-spacer/>
-          <v-btn variant="text" @click="newProfileDialog=false">Annuler</v-btn>
-          <v-btn color="primary" @click="saveProfile">{{ editProfileMode ? 'Enregistrer' : 'Créer le profil' }}</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <!-- ── Assign Profile to User Dialog ── -->
-    <v-dialog v-model="assignUserDialog" max-width="480">
-      <v-card rounded="xl">
-        <v-card-title class="pa-5 pb-3">Assigner un profil à un utilisateur</v-card-title>
-        <v-card-text class="pa-5">
-          <v-select v-model="assignForm.userId" :items="users" item-title="name" item-value="id" label="Utilisateur" class="mb-3" hide-details/>
-          <v-select v-model="assignForm.profileId" :items="profiles" item-title="name" item-value="id" label="Profil à assigner" class="mb-3" hide-details clearable/>
-          <v-textarea v-model="assignForm.note" label="Note / Justification" rows="2" hide-details/>
-        </v-card-text>
-        <v-card-actions class="pa-4">
-          <v-spacer/>
-          <v-btn variant="text" @click="assignUserDialog=false">Annuler</v-btn>
-          <v-btn color="primary" prepend-icon="mdi-check" @click="saveAssignment">Assigner</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
     <!-- ── Revoke Access Confirmation ── -->
     <v-dialog v-model="revokeDialog" max-width="400">
       <v-card rounded="xl">
@@ -382,7 +205,7 @@
         <v-card-text class="pa-5">
           <p class="mb-3">Voulez-vous révoquer tous les droits de <strong>{{ revokeTarget?.name }}</strong> ?</p>
           <v-alert type="warning" variant="tonal" density="compact" rounded="lg">
-            Cette action désactivera le compte et supprimera toutes les permissions.
+            Cette action désactivera le compte (PATCH /utilisateurs/:id — statut inactif).
           </v-alert>
         </v-card-text>
         <v-card-actions class="pa-4">
@@ -402,239 +225,82 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import { listerUtilisateurs } from '../../services/utilisateurs'
 import { listerAuditLogs } from '../../services/audit'
 import { modifierStatutUtilisateur } from '../../services/admin'
+import { getMatriceRbac, type EntreeMatriceRbac } from '../../services/rbac'
 
 // ── Types ──────────────────────────────────────────────────────────────────
-type CrudKey = 'c' | 'r' | 'u' | 'd' | 'e'
-interface CrudFlags { c: boolean; r: boolean; u: boolean; d: boolean; e: boolean }
-interface Profile {
-  id: string; name: string; baseRole: string; description: string
-  permissions: string[]; usersCount: number; icon: string; color: string
-}
 interface UserRow {
-  id: string; name: string; email: string; role: string; roleCode: string
-  profil: string | null; statut: string; lastLogin: string
+  id: string; name: string; email: string; roleCode: string
+  statut: string; lastLogin: string
 }
 
-// ── Constants ──────────────────────────────────────────────────────────────
-const crudKeys: CrudKey[] = ['c', 'r', 'u', 'd', 'e']
-const crudColorMap: Record<CrudKey, string> = {
-  c: '#2774AE', r: '#1B8F4C', u: '#E65100', d: '#C62828', e: '#6A1B9A',
-}
-const crudLabelMap: Record<CrudKey, string> = {
-  c: 'Créer', r: 'Lire', u: 'Modifier', d: 'Supprimer', e: 'Exporter',
-}
-const crudLegend = crudKeys.map(k => ({ key: k, label: crudLabelMap[k], color: crudColorMap[k] }))
-
-const matrixRoles = ['Contribuable', 'Agent OTR', 'Agent DGBF', 'Agence', 'Décideur', 'Auditeur', 'Admin']
-
+// ── Couleurs par rôle (codes réels de l'enum API) ─────────────────────────
 const roleColorMap: Record<string, string> = {
-  'Contribuable': 'info', 'Agent OTR': 'primary', 'Agent DGBF': 'secondary',
-  'Agence': 'warning', 'Décideur': 'purple', 'Auditeur': 'error', 'Admin': 'success',
+  contribuable: 'info', agent_ci: 'primary', agent_cddi: 'primary',
+  agent_dgbf: 'secondary', agent_dgtcp: 'teal', agent_agence: 'warning',
+  agent_mae: 'indigo', agent_dgmg: 'brown', agent_dsi_mef: 'cyan',
+  agent_ministere: 'deep-purple', agent_conedef: 'blue-grey',
+  decideur: 'purple', auditeur: 'error', admin_si: 'success',
 }
-const roleColor = (r: string) => roleColorMap[r] || 'primary'
+const roleColor = (code: string) => roleColorMap[code] || 'primary'
 
-const matrixGroups = [
-  { label: 'PORTAIL CONTRIBUABLE', perms: [
-    { key: 'portail_view', label: 'Accès portail contribuable' },
-    { key: 'demande_create', label: 'Déposer une demande' },
-    { key: 'demande_view', label: 'Voir ses dossiers' },
-    { key: 'attestation_download', label: 'Télécharger attestation' },
-  ]},
-  { label: 'BACK-OFFICE', perms: [
-    { key: 'dossier_view_all', label: 'Voir tous les dossiers' },
-    { key: 'dossier_instruct', label: 'Instruire un dossier' },
-    { key: 'dossier_validate', label: 'Valider / Signer' },
-    { key: 'dossier_reject', label: 'Rejeter un dossier' },
-    { key: 'dossier_export', label: 'Exporter la liste dossiers' },
-    { key: 'budget_view', label: 'Tableau dépenses fiscales' },
-  ]},
-  { label: 'ANALYTIQUE', perms: [
-    { key: 'dashboard_deciseur', label: 'Tableau de bord décideur' },
-    { key: 'rapport_generer', label: 'Générer rapport annuel' },
-    { key: 'simulation', label: 'Simuler scénarios' },
-    { key: 'referentiel', label: 'Référentiel juridique' },
-  ]},
-  { label: 'AUDIT & CONTRÔLE', perms: [
-    { key: 'audit_journal', label: 'Journal d\'audit (lecture)' },
-    { key: 'audit_anomalies', label: 'Anomalies moteur règles' },
-    { key: 'audit_dossiers', label: 'Consultation dossiers RO' },
-    { key: 'audit_missions', label: 'Missions de contrôle' },
-  ]},
-  { label: 'ADMINISTRATION', perms: [
-    { key: 'admin_users', label: 'Gérer les utilisateurs' },
-    { key: 'admin_roles', label: 'Gérer les rôles' },
-    { key: 'admin_connecteurs', label: 'Gérer les connecteurs SI' },
-    { key: 'admin_workflow', label: 'Éditeur workflow BPM' },
-    { key: 'admin_parametres', label: 'Paramètres & Sécurité' },
-  ]},
-  { label: 'OPEN DATA', perms: [
-    { key: 'opendata_view', label: 'Portail open data' },
-    { key: 'opendata_download', label: 'Télécharger datasets' },
-  ]},
-]
+const httpColorMap: Record<string, string> = {
+  GET: '#1B8F4C', POST: '#2774AE', PUT: '#E65100', PATCH: '#E65100', DELETE: '#C62828',
+}
+const httpColor = (m: string) => httpColorMap[m] || '#6A1B9A'
 
-// ── CRUD permissions reactive store ────────────────────────────────────────
-const empty = (): CrudFlags => ({ c: false, r: false, u: false, d: false, e: false })
-const full = (): CrudFlags => ({ c: true, r: true, u: true, d: true, e: true })
-const ro = (): CrudFlags => ({ c: false, r: true, u: false, d: false, e: false })
-const rde = (): CrudFlags => ({ c: false, r: true, u: false, d: false, e: true })
-const crud = (c: boolean, r: boolean, u: boolean, d: boolean, e: boolean): CrudFlags => ({ c, r, u, d, e })
+// ── Matrice RBAC réelle (GET /admin/rbac/matrice) ─────────────────────────
+const matriceRoles = ref<string[]>([])
+const entrees = ref<EntreeMatriceRbac[]>([])
+const matriceLoading = ref(false)
+const matriceError = ref<string | null>(null)
+const recherche = ref('')
 
-const crudMap = reactive<Record<string, Record<string, CrudFlags>>>({
-  'Contribuable': {
-    portail_view: ro(), demande_create: crud(true, true, false, false, false),
-    demande_view: rde(), attestation_download: crud(false, true, false, false, true),
-    opendata_view: ro(), opendata_download: rde(),
-  },
-  'Agent OTR': {
-    dossier_view_all: rde(), dossier_instruct: crud(true, true, true, false, false),
-    dossier_validate: crud(false, true, true, false, true), dossier_reject: crud(false, true, false, false, false),
-    dossier_export: crud(false, true, false, false, true), opendata_view: ro(),
-  },
-  'Agent DGBF': {
-    dossier_view_all: rde(), dossier_instruct: crud(true, true, true, false, false),
-    budget_view: rde(), opendata_view: ro(),
-  },
-  'Agence': {
-    portail_view: ro(), dossier_view_all: rde(), opendata_view: ro(),
-  },
-  'Décideur': {
-    dossier_view_all: rde(), dashboard_deciseur: rde(),
-    rapport_generer: crud(true, true, false, false, true), simulation: crud(true, true, true, false, true),
-    referentiel: rde(), opendata_view: ro(), opendata_download: rde(),
-  },
-  'Auditeur': {
-    audit_journal: ro(), audit_anomalies: rde(), audit_dossiers: ro(),
-    audit_missions: crud(true, true, true, false, true), dossier_view_all: ro(), opendata_view: ro(),
-  },
-  'Admin': full() as unknown as Record<string, CrudFlags>,
+async function chargerMatrice() {
+  matriceLoading.value = true
+  matriceError.value = null
+  try {
+    const m = await getMatriceRbac()
+    matriceRoles.value = m.roles
+    entrees.value = m.entrees
+  } catch (e) {
+    entrees.value = []
+    matriceError.value = e instanceof Error ? e.message : 'Erreur de chargement de la matrice RBAC'
+  } finally {
+    matriceLoading.value = false
+  }
+}
+
+const entreesFiltrees = computed(() => {
+  const q = recherche.value.trim().toLowerCase()
+  if (!q) return entrees.value
+  return entrees.value.filter(e =>
+    e.chemin.toLowerCase().includes(q) ||
+    e.http.toLowerCase().includes(q) ||
+    e.controleur.toLowerCase().includes(q) ||
+    e.methode.toLowerCase().includes(q) ||
+    e.roles.some(r => r.toLowerCase().includes(q)),
+  )
 })
 
-function getCrud(role: string, permKey: string, k: CrudKey): boolean {
-  if (role === 'Admin') return true
-  return crudMap[role]?.[permKey]?.[k] ?? false
-}
-function setCrud(role: string, permKey: string, k: CrudKey, val: boolean) {
-  if (!crudMap[role]) crudMap[role] = {}
-  if (!crudMap[role][permKey]) crudMap[role][permKey] = empty()
-  crudMap[role][permKey][k] = val
-  addJournal(`${k.toUpperCase()} "${permKey}" ${val ? 'accordé à' : 'retiré de'} "${role}"`, val ? 'grant' : 'revoke')
-}
-function clearCrud(role: string, permKey: string) {
-  if (crudMap[role]) crudMap[role][permKey] = empty()
-  addJournal(`Tous droits retirés pour "${permKey}" du rôle "${role}"`, 'revoke')
-}
-function setFullCrud(role: string, permKey: string) {
-  if (!crudMap[role]) crudMap[role] = {}
-  crudMap[role][permKey] = full()
-  addJournal(`Tous droits accordés pour "${permKey}" au rôle "${role}"`, 'grant')
-}
-
-// ── Module access ──────────────────────────────────────────────────────────
-const moduleGroups = [
-  { label: 'PORTAIL CONTRIBUABLE', icon: 'mdi-home-city', routes: [
-    { path: '/portail/dashboard', label: 'Tableau de bord' },
-    { path: '/portail/nouvelle-demande', label: 'Nouvelle demande' },
-    { path: '/portail/demandes/:id', label: 'Suivi dossier' },
-    { path: '/portail/exonerations-actives', label: 'Exonérations actives' },
-    { path: '/portail/profil', label: 'Profil entreprise' },
-  ]},
-  { label: 'BACK-OFFICE', icon: 'mdi-office-building', routes: [
-    { path: '/backoffice/dashboard', label: 'Dashboard agent' },
-    { path: '/backoffice/dossiers', label: 'Liste dossiers' },
-    { path: '/backoffice/dossiers/:id/instruction', label: 'Instruction dossier' },
-    { path: '/backoffice/dossiers/:id/validation', label: 'Validation / Signature' },
-    { path: '/backoffice/controle', label: 'Contrôle a posteriori' },
-    { path: '/backoffice/budget', label: 'Budget / Dépenses fiscales' },
-  ]},
-  { label: 'AGENCES', icon: 'mdi-domain', routes: [
-    { path: '/agences/dashboard', label: 'Dashboard agence' },
-    { path: '/agences/conventions', label: 'Conventions' },
-    { path: '/agences/agrements', label: 'Agréments' },
-    { path: '/agences/engagements', label: 'Suivi engagements' },
-  ]},
-  { label: 'DÉCIDEUR', icon: 'mdi-chart-line', routes: [
-    { path: '/decideur/dashboard', label: 'Tableau de bord décideur' },
-    { path: '/decideur/analyse', label: 'Analyse approfondie' },
-    { path: '/decideur/rapport-annuel', label: 'Rapport annuel UEMOA' },
-    { path: '/decideur/simulation', label: 'Simulation scénarios' },
-    { path: '/decideur/referentiel', label: 'Référentiel juridique' },
-  ]},
-  { label: 'AUDIT', icon: 'mdi-magnify-scan', routes: [
-    { path: '/audit/dashboard', label: 'Dashboard audit' },
-    { path: '/audit/journal', label: 'Journal d\'audit' },
-    { path: '/audit/anomalies', label: 'Analyse anomalies' },
-    { path: '/audit/dossiers', label: 'Consultation dossiers' },
-    { path: '/audit/missions', label: 'Missions de contrôle' },
-  ]},
-  { label: 'OPEN DATA', icon: 'mdi-earth', routes: [
-    { path: '/opendata', label: 'Accueil portail public' },
-    { path: '/opendata/tableaux-de-bord', label: 'Tableaux de bord publics' },
-    { path: '/opendata/datasets', label: 'Jeux de données' },
-    { path: '/opendata/rapports', label: 'Rapports officiels' },
-  ]},
-  { label: 'ADMINISTRATION', icon: 'mdi-cog', routes: [
-    { path: '/admin/utilisateurs', label: 'Gestion utilisateurs' },
-    { path: '/admin/roles', label: 'Rôles & habilitations' },
-    { path: '/admin/connecteurs', label: 'Connecteurs SI' },
-    { path: '/admin/workflow', label: 'Éditeur workflow' },
-    { path: '/admin/regles', label: 'Moteur de règles' },
-    { path: '/admin/parametres', label: 'Paramètres & Sécurité' },
-    { path: '/admin/monitoring', label: 'Monitoring système' },
-  ]},
-]
-
-const moduleAccess = reactive<Record<string, Set<string>>>({
-  'Contribuable': new Set(['/portail/dashboard', '/portail/nouvelle-demande', '/portail/demandes/:id', '/portail/exonerations-actives', '/portail/profil', '/opendata']),
-  'Agent OTR': new Set(['/backoffice/dashboard', '/backoffice/dossiers', '/backoffice/dossiers/:id/instruction', '/backoffice/dossiers/:id/validation', '/backoffice/controle']),
-  'Agent DGBF': new Set(['/backoffice/dashboard', '/backoffice/dossiers', '/backoffice/dossiers/:id/instruction', '/backoffice/budget']),
-  'Agence': new Set(['/agences/dashboard', '/agences/conventions', '/agences/agrements', '/agences/engagements', '/opendata']),
-  'Décideur': new Set(['/decideur/dashboard', '/decideur/analyse', '/decideur/rapport-annuel', '/decideur/simulation', '/decideur/referentiel', '/opendata', '/opendata/tableaux-de-bord', '/opendata/rapports']),
-  'Auditeur': new Set(['/audit/dashboard', '/audit/journal', '/audit/anomalies', '/audit/dossiers', '/audit/missions', '/opendata']),
-  'Admin': new Set(moduleGroups.flatMap(g => g.routes.map(r => r.path))),
+const entreesGroupees = computed(() => {
+  const map = new Map<string, EntreeMatriceRbac[]>()
+  for (const e of entreesFiltrees.value) {
+    const list = map.get(e.controleur) ?? []
+    list.push(e)
+    map.set(e.controleur, list)
+  }
+  return [...map.entries()].map(([controleur, list]) => ({ controleur, entrees: list }))
 })
-
-function hasModuleAccess(role: string, path: string): boolean {
-  return moduleAccess[role]?.has(path) ?? false
-}
-function toggleModule(role: string, path: string, val: boolean | null) {
-  if (!moduleAccess[role]) moduleAccess[role] = new Set()
-  if (val) moduleAccess[role].add(path)
-  else moduleAccess[role].delete(path)
-}
-
-// ── Profils : configuration de référence locale (PAS d'endpoint profils dans l'API v1).
-// usersCount est calculé depuis les utilisateurs réels (par rôle de base).
-const profiles = ref<Profile[]>([
-  { id: 'p1', name: 'Inspecteur senior IGF', baseRole: 'Auditeur', description: 'Auditeur avec droits étendus sur les missions et accès aux constats.', permissions: ['audit_missions', 'audit_journal', 'audit_anomalies', 'audit_dossiers'], usersCount: 0, icon: 'mdi-magnify-scan', color: 'error' },
-  { id: 'p2', name: 'Agent OTR Douanes', baseRole: 'Agent OTR', description: "Agent spécialisé douanes avec droits d'instruction et validation.", permissions: ['dossier_instruct', 'dossier_validate', 'dossier_export'], usersCount: 0, icon: 'mdi-office-building', color: 'primary' },
-  { id: 'p3', name: 'Analyste DGBF', baseRole: 'Agent DGBF', description: 'Analyste budget avec accès read-only aux dossiers et exports budget.', permissions: ['budget_view', 'dossier_view_all', 'dossier_export'], usersCount: 0, icon: 'mdi-chart-bar', color: 'secondary' },
-  { id: 'p4', name: 'Décideur MEF', baseRole: 'Décideur', description: 'Dirigeant avec accès complet au tableau de bord et simulation.', permissions: ['dashboard_deciseur', 'rapport_generer', 'simulation', 'referentiel'], usersCount: 0, icon: 'mdi-briefcase', color: 'purple' },
-])
 
 // ── Utilisateurs réels (GET /utilisateurs) ─────────────────────────────────
 const users = ref<UserRow[]>([])
 const usersLoading = ref(false)
 const usersError = ref<string | null>(null)
-
-/** Codes rôle API → libellés de la matrice. */
-const roleLabelMap: Record<string, string> = {
-  contribuable: 'Contribuable',
-  agent_ci: 'Agent OTR',
-  agent_cddi: 'Agent OTR',
-  agent_dgbf: 'Agent DGBF',
-  agent_dgtcp: 'Agent DGTCP',
-  agent_agence: 'Agence',
-  decideur: 'Décideur',
-  auditeur: 'Auditeur',
-  admin_si: 'Admin',
-}
-const roleLabel = (code: string) => roleLabelMap[code] ?? code
 
 async function chargerUtilisateurs() {
   usersLoading.value = true
@@ -645,16 +311,10 @@ async function chargerUtilisateurs() {
       id: u.id,
       name: `${u.prenom ?? ''} ${u.nom ?? ''}`.trim() || u.email,
       email: u.email,
-      role: roleLabel(u.role),
       roleCode: u.role,
-      profil: null, // pas d'endpoint profils — aucune affectation réelle à afficher
       statut: u.statutCode === 'actif' ? 'Actif' : 'Suspendu',
       lastLogin: u.derniereConnexion ? new Date(u.derniereConnexion).toLocaleString('fr-FR') : '—',
     }))
-    // Compteurs d'usage des profils calculés sur les utilisateurs réels.
-    for (const p of profiles.value) {
-      p.usersCount = users.value.filter(u => u.role === p.baseRole).length
-    }
   } catch (e) {
     users.value = []
     usersError.value = e instanceof Error ? e.message : 'Erreur de chargement des utilisateurs'
@@ -667,7 +327,6 @@ const userHeaders = [
   { title: 'Nom', key: 'name' },
   { title: 'Email', key: 'email' },
   { title: 'Rôle', key: 'role' },
-  { title: 'Profil', key: 'profil' },
   { title: 'Statut', key: 'statut' },
   { title: 'Dernière connexion', key: 'lastLogin' },
   { title: 'Actions', key: 'actions', sortable: false },
@@ -675,18 +334,6 @@ const userHeaders = [
 
 // ── State ──────────────────────────────────────────────────────────────────
 const mainTab = ref('matrix')
-const newRoleDialog = ref(false)
-const editRoleMode = ref(false)
-const roleForm = reactive({ name: '', baseRole: '', description: '' })
-
-const newProfileDialog = ref(false)
-const editProfileMode = ref(false)
-const editingProfileId = ref<string | null>(null)
-const profileForm = reactive({ name: '', baseRole: '', description: '', permissions: [] as string[] })
-
-const assignUserDialog = ref(false)
-const assignForm = reactive({ userId: '', profileId: '', note: '' })
-
 const revokeDialog = ref(false)
 const revokeTarget = ref<UserRow | null>(null)
 
@@ -694,9 +341,6 @@ const snackbar = ref(false)
 const snackMsg = ref('')
 const snackColor = ref<'success' | 'error'>('success')
 
-const allPermKeys = computed(() => matrixGroups.flatMap(g => g.perms.map(p => p.key)))
-
-// ── Helpers ────────────────────────────────────────────────────────────────
 function snack(msg: string, color: 'success' | 'error' = 'success') {
   snackMsg.value = msg
   snackColor.value = color
@@ -707,7 +351,6 @@ function snack(msg: string, color: 'success' | 'error' = 'success') {
 interface JournalItem { id: string | number; action: string; date: string; type: 'grant' | 'revoke' }
 const journalRoles = ref<JournalItem[]>([])
 const journalLoading = ref(false)
-let journalId = 1
 
 /** Charge les événements d'habilitation réels depuis le journal d'audit. */
 async function chargerJournal() {
@@ -730,97 +373,23 @@ async function chargerJournal() {
   }
 }
 
-function addJournal(action: string, type: 'grant' | 'revoke') {
-  const d = new Date()
-  journalRoles.value.unshift({
-    id: `local-${journalId++}`,
-    action: `Admin — ${action}`,
-    date: `${d.toLocaleDateString('fr-FR')} ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`,
-    type,
-  })
-}
-
 onMounted(() => {
+  chargerMatrice()
   chargerUtilisateurs()
   chargerJournal()
 })
 
-// ── Role actions ───────────────────────────────────────────────────────────
-function openNewRole() { editRoleMode.value = false; roleForm.name = ''; roleForm.baseRole = ''; roleForm.description = ''; newRoleDialog.value = true }
-function saveRole() {
-  if (roleForm.name) {
-    snack(`Rôle "${roleForm.name}" ${editRoleMode.value ? 'modifié' : 'créé'}`)
-    addJournal(`Rôle "${roleForm.name}" ${editRoleMode.value ? 'modifié' : 'créé'}`, 'grant')
-  }
-  newRoleDialog.value = false
-}
-
-// ── Profile actions ────────────────────────────────────────────────────────
-function openNewProfile() {
-  editProfileMode.value = false; editingProfileId.value = null
-  profileForm.name = ''; profileForm.baseRole = ''; profileForm.description = ''; profileForm.permissions = []
-  newProfileDialog.value = true
-}
-function editProfile(p: Profile) {
-  editProfileMode.value = true; editingProfileId.value = p.id
-  profileForm.name = p.name; profileForm.baseRole = p.baseRole
-  profileForm.description = p.description; profileForm.permissions = [...p.permissions]
-  newProfileDialog.value = true
-}
-function saveProfile() {
-  if (!profileForm.name) return
-  if (editProfileMode.value && editingProfileId.value) {
-    const idx = profiles.value.findIndex(p => p.id === editingProfileId.value)
-    if (idx !== -1) {
-      profiles.value[idx] = { ...profiles.value[idx], name: profileForm.name, baseRole: profileForm.baseRole, description: profileForm.description, permissions: [...profileForm.permissions] }
-    }
-  } else {
-    profiles.value.push({
-      id: `p${Date.now()}`, name: profileForm.name, baseRole: profileForm.baseRole,
-      description: profileForm.description, permissions: [...profileForm.permissions],
-      usersCount: 0, icon: 'mdi-account-cog', color: 'primary',
-    })
-  }
-  snack(`Profil "${profileForm.name}" enregistré`)
-  addJournal(`Profil "${profileForm.name}" ${editProfileMode.value ? 'modifié' : 'créé'}`, 'grant')
-  newProfileDialog.value = false
-}
-function deleteProfile(id: string) {
-  const p = profiles.value.find(x => x.id === id)
-  profiles.value = profiles.value.filter(x => x.id !== id)
-  if (p) { snack(`Profil "${p.name}" supprimé`, 'error'); addJournal(`Profil "${p.name}" supprimé`, 'revoke') }
-}
-function openAssignProfile(p: Profile) {
-  assignForm.profileId = p.id; assignForm.userId = ''; assignForm.note = ''
-  assignUserDialog.value = true
-}
-
-// ── User actions ───────────────────────────────────────────────────────────
-function saveAssignment() {
-  const user = users.value.find(u => u.id === assignForm.userId)
-  const prof = profiles.value.find(p => p.id === assignForm.profileId)
-  if (user && prof) {
-    user.profil = prof.name
-    snack(`Profil "${prof.name}" assigné à ${user.name} (local — non persisté, pas d'endpoint profils)`)
-    addJournal(`Profil "${prof.name}" assigné à ${user.name}`, 'grant')
-  }
-  assignUserDialog.value = false
-}
-function editUserProfile(item: UserRow) {
-  assignForm.userId = item.id; assignForm.profileId = ''; assignForm.note = ''
-  assignUserDialog.value = true
-}
+// ── User actions (réelles : PATCH /utilisateurs/:id) ───────────────────────
 function revokeUserAccess(item: UserRow) { revokeTarget.value = item; revokeDialog.value = true }
 async function confirmRevoke() {
   if (revokeTarget.value) {
     const target = revokeTarget.value
     try {
-      // Désactivation réelle du compte via PATCH /utilisateurs/:id.
       await modifierStatutUtilisateur(target.id, 'inactif')
       const u = users.value.find(x => x.id === target.id)
-      if (u) { u.statut = 'Suspendu'; u.profil = null }
-      addJournal(`Accès révoqué pour ${target.name}`, 'revoke')
+      if (u) u.statut = 'Suspendu'
       snack(`Accès de ${target.name} révoqué`, 'error')
+      chargerJournal()
     } catch (e) {
       snack(e instanceof Error ? e.message : 'Échec de la révocation', 'error')
     }
@@ -833,28 +402,33 @@ async function toggleUserStatus(item: UserRow) {
     await modifierStatutUtilisateur(item.id, nouveau)
     item.statut = nouveau === 'actif' ? 'Actif' : 'Suspendu'
     snack(`${item.name} ${item.statut === 'Actif' ? 'réactivé' : 'suspendu'}`)
-    addJournal(`${item.name} ${item.statut === 'Actif' ? 'réactivé' : 'suspendu'}`, item.statut === 'Actif' ? 'grant' : 'revoke')
+    chargerJournal()
   } catch (e) {
     snack(e instanceof Error ? e.message : 'Échec du changement de statut', 'error')
   }
 }
 
-// ── Export ─────────────────────────────────────────────────────────────────
+// ── Export CSV de la matrice RÉELLE ─────────────────────────────────────────
 function exportMatrix() {
-  const lines: string[] = ['Matrice des permissions OASE — Export', `Date: ${new Date().toLocaleString('fr-FR')}`, '']
-  lines.push(['Fonctionnalité', ...matrixRoles.map(r => `${r} (C/R/U/D/E)`)].join(';'))
-  matrixGroups.forEach(g => {
-    lines.push(`\n=== ${g.label} ===`)
-    g.perms.forEach(p => {
-      const cols = matrixRoles.map(role => crudKeys.map(k => getCrud(role, p.key, k) ? k.toUpperCase() : '-').join(''))
-      lines.push([p.label, ...cols].join(';'))
-    })
-  })
+  const lines: string[] = [
+    'Matrice RBAC OASE — Export (données réelles GET /admin/rbac/matrice)',
+    `Date: ${new Date().toLocaleString('fr-FR')}`,
+    '',
+    ['Methode', 'Chemin', 'Controleur', 'Methode handler', 'Roles autorises'].join(';'),
+  ]
+  for (const e of entreesFiltrees.value) {
+    lines.push([e.http, e.chemin, e.controleur, e.methode, e.roles.join('|')].join(';'))
+  }
   const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
-  const a = document.createElement('a'); a.href = url; a.download = 'matrice_permissions_oase.csv'; a.click()
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `matrice_rbac_oase_${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
   URL.revokeObjectURL(url)
-  snack('Matrice exportée en CSV')
+  snack('Matrice RBAC réelle exportée en CSV')
 }
 </script>
 
@@ -868,14 +442,14 @@ function exportMatrix() {
   background: rgb(var(--v-theme-surface-light));
 }
 .feat-col {
-  min-width: 190px;
+  min-width: 260px;
   padding: 12px;
   text-align: start;
   border-bottom: 1px solid rgba(0,0,0,0.08);
   font-weight: 600;
 }
 .role-col {
-  min-width: 110px;
+  min-width: 96px;
   padding: 10px;
   border-bottom: 1px solid rgba(0,0,0,0.08);
 }
@@ -904,39 +478,16 @@ function exportMatrix() {
   color: #94A3B8;
   font-family: monospace;
 }
-
-/* ── CRUD cell ── */
-.crud-cell {
-  display: inline-flex;
-  gap: 2px;
-  align-items: center;
-  padding: 3px 4px;
-  border-radius: 6px;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: border-color 0.15s, background 0.15s;
+.role-code {
+  font-size: 10px;
 }
-.crud-cell:hover {
-  border-color: rgba(39,116,174,0.3);
-  background: rgba(39,116,174,0.04);
-}
-.crud-letter {
-  display: inline-flex;
-  align-items: center;
+.http-chip {
+  font-family: monospace;
+  font-weight: 700;
+  min-width: 52px;
   justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
-  font-size: 9px;
-  font-weight: 800;
-  line-height: 1;
-  transition: all 0.12s;
 }
-.crud-on {
-  color: #fff;
-}
-.crud-off {
-  background: rgba(0,0,0,0.06);
-  color: rgba(0,0,0,0.2);
+.endpoint-path {
+  font-size: 0.8rem;
 }
 </style>

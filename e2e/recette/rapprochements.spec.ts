@@ -20,8 +20,9 @@ test.describe('TC-TRESOR-01 — Rapprochements trésor', () => {
     expect(res.status()).toBe(200)
     const { data, kpis } = await res.json()
 
-    // Volumes réels : 30 demandes approuvées au seed
-    expect(kpis.total).toBe(30)
+    // Volumes réels : au moins les 30 demandes approuvées du seed
+    // (le total croît à chaque recette P4 qui approuve une demande — on vérifie la cohérence, pas un chiffre figé)
+    expect(kpis.total).toBeGreaterThanOrEqual(30)
     expect(kpis.reconciles + kpis.enEcart + kpis.aJustifier).toBe(kpis.total)
     expect(data.length).toBe(kpis.total)
 
