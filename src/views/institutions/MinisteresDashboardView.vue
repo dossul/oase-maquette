@@ -2,37 +2,67 @@
   <div>
     <PageHeader
       title="Tableau de bord ministère sectoriel"
-      subtitle="Avis sectoriels, contributions sur les mesures et campagnes de mise à jour"
+      subtitle="Suivi des dossiers en instruction et des conventions sectorielles"
       icon="mdi-office-building"
-    >
-      <template #actions>
-        <v-btn color="secondary" variant="tonal" size="small" prepend-icon="mdi-file-send">Soumettre un avis</v-btn>
-        <v-btn color="primary" size="small" prepend-icon="mdi-update">Mettre a jour un lot</v-btn>
-      </template>
-    </PageHeader>
+    />
 
-    <!-- TODO(endpoint): aucun endpoint n'expose encore les KPIs avis/contributions sectorielles — section masquee pour ne pas afficher de chiffres fictifs. -->
+    <v-alert v-if="erreur" type="error" variant="tonal" rounded="lg" density="compact" class="mb-4">{{ erreur }}</v-alert>
+
+    <!-- KPIs réels (GET /demandes + GET /conventions) -->
+    <v-row class="mb-4">
+      <v-col v-for="kpi in kpis" :key="kpi.label" cols="6" md="3">
+        <KpiCard v-bind="kpi" />
+      </v-col>
+    </v-row>
 
     <v-row>
       <v-col cols="12" md="8">
         <v-card rounded="lg" elevation="1" class="mb-4">
-          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Demandes d'avis et contributions attendues</v-card-title>
-          <!-- TODO(endpoint): GET /avis-sectoriels (ou équivalent) requis pour alimenter cette table. -->
-          <v-card-text class="pa-4">
-            <v-alert type="info" variant="tonal" rounded="lg" density="compact">
-              Aucune demande d'avis disponible. Cette section sera alimentée par l'API dès que le module d'avis sectoriels sera exposé.
-            </v-alert>
-          </v-card-text>
+          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">
+            Dossiers en instruction (source : GET /demandes)
+          </v-card-title>
+          <v-data-table
+            :headers="demandeHeaders"
+            :items="demandes"
+            :loading="chargement"
+            hover
+            density="compact"
+            no-data-text="Aucun dossier en instruction dans votre périmètre."
+          >
+            <template #item.montant="{ item }">
+              {{ formatMontant(item.montantFcfa) }}
+            </template>
+            <template #item.depot="{ item }">
+              {{ item.dateDepot ? new Date(item.dateDepot).toLocaleDateString('fr-FR') : '—' }}
+            </template>
+            <template #item.statut="{ item }">
+              <v-chip size="x-small" color="info" variant="tonal">{{ item.statutCode }}</v-chip>
+            </template>
+          </v-data-table>
         </v-card>
 
         <v-card rounded="lg" elevation="1">
-          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">Campagnes de mise a jour sectorielle</v-card-title>
-          <!-- TODO(endpoint): GET /campagnes requis pour suivre l'avancement réel des campagnes. -->
-          <v-card-text class="pa-4">
-            <v-alert type="info" variant="tonal" rounded="lg" density="compact">
-              Aucune campagne enregistrée pour le moment.
-            </v-alert>
-          </v-card-text>
+          <v-card-title class="pa-4 pb-2 text-body-1 font-weight-semibold">
+            Conventions sectorielles suivies (source : GET /conventions)
+          </v-card-title>
+          <v-data-table
+            :headers="conventionHeaders"
+            :items="conventions"
+            :loading="chargement"
+            hover
+            density="compact"
+            no-data-text="Aucune convention enregistrée."
+          >
+            <template #item.contribuable="{ item }">
+              {{ item.contribuables?.raisonSociale ?? '—' }}
+            </template>
+            <template #item.echeance="{ item }">
+              {{ item.dateFin ? new Date(item.dateFin).toLocaleDateString('fr-FR') : '—' }}
+            </template>
+            <template #item.statut="{ item }">
+              <v-chip :color="item.statutCode === 'active' ? 'success' : 'secondary'" size="x-small" variant="tonal">{{ item.statutCode }}</v-chip>
+            </template>
+          </v-data-table>
         </v-card>
       </v-col>
 
@@ -48,12 +78,77 @@
           </v-list>
         </v-card>
 
-        <!-- TODO(endpoint): GET /points-focaux requis — section masquee (pas de donnees reelles). -->
+        <!-- TODO(endpoint): GET /campagnes et GET /avis-sectoriels requis pour les campagnes
+             de mise à jour et les avis formels — sections non affichées (pas de données réelles). -->
       </v-col>
     </v-row>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
+import KpiCard from '../../components/KpiCard.vue'
+import { api, ApiError } from '../../services/api'
+import type { DemandeApi } from '../../services/demandes'
+
+interface ConventionApi {
+  id: string
+  reference: string
+  regimeCode?: string | null
+  statutCode: string
+  dateDebut?: string | null
+  dateFin?: string | null
+  contribuables?: { raisonSociale: string } | null
+}
+
+const chargement = ref(false)
+const erreur = ref('')
+const demandes = ref<DemandeApi[]>([])
+const totalDossiers = ref(0)
+const conventions = ref<ConventionApi[]>([])
+
+onMounted(async () => {
+  chargement.value = true
+  try {
+    const [d, c] = await Promise.all([
+      api<{ data: DemandeApi[]; meta: { total: number } }>('/demandes?limit=10'),
+      api<ConventionApi[]>('/conventions'),
+    ])
+    demandes.value = d.data
+    totalDossiers.value = d.meta.total
+    conventions.value = c
+  } catch (e) {
+    erreur.value = e instanceof ApiError ? e.message : 'Impossible de charger les données sectorielles.'
+  } finally {
+    chargement.value = false
+  }
+})
+
+const kpis = computed(() => {
+  const actives = conventions.value.filter((cv) => cv.statutCode === 'active').length
+  return [
+    { label: 'Dossiers dans le périmètre', value: String(totalDossiers.value), icon: 'mdi-folder-open-outline', color: 'primary', subtitle: 'Source : API /demandes' },
+    { label: 'Conventions actives', value: String(actives), icon: 'mdi-file-sign', color: 'success', subtitle: `sur ${conventions.value.length} convention(s)` },
+  ]
+})
+
+const demandeHeaders = [
+  { title: 'Référence', key: 'reference' },
+  { title: 'Montant', key: 'montant' },
+  { title: 'Dépôt', key: 'depot' },
+  { title: 'Statut', key: 'statut' },
+]
+
+const conventionHeaders = [
+  { title: 'Référence', key: 'reference' },
+  { title: 'Contribuable', key: 'contribuable' },
+  { title: 'Échéance', key: 'echeance' },
+  { title: 'Statut', key: 'statut' },
+]
+
+const formatMontant = (v?: string) => {
+  const n = Number(v ?? 0)
+  return n ? `${n.toLocaleString('fr-FR')} FCFA` : '—'
+}
 </script>

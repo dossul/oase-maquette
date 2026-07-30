@@ -4,12 +4,7 @@
       title="Tableau de bord CONEDEF"
       subtitle="Cycle d'evaluation des depenses fiscales, revenue forgone et synchronisation avec le rapport annuel"
       icon="mdi-chart-box-outline"
-    >
-      <template #actions>
-        <v-btn color="secondary" variant="tonal" size="small" prepend-icon="mdi-book-open-variant">Notes methodologiques</v-btn>
-        <v-btn color="primary" size="small" prepend-icon="mdi-file-chart-outline">Preparer l annexe LFI</v-btn>
-      </template>
-    </PageHeader>
+    />
 
     <v-row class="mb-4">
       <v-col v-for="kpi in kpis" :key="kpi.label" cols="6" md="3">
@@ -63,28 +58,47 @@
 import { computed, onMounted, ref } from 'vue'
 import PageHeader from '../../components/PageHeader.vue'
 import KpiCard from '../../components/KpiCard.vue'
+import { api } from '../../services/api'
 import { listerRapports, labelTypeRapport, type RapportApi } from '../../services/rapports'
+
+interface ConventionApi {
+  id: string
+  reference: string
+  statutCode: string
+}
 
 const loading = ref(false)
 const error = ref<string | null>(null)
 const rapports = ref<RapportApi[]>([])
+const conventionsActives = ref<number | null>(null)
 
 onMounted(async () => {
   loading.value = true
   try {
-    rapports.value = await listerRapports()
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Impossible de charger les rapports.'
+    const [r, c] = await Promise.allSettled([listerRapports(), api<ConventionApi[]>('/conventions')])
+    if (r.status === 'fulfilled') rapports.value = r.value
+    else error.value = r.reason instanceof Error ? r.reason.message : 'Impossible de charger les rapports.'
+    // Les conventions ne sont qu'un KPI d'appoint : un échec ne bloque pas le tableau de bord
+    if (c.status === 'fulfilled') conventionsActives.value = c.value.filter((cv) => cv.statutCode === 'active').length
   } finally {
     loading.value = false
   }
 })
 
-// KPI calculé sur données réelles (GET /rapports). Les KPIs "mesures évaluables", "annexe LFI"
-// et "écarts sectoriels" sont masqués : aucun endpoint ne les expose (TODO backend).
-const kpis = computed(() => [
-  { label: 'Rapports generes', value: String(rapports.value.length), icon: 'mdi-file-chart-outline', color: 'primary', subtitle: 'Source : API /rapports' },
-])
+// KPIs calculés sur données réelles (GET /rapports, GET /conventions).
+// Les KPIs "mesures évaluables" et "écarts sectoriels" restent masqués : aucun endpoint ne les expose.
+const kpis = computed(() => {
+  const aboutis = rapports.value.filter((r) => r.statutCode === 'completed').length
+  const exercices = [...new Set(rapports.value.map((r) => r.periodeAnnee).filter(Boolean))].sort().reverse()
+  const liste = [
+    { label: 'Rapports generes', value: String(rapports.value.length), icon: 'mdi-file-chart-outline', color: 'primary', subtitle: `${aboutis} abouti(s) — Source : API /rapports` },
+    { label: 'Dernier exercice couvert', value: exercices.length ? String(exercices[0]) : '—', icon: 'mdi-calendar-check-outline', color: 'info', subtitle: `${exercices.length} exercice(s) au total` },
+  ]
+  if (conventionsActives.value !== null) {
+    liste.push({ label: 'Conventions actives', value: String(conventionsActives.value), icon: 'mdi-file-sign', color: 'success', subtitle: 'Source : API /conventions' })
+  }
+  return liste
+})
 
 const headers = [
   { title: 'Rapport', key: 'rapport' },
