@@ -105,7 +105,7 @@
               persistent-hint
               class="mb-4"
             />
-            <v-btn color="primary" block prepend-icon="mdi-play" :loading="computing" @click="compute">Calculer l'impact</v-btn>
+            <v-btn color="primary" block prepend-icon="mdi-play" @click="compute">Calculer l'impact</v-btn>
           </v-card-text>
         </v-card>
 
@@ -191,7 +191,7 @@
               </div>
             </div>
 
-            <v-btn variant="tonal" color="primary" class="mt-4" prepend-icon="mdi-download">
+            <v-btn variant="tonal" color="primary" class="mt-4" prepend-icon="mdi-download" @click="exporterRapport">
               Exporter rapport simulation
             </v-btn>
           </v-card-text>
@@ -229,7 +229,6 @@ const secteurs = computed(() => secteurParamsList.map(s => s.secteur))
 
 // ── État ──────────────────────────────────────────────────────────────────
 const form = ref({ type: 'Exonération TVA', secteur: 'Numérique', taux: 15, duree: 24, assiette: 1.2 })
-const computing = ref(false)
 const result = ref(false)
 const activeScenario = ref('s1')
 const showTips = ref(false)
@@ -353,10 +352,46 @@ watch(
 )
 
 const compute = () => {
-  computing.value = true
-  setTimeout(() => {
-    computing.value = false
-    result.value = true
-  }, 600)
+  // Le calcul est local et instantané (paramètres INSEED déjà chargés) :
+  // pas de latence simulée — les métriques réactives sont déjà à jour.
+  result.value = true
+}
+
+/** Export réel du rapport de simulation (fichier texte téléchargé côté client). */
+const exporterRapport = () => {
+  const { manque, emplois, pibImpact, ratio, params } = calcImpact(
+    form.value.taux, form.value.duree, form.value.assiette, form.value.secteur,
+  )
+  const lignes = [
+    'OASE — RAPPORT DE SIMULATION FISCALE',
+    `Généré le ${new Date().toLocaleString('fr-FR')}`,
+    '',
+    'PARAMÈTRES DU SCÉNARIO',
+    `Type d'exonération : ${form.value.type}`,
+    `Secteur cible      : ${form.value.secteur}`,
+    `Taux               : ${form.value.taux} %`,
+    `Durée              : ${form.value.duree} mois`,
+    `Assiette estimée   : ${form.value.assiette} Mds FCFA`,
+    '',
+    'RÉSULTATS (méthode revenue foregone)',
+    `Manque à gagner estimé : ${manque.toFixed(2)} Mds FCFA sur ${form.value.duree} mois`,
+    `Emplois créés estimés  : ${emplois.toLocaleString('fr-FR')} (multiplicateur ${params.emploiMult}/Mds)`,
+    `Impact PIB direct      : +${pibImpact.toFixed(2)} % (multiplicateur INSEED ${params.pibMult})`,
+    `Ratio coût/bénéfice    : 1 : ${ratio.toFixed(1)}`,
+    '',
+    `Référentiel : INSEED ${inseedMeta.anneeRef} — ${inseedMeta.source}${inseedCharge.value ? ' (chargé depuis l’API)' : ' (valeurs de repli — API indisponible)'}`,
+    '',
+    '⚠️ Estimation indicative — ne constitue pas un engagement budgétaire officiel.',
+    'Tout scénario retenu doit faire l’objet d’une validation UPF avant transmission à la DGBF.',
+  ]
+  const blob = new Blob([lignes.join('\n')], { type: 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `simulation-oase-${form.value.secteur.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${form.value.taux}pct-${form.value.duree}m.txt`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
 </script>
