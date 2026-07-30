@@ -1,110 +1,169 @@
 <template>
   <v-card rounded="xl" elevation="0" style="background:rgba(255,255,255,0.95)">
     <v-card-text class="pa-8">
-      <div class="text-center mb-4">
+      <div class="text-center mb-6">
         <v-avatar color="success" size="56" rounded="lg" class="mb-3">
           <v-icon icon="mdi-account-check" size="28" color="white" />
         </v-avatar>
         <h2 style="font-size:1.3rem;font-weight:700;color:#1A2332">Activation de votre compte</h2>
-        <p class="text-medium-emphasis text-body-2 mt-1">Bienvenue, <strong>{{ profile.prenom }}</strong> — {{ profile.structure }}</p>
+        <p class="text-medium-emphasis text-body-2 mt-1">
+          Première connexion : définissez votre mot de passe grâce au code envoyé à votre adresse e-mail.
+        </p>
       </div>
 
-      <!-- Stepper -->
-      <v-stepper v-model="step" :items="steps" flat class="mb-4" style="box-shadow:none">
-        <template #item.1>
-          <div class="pa-2">
-            <v-row>
-              <v-col cols="12" sm="6">
-                <v-text-field v-model="profile.prenom" label="Prénom" prepend-inner-icon="mdi-account" class="mb-3" />
-              </v-col>
-              <v-col cols="12" sm="6">
-                <v-text-field v-model="profile.nom" label="Nom" prepend-inner-icon="mdi-account" class="mb-3" />
-              </v-col>
-              <v-col cols="12" sm="6">
-                <v-text-field v-model="profile.poste" label="Poste / Fonction" prepend-inner-icon="mdi-briefcase" class="mb-3" />
-              </v-col>
-              <v-col cols="12" sm="6">
-                <v-text-field v-model="profile.tel" label="Téléphone de service" prepend-inner-icon="mdi-phone" class="mb-3" />
-              </v-col>
-            </v-row>
-          </div>
-        </template>
+      <!-- Étape 1 : demande du code -->
+      <div v-if="step === 1">
+        <p class="text-body-2 text-medium-emphasis mb-5">
+          Saisissez l'adresse e-mail de votre compte OASE. Si un compte actif y correspond, un code d'activation vous sera envoyé (valable 15 minutes).
+        </p>
+        <v-text-field v-model="email" label="Adresse e-mail du compte" prepend-inner-icon="mdi-email"
+          :rules="[v => !!v || 'Requis', v => /.+@.+\..+/.test(v) || 'Format invalide']"
+          :disabled="sent" class="mb-4" @keyup.enter="sendCode" />
 
-        <template #item.2>
-          <div class="pa-2">
-            <v-text-field v-model="newPwd" label="Mot de passe" :type="showPwd ? 'text' : 'password'" :append-inner-icon="showPwd ? 'mdi-eye-off' : 'mdi-eye'" @click:append-inner="showPwd = !showPwd" prepend-inner-icon="mdi-lock" class="mb-3" />
-            <div class="d-flex ga-1 mb-3">
-              <div v-for="i in 4" :key="i" :style="{ flex:1, height:'4px', borderRadius:'2px', background: i <= strength ? strengthColors[strength-1] : '#E5E7EB' }" />
+        <v-alert v-if="sent" type="success" variant="tonal" rounded="lg" class="mb-4">
+          {{ messageSucces }}
+        </v-alert>
+        <v-alert v-if="erreur" type="error" variant="tonal" rounded="lg" class="mb-4">{{ erreur }}</v-alert>
+
+        <v-btn v-if="!sent" color="primary" block size="large" rounded="lg" :loading="loading"
+          :disabled="!/.+@.+\..+/.test(email)" @click="sendCode" prepend-icon="mdi-send">
+          Recevoir le code d'activation
+        </v-btn>
+        <template v-else>
+          <v-btn color="primary" block size="large" rounded="lg" @click="step = 2" prepend-icon="mdi-arrow-right">
+            J'ai reçu le code
+          </v-btn>
+          <v-btn variant="text" block class="mt-2" :loading="loading" @click="sendCode">
+            Renvoyer le code
+          </v-btn>
+        </template>
+      </div>
+
+      <!-- Étape 2 : code + définition du mot de passe -->
+      <div v-else-if="step === 2">
+        <v-text-field v-model="code" label="Code à 6 chiffres reçu par e-mail" prepend-inner-icon="mdi-numeric"
+          maxlength="6" :rules="[v => /^\d{6}$/.test(v) || '6 chiffres requis']" class="mb-3" />
+
+        <v-text-field v-model="newPwd" label="Choisissez votre mot de passe" :type="showPwd ? 'text' : 'password'"
+          :append-inner-icon="showPwd ? 'mdi-eye-off' : 'mdi-eye'" @click:append-inner="showPwd = !showPwd"
+          prepend-inner-icon="mdi-lock" class="mb-3" />
+
+        <div class="mb-4">
+          <div class="d-flex ga-1 mb-2">
+            <div v-for="i in 4" :key="i" :style="{ flex: 1, height: '4px', borderRadius: '2px', background: i <= strength ? strengthColor : '#E5E7EB', transition: 'background 0.3s' }" />
+          </div>
+          <div class="mt-2">
+            <div v-for="c in criteria" :key="c.label" class="d-flex align-center ga-1 mb-1">
+              <v-icon :icon="c.met ? 'mdi-check-circle' : 'mdi-circle-outline'" :color="c.met ? 'success' : 'default'" size="14" />
+              <span class="text-caption" :class="c.met ? 'text-success' : 'text-medium-emphasis'">{{ c.label }}</span>
             </div>
-            <v-text-field v-model="confirmPwd" label="Confirmer le mot de passe" type="password" prepend-inner-icon="mdi-lock-check" :error-messages="confirmPwd && confirmPwd !== newPwd ? ['Ne correspond pas'] : []" />
           </div>
-        </template>
+        </div>
 
-        <template #item.3>
-          <div class="pa-2">
-            <v-alert type="info" variant="tonal" rounded="lg" class="mb-4">
-              L'authentification à deux facteurs renforce la sécurité de votre compte.
-            </v-alert>
-            <v-radio-group v-model="mfaMethod">
-              <v-radio value="sms" label="SMS sur mon téléphone de service" />
-              <v-radio value="totp" label="Application d'authentification (TOTP)" />
-              <v-radio value="skip" label="Configurer plus tard (déconseillé)" />
-            </v-radio-group>
-            <v-text-field v-if="mfaMethod === 'sms'" v-model="profile.tel" label="Numéro de téléphone" prepend-inner-icon="mdi-phone" class="mt-2" />
-          </div>
-        </template>
+        <v-text-field v-model="confirmPwd" label="Confirmez le mot de passe" type="password"
+          prepend-inner-icon="mdi-lock-check"
+          :error-messages="confirmPwd && confirmPwd !== newPwd ? ['Les mots de passe ne correspondent pas'] : []"
+          class="mb-4" @keyup.enter="activate" />
 
-        <template #item.4>
-          <div class="pa-2">
-            <v-alert type="warning" variant="tonal" rounded="lg" class="mb-4">
-              Veuillez lire et accepter les conditions d'utilisation avant d'activer votre compte.
-            </v-alert>
-            <v-card variant="outlined" rounded="lg" class="mb-4 pa-4" style="max-height:150px;overflow-y:auto;font-size:0.8rem;color:#555">
-              Les utilisateurs de la plateforme OASE s'engagent à utiliser le système uniquement dans le cadre de leurs fonctions officielles. Toute action est journalisée et peut faire l'objet d'un contrôle. L'accès non autorisé à des données confidentielles est passible de sanctions disciplinaires et pénales conformément à la législation togolaise en vigueur.
-            </v-card>
-            <v-checkbox v-model="accepted" label="J'ai lu et j'accepte les Conditions d'utilisation et la Politique de confidentialité" :rules="[v => !!v || 'Obligatoire']" />
-          </div>
-        </template>
-      </v-stepper>
+        <v-alert v-if="erreur" type="error" variant="tonal" rounded="lg" class="mb-4">{{ erreur }}</v-alert>
 
-      <div class="d-flex ga-3 justify-end">
-        <v-btn v-if="step > 1" variant="tonal" @click="step--">Précédent</v-btn>
-        <v-btn v-if="step < 4" color="primary" @click="step++">Suivant</v-btn>
-        <v-btn v-else color="success" :disabled="!accepted" :loading="loading" @click="activate" prepend-icon="mdi-check-circle">
+        <v-btn color="success" block size="large" rounded="lg" :loading="loading"
+          :disabled="!formValide" @click="activate" prepend-icon="mdi-check-circle">
           Activer mon compte
         </v-btn>
+        <v-btn variant="text" block class="mt-2" @click="step = 1; erreur = ''">
+          ← Modifier l'adresse e-mail
+        </v-btn>
       </div>
+
+      <!-- Étape 3 : succès -->
+      <div v-else class="text-center">
+        <v-icon icon="mdi-check-circle" color="success" size="56" class="mb-3" />
+        <p class="text-body-1 mb-2"><strong>Votre compte est activé.</strong></p>
+        <p class="text-body-2 text-medium-emphasis mb-4">Connectez-vous avec votre adresse e-mail et votre nouveau mot de passe.</p>
+        <v-btn color="primary" rounded="lg" to="/login" prepend-icon="mdi-login">Aller à la connexion</v-btn>
+      </div>
+
+      <v-btn v-if="step !== 3" variant="text" size="small" to="/login" prepend-icon="mdi-arrow-left" class="mt-4 d-block mx-auto" color="secondary">
+        Retour à la connexion
+      </v-btn>
     </v-card-text>
   </v-card>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { api, ApiError } from '../../services/api'
 
-const router = useRouter()
+/**
+ * Activation = premier reset de mot de passe par e-mail.
+ * Utilise les mêmes endpoints publics que « mot de passe oublié » :
+ *   POST /auth/password/reset-request  → code à 6 chiffres par e-mail (15 min)
+ *   POST /auth/password/reset-confirm  → définit le mot de passe, révoque les sessions
+ */
 const step = ref(1)
-const steps = ['Profil', 'Mot de passe', 'MFA', 'Conditions']
-const profile = ref({ prenom: 'Kofi', nom: 'ABALO', poste: 'Agent instructeur', tel: '+228 90 00 00 00', structure: 'OTR Douanes' })
+const email = ref('')
+const sent = ref(false)
+const loading = ref(false)
+const code = ref('')
 const newPwd = ref('')
 const confirmPwd = ref('')
 const showPwd = ref(false)
-const mfaMethod = ref('sms')
-const accepted = ref(false)
-const loading = ref(false)
-const strengthColors = ['#C62828', '#E65100', '#0277BD', '#1B8F4C']
+const erreur = ref('')
+const messageSucces = ref('')
 
-const strength = computed(() => {
-  let s = 0
-  if (newPwd.value.length >= 12) s++
-  if (/[A-Z]/.test(newPwd.value)) s++
-  if (/[0-9]/.test(newPwd.value)) s++
-  if (/[^a-zA-Z0-9]/.test(newPwd.value)) s++
-  return s
-})
+// Règles strictement identiques au DTO backend (min 10 + maj + chiffre + spécial)
+const criteria = computed(() => [
+  { label: 'Au moins 10 caractères', met: newPwd.value.length >= 10 },
+  { label: 'Au moins une majuscule', met: /[A-Z]/.test(newPwd.value) },
+  { label: 'Au moins un chiffre', met: /[0-9]/.test(newPwd.value) },
+  { label: 'Caractère spécial (!@#$…)', met: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(newPwd.value) },
+])
 
-const activate = () => {
+const strength = computed(() => criteria.value.filter(c => c.met).length)
+const strengthColor = computed(() => ['', 'error', 'warning', 'info', 'success'][strength.value])
+const formValide = computed(() =>
+  /^\d{6}$/.test(code.value) &&
+  criteria.value.every(c => c.met) &&
+  confirmPwd.value === newPwd.value,
+)
+
+const sendCode = async () => {
   loading.value = true
-  setTimeout(() => router.push('/portail/dashboard'), 1000)
+  erreur.value = ''
+  try {
+    const res = await api<{ data: { message: string } }>('/auth/password/reset-request', {
+      method: 'POST',
+      body: JSON.stringify({ email: email.value.trim() }),
+    })
+    messageSucces.value = res.data.message
+    sent.value = true
+  } catch (e) {
+    erreur.value = e instanceof ApiError ? e.message : 'Erreur réseau — réessayez.'
+  } finally {
+    loading.value = false
+  }
+}
+
+const activate = async () => {
+  if (!formValide.value) return
+  loading.value = true
+  erreur.value = ''
+  try {
+    await api('/auth/password/reset-confirm', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: email.value.trim(),
+        code: code.value,
+        newPassword: newPwd.value,
+        newPasswordConfirm: confirmPwd.value,
+      }),
+    })
+    step.value = 3
+  } catch (e) {
+    erreur.value = e instanceof ApiError ? e.message : 'Erreur réseau — réessayez.'
+  } finally {
+    loading.value = false
+  }
 }
 </script>
