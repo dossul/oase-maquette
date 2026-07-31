@@ -37,9 +37,18 @@
           prepend-inner-icon="mdi-lock"
           :append-inner-icon="showPass ? 'mdi-eye-off' : 'mdi-eye'"
           @click:append-inner="showPass = !showPass"
+          @keydown="onPwdKeydown"
           :rules="[v => !!v || 'Champ requis']"
           class="mb-2"
         />
+
+        <!-- Avertissements anti-échec de saisie (recette 31/07) -->
+        <v-alert v-if="capsLockOn" type="warning" variant="tonal" rounded="lg" class="mb-3" density="compact">
+          Verr Maj semble activé — le mot de passe est sensible à la casse.
+        </v-alert>
+        <v-alert v-if="password !== password.trim()" type="warning" variant="tonal" rounded="lg" class="mb-3" density="compact">
+          Le mot de passe contient des espaces invisibles en début ou en fin (copier-coller ?). Ils seront ignorés à l'envoi.
+        </v-alert>
 
         <div class="d-flex justify-space-between mb-4">
           <v-btn variant="text" size="small" color="primary" to="/reset-password">Mot de passe oublié ?</v-btn>
@@ -117,6 +126,14 @@ const locked = ref(false)
 const lockTimer = ref(60)
 const attempts = ref(0)
 const lang = ref('fr')
+const capsLockOn = ref(false)
+
+/** Détection Verr Maj pendant la saisie du mot de passe (échec classique en démo). */
+function onPwdKeydown(e: KeyboardEvent) {
+  if (typeof e.getModifierState === 'function') {
+    capsLockOn.value = e.getModifierState('CapsLock')
+  }
+}
 
 let lockInterval: ReturnType<typeof setInterval> | undefined
 
@@ -136,6 +153,52 @@ function verrouillerLocalement() {
   }, 1000)
 }
 
+interface LoginResponse {
+  access_token?: string; refresh_token?: string
+  mfa_required?: boolean; mfa_token?: string; canal?: string
+  user?: any
+}
+
+/** Appel login. Retourne null sur 401 (identifiants rejetés), propage les autres erreurs. */
+async function postLogin(pwd: string): Promise<LoginResponse | null> {
+  try {
+    return await api<LoginResponse>('/auth/login', {
+      method: 'POST',
+      // [Recette 31/07] email trimmé : un copier-coller d'identifiant avec espaces
+      // autour provoquait un 401 « identifiants incorrects » trompeur en démo.
+      body: JSON.stringify({ email: email.value.trim(), password: pwd }),
+    })
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) return null
+    throw e
+  }
+}
+
+/** Traite une réponse de login réussie (MFA ou session directe). */
+function handleSuccess(res: LoginResponse) {
+  attempts.value = 0
+
+  // OASE [BUG #11] fix : le backend renvoie { mfa_required, mfa_token, canal } SANS
+  // champ user — l'ancienne condition (res.mfa_required && res.user) n'était jamais
+  // vraie et l'utilisateur MFA recevait « identifiants incorrects ». On stocke le
+  // mfa_token temporaire pour la page /mfa (pas de session tant que le code n'est
+  // pas vérifié).
+  if (res.mfa_required && res.mfa_token) {
+    sessionStorage.setItem('oase_mfa_token', res.mfa_token)
+    sessionStorage.setItem('oase_mfa_canal', res.canal ?? 'totp')
+    return router.push('/mfa')
+  }
+
+  if (res.access_token && res.user) {
+    auth.setSession(res.access_token, res.user)
+    // OASE [BUG #2] fix : on redirige vers le dashboard par défaut du rôle
+    // de l'utilisateur (ex: admin → /admin/utilisateurs, agent_otr → /backoffice/dashboard).
+    // Auparavant, on pushait '/' qui redirigeait inconditionnellement vers /login → cercle vicieux.
+    const target = getDefaultRouteForRole(res.user.role)
+    return router.push(target)
+  }
+}
+
 const handleLogin = async () => {
   const { valid } = await formRef.value.validate()
   if (!valid) return
@@ -146,53 +209,35 @@ const handleLogin = async () => {
   validationError.value = ''
 
   try {
-    const res = await api<{ access_token?: string; refresh_token?: string; mfa_required?: boolean; mfa_token?: string; canal?: string; user?: any }>('/auth/login', {
-      method: 'POST',
-      // [Recette 31/07] email trimmé : un copier-coller d'identifiant avec espaces
-      // autour provoquait un 401 « identifiants incorrects » trompeur en démo.
-      // Le mot de passe n'est PAS trimmé (un espace peut y être intentionnel).
-      body: JSON.stringify({ email: email.value.trim(), password: password.value }),
-    })
+    const res = await postLogin(password.value)
 
-    // Succès : le compteur de tentatives repart à zéro
-    attempts.value = 0
-
-    // OASE [BUG #11] fix : le backend renvoie { mfa_required, mfa_token, canal } SANS
-    // champ user — l'ancienne condition (res.mfa_required && res.user) n'était jamais
-    // vraie et l'utilisateur MFA recevait « identifiants incorrects ». On stocke le
-    // mfa_token temporaire pour la page /mfa (pas de session tant que le code n'est
-    // pas vérifié).
-    if (res.mfa_required && res.mfa_token) {
-      sessionStorage.setItem('oase_mfa_token', res.mfa_token)
-      sessionStorage.setItem('oase_mfa_canal', res.canal ?? 'totp')
-      return router.push('/mfa')
+    // [Recette 31/07] 401 alors que le mot de passe affiché semblait correct :
+    // un espace invisible de copier-coller en début/fin le modifiait. Si le
+    // premier essai échoue avec des espaces en bord, on retente une fois avec
+    // la version trimmée AVANT de compter l'échec (l'avertissement visuel
+    // ci-dessus informe l'utilisateur que les espaces seront ignorés).
+    if (res === null && password.value !== password.value.trim()) {
+      const retried = await postLogin(password.value.trim())
+      if (retried !== null) return handleSuccess(retried)
     }
 
-    if (res.access_token && res.user) {
-      auth.setSession(res.access_token, res.user)
-      // OASE [BUG #2] fix : on redirige vers le dashboard par défaut du rôle
-      // de l'utilisateur (ex: admin → /admin/utilisateurs, agent_otr → /backoffice/dashboard).
-      // Auparavant, on pushait '/' qui redirigeait inconditionnellement vers /login → cercle vicieux.
-      const target = getDefaultRouteForRole(res.user.role)
-      return router.push(target)
-    }
+    if (res !== null) return handleSuccess(res)
 
+    // 401 (après l'éventuel retry trim) : SEUL cas qui incrémente le compteur
+    attempts.value++
     loginError.value = true
+    if (attempts.value >= 5) {
+      loginError.value = false
+      verrouillerLocalement()
+    }
   } catch (e) {
     // [Recette 29/07] Distinction honnête des causes d'échec :
-    // - 401 = identifiants rejetés → SEUL cas qui incrémente le compteur de tentatives
+    // - 401 = identifiants rejetés → géré ci-dessus via postLogin (retour null)
     // - 400 = validation (format) → message métier, pas de « mot de passe incorrect »
     // - réseau / 5xx = erreur technique → message dédié, compteur inchangé
     // (avant ce fix, une coupure serveur pendant un redéploiement affichait
     // « Identifiant ou mot de passe incorrect. Tentative X/5 » à tort).
-    if (e instanceof ApiError && e.status === 401) {
-      attempts.value++
-      loginError.value = true
-      if (attempts.value >= 5) {
-        loginError.value = false
-        verrouillerLocalement()
-      }
-    } else if (e instanceof ApiError && e.status === 400) {
+    if (e instanceof ApiError && e.status === 400) {
       validationError.value = e.message || 'Requête invalide — vérifiez les champs saisis.'
     } else {
       serverError.value = true

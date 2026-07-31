@@ -54,4 +54,22 @@ test.describe('Auth — formulaire de connexion UI (vraie soumission)', () => {
     await expect(page).toHaveURL(/\/portail\/dashboard/, { timeout: 20000 })
     await expect(page.getByText('Identifiant ou mot de passe incorrect')).not.toBeVisible()
   })
+
+  test('TC-AUTH-UI-04 — mot de passe avec espace invisible à la fin : retry trim → login accepté + avertissement visible', async ({ page }) => {
+    // [Recette 31/07] reproduction exacte de l'échec de démo : le champ affichait
+    // « Oase@2026! » mais contenait un espace invisible → 401. Désormais :
+    // avertissement visuel pendant la saisie + retry transparent avec trim.
+    await page.goto('/login')
+    await page.getByLabel(/Identifiant/).fill(CONTRIBUABLE)
+    await page.getByLabel('Mot de passe', { exact: true }).fill(`${BON_MDP} `)
+
+    // Avertissement visible AVANT soumission
+    await expect(page.getByText(/espaces invisibles en début ou en fin/)).toBeVisible()
+
+    await page.getByRole('button', { name: 'Se connecter' }).click()
+
+    // Le retry trim transparent connecte sans compter d'échec
+    await expect(page).toHaveURL(/\/portail\/dashboard/, { timeout: 20000 })
+    await expect(page.getByText('Identifiant ou mot de passe incorrect')).not.toBeVisible()
+  })
 })
