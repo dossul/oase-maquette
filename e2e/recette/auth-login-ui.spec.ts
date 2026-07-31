@@ -42,4 +42,16 @@ test.describe('Auth — formulaire de connexion UI (vraie soumission)', () => {
     const erreursJs = consoleErrors.filter((e) => !e.includes('favicon') && !e.includes('Failed to load resource'))
     expect(erreursJs, 'erreurs JS après login UI').toEqual([])
   })
+
+  test('TC-AUTH-UI-03 — email avec espaces (copier-coller) : login accepté grâce au trim', async ({ page }) => {
+    // [Recette 31/07] échec 401 constaté en démonstration publique : saisie d'identifiant
+    // entourée d'espaces. Le frontend trimme désormais l'email avant l'envoi.
+    await page.goto('/login')
+    await page.getByLabel(/Identifiant/).fill(`  ${CONTRIBUABLE}  `)
+    await page.getByLabel('Mot de passe', { exact: true }).fill(BON_MDP)
+    await page.getByRole('button', { name: 'Se connecter' }).click()
+
+    await expect(page).toHaveURL(/\/portail\/dashboard/, { timeout: 20000 })
+    await expect(page.getByText('Identifiant ou mot de passe incorrect')).not.toBeVisible()
+  })
 })

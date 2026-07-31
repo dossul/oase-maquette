@@ -148,7 +148,10 @@ const handleLogin = async () => {
   try {
     const res = await api<{ access_token?: string; refresh_token?: string; mfa_required?: boolean; mfa_token?: string; canal?: string; user?: any }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email: email.value, password: password.value }),
+      // [Recette 31/07] email trimmé : un copier-coller d'identifiant avec espaces
+      // autour provoquait un 401 « identifiants incorrects » trompeur en démo.
+      // Le mot de passe n'est PAS trimmé (un espace peut y être intentionnel).
+      body: JSON.stringify({ email: email.value.trim(), password: password.value }),
     })
 
     // Succès : le compteur de tentatives repart à zéro
